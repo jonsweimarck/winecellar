@@ -157,9 +157,12 @@ Samma kända fällor gäller (se `CLAUDE.md`): HikariCPs poolstorlek måste
 sänkas, tillägget måste länkas om appen skapas om.
 
 **Deployen är verifierad fungerande (2026-07-12):** riktig Postgres,
-GitHub-länkad autodeploy, `spring-boot:run` via `clevercloud/maven.json`.
-Appens URL är medvetet inte listad här - ingen autentisering finns än (se
-Nästa steg), och det här repot är delat.
+GitHub-länkad autodeploy, `spring-boot:run` via `clevercloud/maven.json`,
+HTTP Basic-autentisering med ett riktigt lösenord satt via
+`WINECELLAR_ADMIN_PASSWORD` i Clever Cloud-konsolen (verifierat att
+standardlösenordet `admin`/`admin` **inte** längre fungerar, se
+CLAUDE.md:s "Säkerhet"). Appens URL är medvetet inte listad här - det här
+repot är delat.
 
 ## Nästa steg
 

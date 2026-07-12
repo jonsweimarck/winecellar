@@ -86,9 +86,13 @@ flaggade som gällande.
 - CSRF är avstängt globalt, av samma skäl som roombooking: htmx-formulären
   skickar ingen CSRF-token, och autentiseringen är stateless Basic-auth per
   anrop - inte en inloggad session som CSRF-skyddet är till för.
-- **Kom ihåg att sätta `WINECELLAR_ADMIN_PASSWORD` i Clever Cloud-konsolen**
-  efter en deploy av detta - annars skyddas produktionsappen bara av
-  standardlösenordet `admin`/`admin`.
+- **`WINECELLAR_ADMIN_PASSWORD` är satt i Clever Cloud-konsolen och
+  verifierad (2026-07-12)**: standardlösenordet `admin`/`admin` ger 401 mot
+  produktionsappen, ett riktigt lösenord ger 200. Värt att komma ihåg om
+  appen någonsin skapas om i konsolen (ny app = ny uppsättning
+  miljövariabler, måste sättas på nytt) - och att Clever Cloud läser
+  miljövariabler vid processstart, så en sparad variabel kräver en
+  omstart/redeploy av appen för att slå igenom, inte bara att den sparas.
 
 ## Excel-import
 
