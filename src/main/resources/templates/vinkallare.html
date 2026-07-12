@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Vinkällaren</title>
+    <script src="https://unpkg.com/htmx.org@2.0.2"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 48rem; margin: 3rem auto; }
+        label { display: block; margin-top: 0.75rem; }
+        input, select { width: 100%; padding: 0.4rem; box-sizing: border-box; }
+        button { padding: 0.4rem 0.8rem; }
+        form.tillägg button { margin-top: 1rem; padding: 0.6rem 1rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 2rem; }
+        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; }
+        .antal-form { display: flex; gap: 0.5rem; align-items: center; }
+        .antal-form input { width: 4rem; }
+    </style>
+</head>
+<body>
+    <h1>Vinkällaren</h1>
+
+    <form class="tillägg" hx-post="/wines" hx-target="#vinlista" hx-swap="outerHTML">
+        <label>Namn
+            <input type="text" name="name" required>
+        </label>
+        <label>Typ
+            <select name="wineType">
+                <option value="RED">Rött</option>
+                <option value="WHITE">Vitt</option>
+                <option value="ROSE">Rosé</option>
+                <option value="SPARKLING">Mousserande</option>
+                <option value="FORTIFIED">Starkvin</option>
+            </select>
+        </label>
+        <label>Producent
+            <input type="text" name="producer" required>
+        </label>
+        <label>Land
+            <input type="text" name="country" required>
+        </label>
+        <label>Årgång
+            <input type="number" name="vintage" required>
+        </label>
+        <label>Antal flaskor
+            <input type="number" name="quantity" min="0" required>
+        </label>
+        <label>Plats
+            <input type="text" name="location" required>
+        </label>
+        <button type="submit">Lägg till vin</button>
+    </form>
+
+    <div id="vinlista" th:fragment="lista">
+        <table>
+            <thead>
+                <tr>
+                    <th>Namn</th>
+                    <th>Typ</th>
+                    <th>Producent</th>
+                    <th>Land</th>
+                    <th>Årgång</th>
+                    <th>Flaskor</th>
+                    <th>Plats</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="vin : ${viner}">
+                    <td th:text="${vin.name}"></td>
+                    <td th:switch="${vin.wineType.name()}">
+                        <span th:case="'RED'">Rött</span>
+                        <span th:case="'WHITE'">Vitt</span>
+                        <span th:case="'ROSE'">Rosé</span>
+                        <span th:case="'SPARKLING'">Mousserande</span>
+                        <span th:case="'FORTIFIED'">Starkvin</span>
+                    </td>
+                    <td th:text="${vin.producer}"></td>
+                    <td th:text="${vin.country}"></td>
+                    <td th:text="${vin.vintage}"></td>
+                    <td>
+                        <form class="antal-form"
+                              th:attr="hx-post=@{/wines/{id}/antal(id=${vin.id.value})}"
+                              hx-target="#vinlista" hx-swap="outerHTML">
+                            <input type="number" name="quantity" min="0" th:value="${vin.quantity}">
+                            <button type="submit">Uppdatera</button>
+                        </form>
+                    </td>
+                    <td th:text="${vin.location}"></td>
+                    <td>
+                        <button type="button"
+                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                                hx-target="#vinlista" hx-swap="outerHTML">
+                            Ta bort
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

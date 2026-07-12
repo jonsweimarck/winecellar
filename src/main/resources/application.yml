@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: winecellar
+  thymeleaf:
+    cache: false
+  datasource:
+    # POSTGRESQL_ADDON_* sätts automatiskt av Clever Cloud när Postgres-tillägget
+    # länkas till appen. Utan dem (lokalt, docker-compose) gäller samma värden
+    # som docker-compose.yml.
+    url: jdbc:postgresql://${POSTGRESQL_ADDON_HOST:localhost}:${POSTGRESQL_ADDON_PORT:5432}/${POSTGRESQL_ADDON_DB:winecellar}
+    username: ${POSTGRESQL_ADDON_USER:winecellar}
+    password: ${POSTGRESQL_ADDON_PASSWORD:winecellar}
+    hikari:
+      # Clever Clouds DEV-nivå av Postgres har ett lågt anslutningstak, se
+      # CLAUDE.md - samma fälla som roombooking redan stötte på.
+      maximum-pool-size: 3
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+server:
+  port: 8080

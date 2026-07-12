@@ -1,0 +1,76 @@
+package com.example.winecellar.acceptance;
+
+import com.example.winecellar.application.WineService;
+import com.example.winecellar.domain.Wine;
+import com.example.winecellar.domain.WineType;
+import com.example.winecellar.infrastructure.InMemoryWineRepository;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.java.Before;
+import io.cucumber.java.sv.Givet;
+import io.cucumber.java.sv.Och;
+import io.cucumber.java.sv.När;
+import io.cucumber.java.sv.Så;
+
+import java.util.Locale;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class LaggTillVinSteps {
+
+    private static final Map<String, WineType> VINTYPER = Map.of(
+            "rött", WineType.RED,
+            "vitt", WineType.WHITE,
+            "rosé", WineType.ROSE,
+            "mousserande", WineType.SPARKLING,
+            "starkvin", WineType.FORTIFIED
+    );
+
+    private WineService wineService;
+
+    @Before
+    public void setUp() {
+        wineService = new WineService(new InMemoryWineRepository());
+    }
+
+    @Givet("att källaren är tom")
+    public void attKällarenÄrTom() {
+        assertThat(wineService.listWines()).isEmpty();
+    }
+
+    @När("jag lägger till ett vin med följande uppgifter:")
+    public void jagLäggerTillEttVinMedFöljandeUppgifter(DataTable dataTable) {
+        Map<String, String> uppgifter = dataTable.asMap(String.class, String.class);
+        Wine nyttVin = new Wine(
+                null,
+                uppgifter.get("namn"),
+                vinTypFrån(uppgifter.get("typ")),
+                uppgifter.get("producent"),
+                uppgifter.get("land"),
+                Integer.parseInt(uppgifter.get("årgång")),
+                Integer.parseInt(uppgifter.get("flaskor")),
+                uppgifter.get("plats")
+        );
+        wineService.save(nyttVin);
+    }
+
+    @Så("ska källaren innehålla {int} vin")
+    public void skaKällarenInnehålla(int antal) {
+        assertThat(wineService.listWines()).hasSize(antal);
+    }
+
+    @Och("vinet {string} ska visas med {int} flaskor i {string}")
+    public void vinetSkaVisasMedFlaskorI(String namn, int flaskor, String plats) {
+        Wine vin = Stegstöd.hittaVin(wineService, namn);
+        assertThat(vin.quantity()).isEqualTo(flaskor);
+        assertThat(vin.location()).isEqualTo(plats);
+    }
+
+    private WineType vinTypFrån(String svenskTyp) {
+        WineType typ = VINTYPER.get(svenskTyp.toLowerCase(Locale.of("sv", "SE")));
+        if (typ == null) {
+            throw new IllegalArgumentException("Okänd vintyp i specifikationen: " + svenskTyp);
+        }
+        return typ;
+    }
+}
