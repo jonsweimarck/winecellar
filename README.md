@@ -156,6 +156,11 @@ GitHub-länkad autodeploy, `clevercloud/maven.json` för att peka ut
 Samma kända fällor gäller (se `CLAUDE.md`): HikariCPs poolstorlek måste
 sänkas, tillägget måste länkas om appen skapas om.
 
+**Deployen är verifierad fungerande (2026-07-12):** riktig Postgres,
+GitHub-länkad autodeploy, `spring-boot:run` via `clevercloud/maven.json`.
+Appens URL är medvetet inte listad här - ingen autentisering finns än (se
+Nästa steg), och det här repot är delat.
+
 ## Nästa steg
 
 - [x] Skriva de första Gherkin-scenarierna tillsammans (lägg till vin, lista
@@ -170,4 +175,5 @@ sänkas, tillägget måste länkas om appen skapas om.
 - [ ] Excel-importskript (`tools/import-excel/`)
 - [ ] Autentisering - inte beslutat än. Personlig app för en användare;
       avgör om det behövs alls innan något byggs
-- [ ] Deploy till Clever Cloud
+- [x] Deploy till Clever Cloud (se "Deploy" ovan) - appen GitHub-länkad,
+      verifierad fungerande mot en riktig Postgres
