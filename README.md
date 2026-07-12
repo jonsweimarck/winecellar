@@ -173,7 +173,8 @@ Nästa steg), och det här repot är delat.
       `vinkallare.html` är en enkel, icke-responsiv tabell
 - [ ] Bilduppladdning och -visning (`bytea` + `image_mime_type`)
 - [ ] Excel-importskript (`tools/import-excel/`)
-- [ ] Autentisering - inte beslutat än. Personlig app för en användare;
-      avgör om det behövs alls innan något byggs
+- [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
+      inte bara en admin-del, eftersom det inte finns någon publik läsvy
+      här och appen redan var nåbar från nätet
 - [x] Deploy till Clever Cloud (se "Deploy" ovan) - appen GitHub-länkad,
       verifierad fungerande mot en riktig Postgres

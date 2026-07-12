@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -17,8 +18,11 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -27,10 +31,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Testar bara webblagret: WineService är stubbad, så det som verifieras är
- * den faktiskt renderade HTML:en (formulärfält, htmx-attribut, listfragmentet) -
- * inte affärslogiken, som redan täcks av acceptanstesterna i features/.
+ * den faktiskt renderade HTML:en (formulärfält, htmx-attribut, listfragmentet)
+ * och åtkomstskyddet - inte affärslogiken, som redan täcks av
+ * acceptanstesterna i features/.
  */
 @WebMvcTest(WineController.class)
+@Import(SecurityConfig.class)
 class WineControllerTest {
 
     @Autowired
@@ -43,6 +49,43 @@ class WineControllerTest {
             new Wine(new WineId(1L), "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1");
 
     @Nested
+    @DisplayName("utan inloggning")
+    class UtanInloggning {
+
+        @Test
+        @DisplayName("ska GET / nekas")
+        void skaGetNekas() throws Exception {
+            mockMvc.perform(get("/"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("ska POST /wines nekas och aldrig nå WineService")
+        void skaPostWinesNekas() throws Exception {
+            mockMvc.perform(post("/wines")
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().isUnauthorized());
+
+            verify(wineService, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("ska DELETE nekas")
+        void skaDeleteNekas() throws Exception {
+            mockMvc.perform(delete("/wines/1"))
+                    .andExpect(status().isUnauthorized());
+
+            verify(wineService, never()).removeWine(new WineId(1L));
+        }
+    }
+
+    @Nested
     @DisplayName("startsidan")
     class Startsidan {
 
@@ -51,7 +94,7 @@ class WineControllerTest {
         void skaVisaFormulärfältOchListaBefintligaViner() throws Exception {
             when(wineService.listWines()).thenReturn(List.of(BAROLO));
 
-            mockMvc.perform(get("/"))
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("hx-post=\"/wines\""),
@@ -77,6 +120,7 @@ class WineControllerTest {
             when(wineService.listWines()).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(post("/wines")
+                            .with(httpBasic("admin", "admin"))
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -101,7 +145,9 @@ class WineControllerTest {
             when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
             when(wineService.listWines()).thenReturn(List.of(BAROLO.withQuantity(2)));
 
-            mockMvc.perform(post("/wines/1/antal").param("quantity", "2"))
+            mockMvc.perform(post("/wines/1/antal")
+                            .with(httpBasic("admin", "admin"))
+                            .param("quantity", "2"))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("Barolo")));
 
@@ -118,7 +164,7 @@ class WineControllerTest {
         void skaIdSkickasTillService() throws Exception {
             when(wineService.listWines()).thenReturn(List.of());
 
-            mockMvc.perform(delete("/wines/1"))
+            mockMvc.perform(delete("/wines/1").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk());
 
             verify(wineService).removeWine(new WineId(1L));

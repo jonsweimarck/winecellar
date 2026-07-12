@@ -73,6 +73,23 @@ flaggade som gällande.
   användas som `Content-Type`-header när bilden serveras tillbaka -
   annars visar webbläsaren inte bilden trots att bytes finns i databasen.
 
+## Säkerhet
+
+- **Hela appen kräver HTTP Basic-inloggning** via `SecurityConfig`
+  (`.anyRequest().authenticated()`) - till skillnad från roombooking (som
+  bara skyddade `/admin/**`) finns här inget legitimt anonymt
+  användningsfall. Appen har ingen separat publik läsvy, så varje route
+  låter en besökare ändra vinsamlingen - och appen var redan nåbar från
+  nätet innan detta beslut togs. Ett enda konto, lösenord från
+  `winecellar.admin.password`/miljövariabeln `WINECELLAR_ADMIN_PASSWORD`
+  (default `admin` bara lokalt).
+- CSRF är avstängt globalt, av samma skäl som roombooking: htmx-formulären
+  skickar ingen CSRF-token, och autentiseringen är stateless Basic-auth per
+  anrop - inte en inloggad session som CSRF-skyddet är till för.
+- **Kom ihåg att sätta `WINECELLAR_ADMIN_PASSWORD` i Clever Cloud-konsolen**
+  efter en deploy av detta - annars skyddas produktionsappen bara av
+  standardlösenordet `admin`/`admin`.
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),
@@ -97,10 +114,12 @@ som inte packas med i `spring-boot:run`.
   `cucumber-spring`/Testcontainers-Postgres förrän ett persistensscenario
   faktiskt skrivs, annars tvingas rena CRUD-scenarier boota en full
   Spring-kontext (och kräva en databas) helt i onödan.
-- Om autentisering läggs till senare: `@WebMvcTest`-slice-tester ser inte
-  en `SecurityConfig`-böna automatiskt, `@Import(SecurityConfig.class)`
-  krävs annars svarar Spring Boots slumpgenererade standardlösenord med 401
-  på redan gröna tester.
+- **`@WebMvcTest`-slice-tester ser inte `SecurityConfig` automatiskt.**
+  Utan `@Import(SecurityConfig.class)` slår Spring Boots egen
+  standardsäkerhet in istället - den kräver autentisering på *allt* bakom
+  ett slumpat genererat lösenord - och redan gröna kontrollertester börjar
+  plötsligt få 401. Se `WineControllerTest` för mönstret; gäller varje ny
+  `@WebMvcTest`-klass.
 
 ## Nästa steg
 
