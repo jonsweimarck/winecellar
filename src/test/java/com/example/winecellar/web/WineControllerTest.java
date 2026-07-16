@@ -12,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -36,9 +37,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * den faktiskt renderade HTML:en (formulärfält, htmx-attribut, listfragmentet)
  * och åtkomstskyddet - inte affärslogiken, som redan täcks av
  * acceptanstesterna i features/.
+ *
+ * @TestPropertySource pinnar admin-lösenordet till "admin" oavsett vad som
+ * faktiskt är satt i miljön testet körs i. Utan detta läcker Clever Clouds
+ * WINECELLAR_ADMIN_PASSWORD (satt för produktionsappen) in i byggsteget och
+ * skriver över application.ymls lokala default - alla httpBasic("admin",
+ * "admin")-anrop nedan börjar då få 401 mot det riktiga produktionslösenordet,
+ * vilket kraschade en hel deploy (se git-historiken/CLAUDE.md).
  */
 @WebMvcTest(WineController.class)
 @Import(SecurityConfig.class)
+@TestPropertySource(properties = "winecellar.admin.password=admin")
 class WineControllerTest {
 
     @Autowired

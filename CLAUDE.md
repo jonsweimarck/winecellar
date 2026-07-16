@@ -138,6 +138,17 @@ som inte packas med i `spring-boot:run`.
   testet om nätverket är begränsat vid det tillfället. Kör installationen
   utan att begränsa till en enskild motor (se README:s "UI-test, utökat med
   Playwright") så slipper man den överraskningen.
+- **Clever Cloud injicerar apparens miljövariabler även i byggsteget, inte
+  bara vid körning.** `WINECELLAR_ADMIN_PASSWORD` (det riktiga
+  produktionslösenordet) fanns alltså tillgängligt när `mvn test` kördes
+  under bygget, och `@Value("${winecellar.admin.password}")` plockade upp
+  det istället för `application.yml`s lokala default `admin` - varje
+  `WebMvcTest` som hårdkodar `httpBasic("admin", "admin")` fick då 401 och
+  hela bygget/deployen kraschade (verifierat 2026-07-16, se git-historiken).
+  Fixat med `@TestPropertySource(properties =
+  "winecellar.admin.password=admin")` på `WineControllerTest` - pinnar
+  testlösenordet oavsett vad miljön runt omkring råkar ha satt. Gäller varje
+  ny `@WebMvcTest`-klass som autentiserar med hårdkodade testuppgifter.
 
 ## Nästa steg
 
