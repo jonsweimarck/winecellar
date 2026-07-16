@@ -67,11 +67,17 @@ flaggade som gällande.
   blir aktuellt senare är det en ny, separat tabell (`wine_consumptions`
   eller liknande), inte en ombyggnad av `wines`.
 - **Bilder lagras som `bytea` + `image_mime_type` direkt i `wines`-tabellen**,
-  inte i extern objektlagring (se README för avvägningen). Viktig detalj
-  att inte glömma vid implementation: `image_mime_type` måste sättas från
-  `MultipartFile.getContentType()` vid uppladdning, och samma värde
-  användas som `Content-Type`-header när bilden serveras tillbaka -
+  inte i extern objektlagring (se README för avvägningen).
+  **Status: byggt** (`POST`/`GET /wines/{id}/bild`, se README:s
+  Datamodell-avsnitt) och verifierat lokalt end-to-end (uppladdad och
+  hämtad bild har identiska bytes, `Content-Type` stämmer). Viktig detalj
+  som höll på att glömmas vid implementationen: `image_mime_type` måste
+  sättas från `MultipartFile.getContentType()` vid uppladdning, och samma
+  värde användas som `Content-Type`-header när bilden serveras tillbaka -
   annars visar webbläsaren inte bilden trots att bytes finns i databasen.
+  Vinlistan bäddar aldrig in bilddata i själva HTML-fragmentet - `<img>`
+  pekar mot `GET`-routen, så listrenderingen förblir lätt även när viner
+  har bilder.
 
 ## Säkerhet
 

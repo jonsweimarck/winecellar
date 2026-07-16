@@ -61,12 +61,13 @@ Tabell `wines` (engelska namn, plural, genomgående):
 | location | `text` | Fritext (Låda 1, Öppen, etc.) - inte enum, växer troligen över tid |
 | created_at, updated_at | `timestamptz` | |
 
-**Nuvarande implementationsstatus:** endast `id`, `name`, `wine_type`,
-`producer`, `country`, `vintage`, `quantity` och `location` finns i den
-körande databasen (`WineEntity`) - de täcker de CRUD-scenarier som är
-skrivna hittills. Resten av tabellen ovan är målschemat, inte redan byggt;
-kolumner läggs till i takt med att nya Gherkin-scenarier kräver dem (betyg,
-bilder, Systembolaget-fält, etc.), inte i en enda stor migrering.
+**Nuvarande implementationsstatus:** `id`, `name`, `wine_type`, `producer`,
+`country`, `vintage`, `quantity`, `location`, `image` och `image_mime_type`
+finns i den körande databasen (`WineEntity`) - de täcker de CRUD- och
+bildscenarier som är skrivna hittills. Resten av tabellen ovan är
+målschemat, inte redan byggt; kolumner läggs till i takt med att nya
+Gherkin-scenarier kräver dem (betyg, Systembolaget-fält, etc.), inte i en
+enda stor migrering.
 
 **Namngivningsprincip:** engelska för kolumner/tabeller, men svenska
 egennamn som faktiskt syftar på svenska institutioner
@@ -84,6 +85,18 @@ här storleksordningen (se diskussion i chatten) - en datakälla, enklare
 backup, ingen extra molntjänst. Om samlingen och bildmängden växer kraftigt
 är det en isolerad migrering senare (flytta bara bilddatan), inte något vi
 bygger beredskap för nu.
+
+**Uppladdning och visning (byggt):** `POST /wines/{id}/bild` tar emot en
+`multipart/form-data`-uppladdning (fältnamn `bild`), sätter `image` och
+`image_mime_type` från `MultipartFile` och sparar via `WineService.save`.
+`GET /wines/{id}/bild` serverar bytes tillbaka med `Content-Type` satt från
+`image_mime_type` (404 om vinet saknar bild). `vinkallare.html` visar en
+`<img>`-tagg mot den GET-routen när `vin.harBild()` är sant, annars en
+textplatshållare - bilddatan skickas alltså aldrig inbäddad i själva
+listfragmentet, bara via webbläsarens egna bildförfrågningar.
+`spring.servlet.multipart.max-file-size`/`max-request-size` är satta till
+5 MB i `application.yml` som en enkel gräns mot orimligt stora
+uppladdningar.
 
 ## Arbetsprocess
 
@@ -178,7 +191,8 @@ repot är delat.
 - [x] Responsiv table/card-mall + `WineListResponsiveIT` - `vinkallare.html`
       växlar mellan tabellvy och kortvy vid 640px, verifierat med Playwright
       i två viewport-bredder
-- [ ] Bilduppladdning och -visning (`bytea` + `image_mime_type`)
+- [x] Bilduppladdning och -visning (`bytea` + `image_mime_type`) -
+      `POST`/`GET /wines/{id}/bild`, se Datamodell ovan
 - [ ] Excel-importskript (`tools/import-excel/`)
 - [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
       inte bara en admin-del, eftersom det inte finns någon publik läsvy

@@ -53,7 +53,9 @@ public class JpaWineRepository implements WineRepository {
                 wine.country(),
                 wine.vintage(),
                 wine.quantity(),
-                wine.location());
+                wine.location(),
+                wine.image(),
+                wine.imageMimeType());
     }
 
     private static Wine toDomain(WineEntity entity) {
@@ -65,6 +67,8 @@ public class JpaWineRepository implements WineRepository {
                 entity.getCountry(),
                 entity.getVintage(),
                 entity.getQuantity(),
-                entity.getLocation());
+                entity.getLocation(),
+                entity.getImage(),
+                entity.getImageMimeType());
     }
 }

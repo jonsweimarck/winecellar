@@ -20,7 +20,7 @@ final class Stegstöd {
     }
 
     static Wine vinMedNamnOchAntal(String namn, int antal) {
-        return new Wine(null, namn, WineType.RED, "Okänd producent", "Okänt land", 2020, antal, "Okänd plats");
+        return new Wine(null, namn, WineType.RED, "Okänd producent", "Okänt land", 2020, antal, "Okänd plats", null, null);
     }
 
     static Wine hittaVin(WineService wineService, String namn) {

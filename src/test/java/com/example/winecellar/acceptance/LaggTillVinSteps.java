@@ -49,7 +49,9 @@ public class LaggTillVinSteps {
                 uppgifter.get("land"),
                 Integer.parseInt(uppgifter.get("årgång")),
                 Integer.parseInt(uppgifter.get("flaskor")),
-                uppgifter.get("plats")
+                uppgifter.get("plats"),
+                null,
+                null
         );
         wineService.save(nyttVin);
     }

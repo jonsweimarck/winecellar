@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -25,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -46,7 +48,7 @@ class WineControllerTest {
     private WineService wineService;
 
     private static final Wine BAROLO =
-            new Wine(new WineId(1L), "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1");
+            new Wine(new WineId(1L), "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1", null, null);
 
     @Nested
     @DisplayName("utan inloggning")
@@ -82,6 +84,23 @@ class WineControllerTest {
                     .andExpect(status().isUnauthorized());
 
             verify(wineService, never()).removeWine(new WineId(1L));
+        }
+
+        @Test
+        @DisplayName("ska bilduppladdning nekas")
+        void skaBilduppladdningNekas() throws Exception {
+            mockMvc.perform(multipart("/wines/1/bild")
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3})))
+                    .andExpect(status().isUnauthorized());
+
+            verify(wineService, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("ska bildvisning nekas")
+        void skaBildvisningNekas() throws Exception {
+            mockMvc.perform(get("/wines/1/bild"))
+                    .andExpect(status().isUnauthorized());
         }
     }
 
@@ -131,7 +150,7 @@ class WineControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("Barolo")));
 
-            verify(wineService).save(new Wine(null, "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1"));
+            verify(wineService).save(new Wine(null, "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1", null, null));
         }
     }
 
@@ -168,6 +187,54 @@ class WineControllerTest {
                     .andExpect(status().isOk());
 
             verify(wineService).removeWine(new WineId(1L));
+        }
+    }
+
+    @Nested
+    @DisplayName("när en bild laddas upp")
+    class NärEnBildLaddasUpp {
+
+        @Test
+        @DisplayName("ska bilden och dess MIME-typ skickas till WineService")
+        void skaBildenOchMimeTypenSkickasTillService() throws Exception {
+            byte[] bilddata = new byte[]{1, 2, 3};
+            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+            when(wineService.listWines()).thenReturn(List.of(BAROLO.withImage(bilddata, "image/jpeg")));
+
+            mockMvc.perform(multipart("/wines/1/bild")
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", bilddata))
+                            .with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Barolo")));
+
+            verify(wineService).save(BAROLO.withImage(bilddata, "image/jpeg"));
+        }
+    }
+
+    @Nested
+    @DisplayName("när en bild visas")
+    class NärEnBildVisas {
+
+        @Test
+        @DisplayName("ska bilden serveras med rätt Content-Type")
+        void skaBildenSererasMedRättContentType() throws Exception {
+            byte[] bilddata = new byte[]{1, 2, 3};
+            when(wineService.findById(new WineId(1L)))
+                    .thenReturn(Optional.of(BAROLO.withImage(bilddata, "image/jpeg")));
+
+            mockMvc.perform(get("/wines/1/bild").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType("image/jpeg"))
+                    .andExpect(content().bytes(bilddata));
+        }
+
+        @Test
+        @DisplayName("ska ge 404 om vinet saknar bild")
+        void skaGe404OmVinetSaknarBild() throws Exception {
+            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+
+            mockMvc.perform(get("/wines/1/bild").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isNotFound());
         }
     }
 }

@@ -68,7 +68,7 @@ class WineListResponsiveIT {
 
     @BeforeEach
     void läggTillEttVin() {
-        wineService.save(new Wine(null, "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1"));
+        wineService.save(new Wine(null, "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1", null, null));
     }
 
     @AfterEach

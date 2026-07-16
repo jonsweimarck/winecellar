@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 
 @Entity
@@ -32,10 +33,16 @@ public class WineEntity {
 
     private String location;
 
+    @Lob
+    private byte[] image;
+
+    private String imageMimeType;
+
     protected WineEntity() {
     }
 
-    WineEntity(Long id, String name, WineType wineType, String producer, String country, int vintage, int quantity, String location) {
+    WineEntity(Long id, String name, WineType wineType, String producer, String country, int vintage, int quantity,
+               String location, byte[] image, String imageMimeType) {
         this.id = id;
         this.name = name;
         this.wineType = wineType;
@@ -44,6 +51,8 @@ public class WineEntity {
         this.vintage = vintage;
         this.quantity = quantity;
         this.location = location;
+        this.image = image;
+        this.imageMimeType = imageMimeType;
     }
 
     Long getId() {
@@ -76,5 +85,13 @@ public class WineEntity {
 
     String getLocation() {
         return location;
+    }
+
+    byte[] getImage() {
+        return image;
+    }
+
+    String getImageMimeType() {
+        return imageMimeType;
     }
 }
