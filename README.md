@@ -203,8 +203,14 @@ Verifierat lokalt (2026-07-17) mot en tom docker-compose-databas: 28 av
 30 rader importerade (2 ofullständiga utkastrader korrekt överhoppade),
 alla fält - inklusive betyg, Systembolagets hopklistrade cell och
 prisceller med extra anteckningstext - stämde vid stickprov mot källfilen,
-och appen renderade listan felfritt efteråt. Inte körd mot
-produktionsdatabasen - det är ett medvetet separat, manuellt steg.
+och appen renderade listan felfritt efteråt.
+
+**Körd mot produktionsdatabasen (2026-07-17):** importen kördes lokalt
+(inte från ett CLI på Clever Cloud - appen har inget sådant, se
+CLAUDE.md) mot produktionens `POSTGRESQL_ADDON_*`-uppgifter från Clever
+Cloud-konsolen, och gick igenom utan fel. Verktyget har ingen
+dedupliceringslogik - en upprepad körning mot samma databas skulle skapa
+dubbletter, så det ska inte köras igen mot samma data.
 
 ## Deploy
 
@@ -237,7 +243,8 @@ repot är delat.
       `POST`/`GET /wines/{id}/bild`, se Datamodell ovan
 - [x] Excel-importskript (`tools/import-excel/`) - fristående Maven-modul,
       `Wine` utökad till 23 fält (`Rating`-enum m.m.) för att rymma hela
-      Vinlista.xlsx, verifierat lokalt - se "Import av befintlig Excel-data"
+      Vinlista.xlsx, körd mot produktionsdatabasen - se "Import av
+      befintlig Excel-data"
 - [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
       inte bara en admin-del, eftersom det inte finns någon publik läsvy
       här och appen redan var nåbar från nätet

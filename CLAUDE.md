@@ -139,6 +139,15 @@ Bild-kolumnen (Excels "bild i cell", inbäddad rich data) importeras
 medvetet inte - se README:s "Import av befintlig Excel-data" för
 kommandon och `VinradParser`/`ImportExcel` för implementationen.
 
+**Körd mot produktionsdatabasen (2026-07-17), gick igenom utan fel.**
+Klever Cloud har inget CLI/konsol att köra verktyget *på* - det behövs
+inte heller, det körs lokalt och pratar med Postgres-tillägget över
+nätverket (det är nåbart utifrån, samma anslutning som t.ex. DBeaver/psql
+skulle använda), pekat mot produktionens `POSTGRESQL_ADDON_*`-uppgifter
+från Clever Cloud-konsolen istället för `localhost`. Ingen
+dedupliceringslogik i verktyget - kör inte en gång till mot samma
+databas, det skulle skapa dubbletter.
+
 ## Kända fällor att vara uppmärksam på (ärvda från roombooking, kan återkomma)
 
 - **Gherkin på svenska kräver `# language: sv`** som absolut första rad i
