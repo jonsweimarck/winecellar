@@ -14,6 +14,29 @@
         th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; }
         .antal-form { display: flex; gap: 0.5rem; align-items: center; }
         .antal-form input { width: 4rem; }
+
+        /* Tabell på desktop, kort på mobil - se WineListResponsiveIT som
+           verifierar att bara en av vyerna är synlig åt gången. */
+        .vinlista-kort { display: none; }
+        @media (max-width: 640px) {
+            .vinlista-tabell { display: none; }
+            .vinlista-kort { display: block; }
+        }
+        .vinkort {
+            border: 1px solid #ddd;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .vinkort dl {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.25rem 1rem;
+            margin: 0.5rem 0;
+        }
+        .vinkort dt { font-weight: bold; }
+        .vinkort dd { margin: 0; }
+        .vinkort .vinkort-fot { display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; }
     </style>
 </head>
 <body>
@@ -51,51 +74,90 @@
     </form>
 
     <div id="vinlista" th:fragment="lista">
-        <table>
-            <thead>
-                <tr>
-                    <th>Namn</th>
-                    <th>Typ</th>
-                    <th>Producent</th>
-                    <th>Land</th>
-                    <th>Årgång</th>
-                    <th>Flaskor</th>
-                    <th>Plats</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="vin : ${viner}">
-                    <td th:text="${vin.name}"></td>
-                    <td th:switch="${vin.wineType.name()}">
+        <div id="vinlista-tabell" class="vinlista-tabell">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Namn</th>
+                        <th>Typ</th>
+                        <th>Producent</th>
+                        <th>Land</th>
+                        <th>Årgång</th>
+                        <th>Flaskor</th>
+                        <th>Plats</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="vin : ${viner}">
+                        <td th:text="${vin.name}"></td>
+                        <td th:switch="${vin.wineType.name()}">
+                            <span th:case="'RED'">Rött</span>
+                            <span th:case="'WHITE'">Vitt</span>
+                            <span th:case="'ROSE'">Rosé</span>
+                            <span th:case="'SPARKLING'">Mousserande</span>
+                            <span th:case="'FORTIFIED'">Starkvin</span>
+                        </td>
+                        <td th:text="${vin.producer}"></td>
+                        <td th:text="${vin.country}"></td>
+                        <td th:text="${vin.vintage}"></td>
+                        <td>
+                            <form class="antal-form"
+                                  th:attr="hx-post=@{/wines/{id}/antal(id=${vin.id.value})}"
+                                  hx-target="#vinlista" hx-swap="outerHTML">
+                                <input type="number" name="quantity" min="0" th:value="${vin.quantity}">
+                                <button type="submit">Uppdatera</button>
+                            </form>
+                        </td>
+                        <td th:text="${vin.location}"></td>
+                        <td>
+                            <button type="button"
+                                    th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                                    hx-target="#vinlista" hx-swap="outerHTML">
+                                Ta bort
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="vinlista-kort" class="vinlista-kort">
+            <div class="vinkort" th:each="vin : ${viner}">
+                <strong th:text="${vin.name}"></strong>
+                <dl>
+                    <dt>Typ</dt>
+                    <dd th:switch="${vin.wineType.name()}">
                         <span th:case="'RED'">Rött</span>
                         <span th:case="'WHITE'">Vitt</span>
                         <span th:case="'ROSE'">Rosé</span>
                         <span th:case="'SPARKLING'">Mousserande</span>
                         <span th:case="'FORTIFIED'">Starkvin</span>
-                    </td>
-                    <td th:text="${vin.producer}"></td>
-                    <td th:text="${vin.country}"></td>
-                    <td th:text="${vin.vintage}"></td>
-                    <td>
-                        <form class="antal-form"
-                              th:attr="hx-post=@{/wines/{id}/antal(id=${vin.id.value})}"
-                              hx-target="#vinlista" hx-swap="outerHTML">
-                            <input type="number" name="quantity" min="0" th:value="${vin.quantity}">
-                            <button type="submit">Uppdatera</button>
-                        </form>
-                    </td>
-                    <td th:text="${vin.location}"></td>
-                    <td>
-                        <button type="button"
-                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
-                                hx-target="#vinlista" hx-swap="outerHTML">
-                            Ta bort
-                        </button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+                    </dd>
+                    <dt>Producent</dt>
+                    <dd th:text="${vin.producer}"></dd>
+                    <dt>Land</dt>
+                    <dd th:text="${vin.country}"></dd>
+                    <dt>Årgång</dt>
+                    <dd th:text="${vin.vintage}"></dd>
+                    <dt>Plats</dt>
+                    <dd th:text="${vin.location}"></dd>
+                </dl>
+                <div class="vinkort-fot">
+                    <form class="antal-form"
+                          th:attr="hx-post=@{/wines/{id}/antal(id=${vin.id.value})}"
+                          hx-target="#vinlista" hx-swap="outerHTML">
+                        <input type="number" name="quantity" min="0" th:value="${vin.quantity}">
+                        <button type="submit">Uppdatera</button>
+                    </form>
+                    <button type="button"
+                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                            hx-target="#vinlista" hx-swap="outerHTML">
+                        Ta bort
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 </html>

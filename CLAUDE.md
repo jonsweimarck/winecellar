@@ -124,6 +124,14 @@ som inte packas med i `spring-boot:run`.
   ett slumpat genererat lösenord - och redan gröna kontrollertester börjar
   plötsligt få 401. Se `WineControllerTest` för mönstret; gäller varje ny
   `@WebMvcTest`-klass.
+- **Playwright Javas `Playwright.create()` installerar alla tre
+  webbläsarmotorer (Chromium, Firefox, WebKit), inte bara den som faktiskt
+  används i testet.** Att bara köra CLI-installationen med `chromium` som
+  argument räcker inte - vid nästa `mvn verify` upptäcker drivrutinen att
+  Firefox/WebKit saknas och försöker ladda ner dem på nytt, vilket kraschar
+  testet om nätverket är begränsat vid det tillfället. Kör installationen
+  utan att begränsa till en enskild motor (se README:s "UI-test, utökat med
+  Playwright") så slipper man den överraskningen.
 
 ## Nästa steg
 

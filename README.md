@@ -23,10 +23,11 @@ web/             Controller + Thymeleaf/htmx
 
 Till skillnad från `roombooking` finns här inga affärsregler att tala om -
 domänlagret är tunt. Det som gör UI-lagret svårare är istället
-responsiviteten, se "UI-test" nedan - men den responsiva table/card-vyn är
-ännu inte byggd (se Nästa steg); nuvarande `vinkallare.html` är en enkel,
-icke-responsiv tabell. `Rating` (betyg, 29 fasta värden) är en beslutad men
-ännu inte byggd domänmodell, se CLAUDE.md.
+responsiviteten, se "UI-test" nedan - `vinkallare.html` renderar både en
+tabellvy och en kortvy i samma HTML-fragment och växlar mellan dem med en
+CSS media query vid 640px, verifierat av `WineListResponsiveIT`. `Rating`
+(betyg, 29 fasta värden) är en beslutad men ännu inte byggd domänmodell, se
+CLAUDE.md.
 
 ## Datamodell
 
@@ -100,18 +101,20 @@ Till skillnad från `roombooking` (där vi medvetet avstod från
 Playwright, eftersom htmx-fragmentet var det enda som behövde verifieras)
 behövs det här: `@WebMvcTest`/MockMvc kör ingen CSS och kan inte se att
 listan faktiskt växlar mellan tabell (desktop) och kort (mobil) vid en viss
-brytpunkt. Det är själva poängen med UI:t, så det förtjänar ett eget
-testlager:
+brytpunkt. Det är själva poängen med UI:t, så det har ett eget testlager:
 
 - **`WineListResponsiveIT`** (Failsafe, `*IT.java`): startar appen
   (`@SpringBootTest(webEnvironment = RANDOM_PORT)`), öppnar sidan med
-  Playwright i två viewport-bredder (desktop, mobil) och verifierar vilket
-  element (tabell-vy respektive kort-vy) som faktiskt är synligt vid
-  respektive bredd.
+  Playwright i två viewport-bredder (1280×800 för desktop, 375×667 för
+  mobil) och verifierar vilket element (`#vinlista-tabell` respektive
+  `#vinlista-kort`) som faktiskt är synligt vid respektive bredd. Egen
+  Testcontainers-Postgres, oberoende av Cucumber-suitens.
 - Kräver `com.microsoft.playwright:playwright` som testberoende, samt att
-  webbläsarbinärerna installeras (`mvn exec:java
-  -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install"`)
-  - görs en gång lokalt och som ett steg i CI innan `mvn verify`.
+  webbläsarbinärerna installeras en gång lokalt (och som ett steg i CI
+  innan `mvn verify`):
+  ```
+  mvn org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.classpathScope=test -Dexec.args="install"
+  ```
 
 ## Köra lokalt
 
@@ -172,8 +175,9 @@ repot är delat.
       testad med Testcontainers, se `vin-persistens.feature`)
 - [x] Grundläggande webblager (`WineController` + `vinkallare.html`,
       htmx-fragment för lägg till/ändra antal/ta bort, `@WebMvcTest`)
-- [ ] Responsiv table/card-mall + `WineListResponsiveIT` - nuvarande
-      `vinkallare.html` är en enkel, icke-responsiv tabell
+- [x] Responsiv table/card-mall + `WineListResponsiveIT` - `vinkallare.html`
+      växlar mellan tabellvy och kortvy vid 640px, verifierat med Playwright
+      i två viewport-bredder
 - [ ] Bilduppladdning och -visning (`bytea` + `image_mime_type`)
 - [ ] Excel-importskript (`tools/import-excel/`)
 - [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
