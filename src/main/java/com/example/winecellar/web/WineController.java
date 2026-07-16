@@ -46,7 +46,10 @@ public class WineController {
             @RequestParam String location,
             Model model
     ) {
-        wineService.save(new Wine(null, name, wineType, producer, country, vintage, quantity, location, null, null));
+        wineService.save(Wine.builder()
+                .name(name).wineType(wineType).producer(producer).country(country)
+                .vintage(vintage).quantity(quantity).location(location)
+                .build());
         model.addAttribute("viner", wineService.listWines());
         // Returnerar bara listfragmentet - htmx byter ut #vinlista, ingen sidladdning.
         return "vinkallare :: lista";

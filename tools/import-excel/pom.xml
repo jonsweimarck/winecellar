@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        Medvetet FRISTÅENDE pom - inte ett <module> av rot-pom.xml och inte
+        en förälder/barn-relation åt något håll. Se CLAUDE.md: POI ska inte
+        bli ett runtime-beroende i den deployade jaren, och om den här filen
+        vore ett Maven-<module> av roten skulle rotens packaging tvingas bli
+        "pom" (aggregator) - vilket skulle göra clevercloud/maven.jsons
+        `spring-boot:run`-mål meningslöst och kunna slå sönder deployen.
+        Körs manuellt, en gång, mot en riktig databas - se README.
+    -->
+    <groupId>com.example</groupId>
+    <artifactId>import-excel</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <poi.version>5.2.5</poi.version>
+    </properties>
+
+    <dependencies>
+        <!-- Återanvänder Wine/WineType/Rating (rena domänobjekt, inga
+             ramverksberoenden) från huvudprojektet istället för att
+             duplicera betygslistan och mappningslogiken. Kräver att
+             huvudprojektet är `mvn install`-at till den lokala
+             .m2-repot innan den här modulen byggs, se README. -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>winecellar</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.4</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.26.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>${maven.compiler.release}</release>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>com.example.winecellar.importexcel.ImportExcel</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

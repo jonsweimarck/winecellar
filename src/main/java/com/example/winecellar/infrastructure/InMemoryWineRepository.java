@@ -24,8 +24,7 @@ public class InMemoryWineRepository implements WineRepository {
     public Wine save(Wine wine) {
         Wine toStore = wine.id() != null
                 ? wine
-                : new Wine(new WineId(nextId.getAndIncrement()), wine.name(), wine.wineType(), wine.producer(),
-                        wine.country(), wine.vintage(), wine.quantity(), wine.location(), wine.image(), wine.imageMimeType());
+                : wine.toBuilder().id(new WineId(nextId.getAndIncrement())).build();
         wines.put(toStore.id().value(), toStore);
         return toStore;
     }

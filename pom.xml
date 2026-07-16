@@ -151,6 +151,17 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Utan klassificerare skriver repackage över jaren med en
+                         Boot-fatjar (klasser under BOOT-INF/classes), vilket gör
+                         den oanvändbar som vanligt Maven-beroende. Med den här
+                         behåller `mvn install` en vanlig, platt jar som huvud-
+                         artefakt - tools/import-excel/ beror på just den för att
+                         återanvända domain-klasserna. Påverkar inte
+                         `spring-boot:run` (körs mot target/classes, inte jaren),
+                         så Clever Cloud-deployen är opåverkad. -->
+                    <classifier>exec</classifier>
+                </configuration>
             </plugin>
 
             <!-- Acceptans-/UI-tester (*IT.java) körs separat från enhetstester,

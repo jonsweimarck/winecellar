@@ -45,30 +45,60 @@ public class JpaWineRepository implements WineRepository {
     }
 
     private static WineEntity toEntity(Wine wine) {
-        return new WineEntity(
-                wine.id() != null ? wine.id().value() : null,
-                wine.name(),
-                wine.wineType(),
-                wine.producer(),
-                wine.country(),
-                wine.vintage(),
-                wine.quantity(),
-                wine.location(),
-                wine.image(),
-                wine.imageMimeType());
+        WineEntity entity = new WineEntity();
+        entity.setId(wine.id() != null ? wine.id().value() : null);
+        entity.setName(wine.name());
+        entity.setWineType(wine.wineType());
+        entity.setProducer(wine.producer());
+        entity.setCountry(wine.country());
+        entity.setRegion(wine.region());
+        entity.setSubregion(wine.subregion());
+        entity.setGrapes(wine.grapes());
+        entity.setVintage(wine.vintage());
+        entity.setPurchaseDate(wine.purchaseDate());
+        entity.setPrice(wine.price());
+        entity.setQuantity(wine.quantity());
+        entity.setPurchaseReason(wine.purchaseReason());
+        entity.setTastingNotes(wine.tastingNotes());
+        entity.setOwnRating(wine.ownRating());
+        entity.setSystembolagetProductNumber(wine.systembolagetProductNumber());
+        entity.setSystembolagetDescription(wine.systembolagetDescription());
+        entity.setMunskankarnaReview(wine.munskankarnaReview());
+        entity.setMunskankarnaRating(wine.munskankarnaRating());
+        entity.setVivinoRating(wine.vivinoRating());
+        entity.setOtherReference(wine.otherReference());
+        entity.setLocation(wine.location());
+        entity.setImage(wine.image());
+        entity.setImageMimeType(wine.imageMimeType());
+        return entity;
     }
 
     private static Wine toDomain(WineEntity entity) {
-        return new Wine(
-                new WineId(entity.getId()),
-                entity.getName(),
-                entity.getWineType(),
-                entity.getProducer(),
-                entity.getCountry(),
-                entity.getVintage(),
-                entity.getQuantity(),
-                entity.getLocation(),
-                entity.getImage(),
-                entity.getImageMimeType());
+        return Wine.builder()
+                .id(new WineId(entity.getId()))
+                .name(entity.getName())
+                .wineType(entity.getWineType())
+                .producer(entity.getProducer())
+                .country(entity.getCountry())
+                .region(entity.getRegion())
+                .subregion(entity.getSubregion())
+                .grapes(entity.getGrapes())
+                .vintage(entity.getVintage())
+                .purchaseDate(entity.getPurchaseDate())
+                .price(entity.getPrice())
+                .quantity(entity.getQuantity())
+                .purchaseReason(entity.getPurchaseReason())
+                .tastingNotes(entity.getTastingNotes())
+                .ownRating(entity.getOwnRating())
+                .systembolagetProductNumber(entity.getSystembolagetProductNumber())
+                .systembolagetDescription(entity.getSystembolagetDescription())
+                .munskankarnaReview(entity.getMunskankarnaReview())
+                .munskankarnaRating(entity.getMunskankarnaRating())
+                .vivinoRating(entity.getVivinoRating())
+                .otherReference(entity.getOtherReference())
+                .location(entity.getLocation())
+                .image(entity.getImage())
+                .imageMimeType(entity.getImageMimeType())
+                .build();
     }
 }

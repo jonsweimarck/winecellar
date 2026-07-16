@@ -41,18 +41,15 @@ public class LaggTillVinSteps {
     @När("jag lägger till ett vin med följande uppgifter:")
     public void jagLäggerTillEttVinMedFöljandeUppgifter(DataTable dataTable) {
         Map<String, String> uppgifter = dataTable.asMap(String.class, String.class);
-        Wine nyttVin = new Wine(
-                null,
-                uppgifter.get("namn"),
-                vinTypFrån(uppgifter.get("typ")),
-                uppgifter.get("producent"),
-                uppgifter.get("land"),
-                Integer.parseInt(uppgifter.get("årgång")),
-                Integer.parseInt(uppgifter.get("flaskor")),
-                uppgifter.get("plats"),
-                null,
-                null
-        );
+        Wine nyttVin = Wine.builder()
+                .name(uppgifter.get("namn"))
+                .wineType(vinTypFrån(uppgifter.get("typ")))
+                .producer(uppgifter.get("producent"))
+                .country(uppgifter.get("land"))
+                .vintage(Integer.parseInt(uppgifter.get("årgång")))
+                .quantity(Integer.parseInt(uppgifter.get("flaskor")))
+                .location(uppgifter.get("plats"))
+                .build();
         wineService.save(nyttVin);
     }
 

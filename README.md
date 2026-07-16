@@ -15,7 +15,7 @@ mobil.
 Samma hexagonala lagerindelning som `roombooking`:
 
 ```
-domain/          Rena domänobjekt (Wine, WineType), inga ramverksberoenden
+domain/          Rena domänobjekt (Wine, WineType, Rating), inga ramverksberoenden
 application/     Use cases och portar (WineService, WineRepository)
 infrastructure/  In-memory-testdubblett + JPA/Postgres-adapter (JpaWineRepository)
 web/             Controller + Thymeleaf/htmx
@@ -25,9 +25,14 @@ Till skillnad från `roombooking` finns här inga affärsregler att tala om -
 domänlagret är tunt. Det som gör UI-lagret svårare är istället
 responsiviteten, se "UI-test" nedan - `vinkallare.html` renderar både en
 tabellvy och en kortvy i samma HTML-fragment och växlar mellan dem med en
-CSS media query vid 640px, verifierat av `WineListResponsiveIT`. `Rating`
-(betyg, 29 fasta värden) är en beslutad men ännu inte byggd domänmodell, se
-CLAUDE.md.
+CSS media query vid 640px, verifierat av `WineListResponsiveIT`.
+
+`Wine` har vuxit till 23 fält i takt med att Excel-importen (se nedan)
+krävde dem - för många för en läsbar positionell record-konstruktor, så
+`Wine.builder()...build()` används på alla anropsplatser istället för
+`new Wine(...)`. De flesta av de nyare fälten (betyg, tasting notes,
+Systembolaget-info m.m.) sätts bara av importskriptet - webb-UI:t
+redigerar fortfarande bara de ursprungliga sju fälten plus bild.
 
 ## Datamodell
 
@@ -61,23 +66,26 @@ Tabell `wines` (engelska namn, plural, genomgående):
 | location | `text` | Fritext (Låda 1, Öppen, etc.) - inte enum, växer troligen över tid |
 | created_at, updated_at | `timestamptz` | |
 
-**Nuvarande implementationsstatus:** `id`, `name`, `wine_type`, `producer`,
-`country`, `vintage`, `quantity`, `location`, `image` och `image_mime_type`
-finns i den körande databasen (`WineEntity`) - de täcker de CRUD- och
-bildscenarier som är skrivna hittills. Resten av tabellen ovan är
-målschemat, inte redan byggt; kolumner läggs till i takt med att nya
-Gherkin-scenarier kräver dem (betyg, Systembolaget-fält, etc.), inte i en
-enda stor migrering.
+**Nuvarande implementationsstatus:** alla kolumner ovan finns i den körande
+databasen (`WineEntity`) **utom** `created_at`/`updated_at` - de är inte
+byggda, ingen skriven Gherkin-scenario har krävt dem än. Resten kom i
+omgångar (CRUD-fälten, sedan bild, sedan resten via Excel-importen), inte
+i en enda stor migrering - se `tools/import-excel/`.
 
 **Namngivningsprincip:** engelska för kolumner/tabeller, men svenska
 egennamn som faktiskt syftar på svenska institutioner
 (`munskankarna_review`, `systembolaget_*`) behåller sitt svenska namn -
 samma princip som att man inte skulle döpa om "IKEA" i en möbelapp.
 
-**Betyg som enum:** `own_rating` och `munskankarna_rating` är begränsade
-till exakt de 29 värdena från Excelns `Listor`-flik (t.ex.
-`"16 (15 - 17,5 Högklassigt vin)"`), som en Java-enum med en
-`CHECK`-constraint som håller databasen i synk. Ingen separat
+**Betyg som enum (byggt):** `own_rating` och `munskankarna_rating` är
+begränsade till exakt de 29 värdena från Excelns `Listor`-flik. `Rating`
+(`domain/Rating.java`) har korta konstantnamn (`R16`, `R14_5` osv. - samma
+mönster som `WineType`s `RED`/`WHITE`) med den fullständiga svenska
+etiketten (t.ex. `"16 (15 - 17,5 Högklassigt vin)"`) som ett fält;
+`Rating.fraEtikett(text)` normaliserar bort inkonsekvent mellanslag i
+källfilen (några av "Enkel vin"-raderna har dubbla mellanslag) innan den
+matchar. `@Enumerated(EnumType.STRING)` gör att Hibernate genererar
+`CHECK`-constrainten automatiskt, precis som för `WineType`. Ingen separat
 uppslagstabell - 29 fasta strängar är overengineering att normalisera bort.
 
 **Bilder i `bytea`, inte objektlagring:** medvetet val för en samling i den
@@ -158,11 +166,45 @@ docker-compose-databasen ovan är igång eller inte.
 ## Import av befintlig Excel-data
 
 `Vinlista.xlsx` importeras **en gång**, inte som en del av den vanliga
-CRUD-cykeln. Ett fristående skript (Apache POI), inte en del av den
-körande applikationen - POI ska inte vara ett runtime-beroende i den
-deployade jaren. Ligger i `tools/import-excel/` som ett eget litet
-program, körs manuellt mot databasen en gång och kan sedan tas bort eller
-lämnas orörd.
+CRUD-cykeln. `tools/import-excel/` är en helt fristående Maven-modul
+(egen `pom.xml`, inte ett `<module>` av rot-pom.xml) - POI och en
+JDBC-drivrutin är beroenden av *den*, inte av den deployade appen.
+
+Den beror på huvudprojektets egna `com.example:winecellar`-artefakt för
+att återanvända `Wine`/`WineType`/`Rating` (rena domänobjekt) istället för
+att duplicera betygslistan och mappningslogiken. Roten måste därför vara
+`mvn install`-ad lokalt innan importmodulen byggs - se
+`spring-boot-maven-plugin`s `<classifier>exec</classifier>`-konfiguration
+i rot-`pom.xml`: utan den skriver `repackage` över den vanliga jaren med
+en Boot-fatjar som inte går att bero på som vanligt bibliotek.
+
+Kör en gång, manuellt, mot en riktig databas:
+
+```
+mvn install -DskipTests                      # från repo-roten, en gång
+cd tools/import-excel
+mvn exec:java -Dexec.args="<sökväg-till-Vinlista.xlsx> [jdbc-url] [användare] [lösenord]"
+```
+
+Utan `jdbc-url`/`användare`/`lösenord` används `POSTGRESQL_ADDON_*`-
+miljövariablerna (samma konvention som `application.yml`), annars
+`localhost`/`winecellar`/`winecellar` (docker-compose-databasen).
+
+Kolumnlayouten (A-U på `Vin`-fliken) är hårdkodad i `VinradParser` - se
+README:s Datamodell-avsnitt för vilket fält varje kolumn motsvarar.
+Rader som saknar vintyp, land, producent eller namn hoppas över med en
+utskriven varning (ofullständiga utkastrader förekommer i källfilen).
+Etikett-kolumnen (`Bild`) importeras **inte** - Excels "bild i cell" är
+inbäddad rich data, inte ett vanligt cellvärde, och att extrahera den
+robust är inte värt det för ett engångsskript. Ladda upp etiketterna
+manuellt via webb-UI:t (`POST /wines/{id}/bild`) efteråt istället.
+
+Verifierat lokalt (2026-07-17) mot en tom docker-compose-databas: 28 av
+30 rader importerade (2 ofullständiga utkastrader korrekt överhoppade),
+alla fält - inklusive betyg, Systembolagets hopklistrade cell och
+prisceller med extra anteckningstext - stämde vid stickprov mot källfilen,
+och appen renderade listan felfritt efteråt. Inte körd mot
+produktionsdatabasen - det är ett medvetet separat, manuellt steg.
 
 ## Deploy
 
@@ -193,7 +235,9 @@ repot är delat.
       i två viewport-bredder
 - [x] Bilduppladdning och -visning (`bytea` + `image_mime_type`) -
       `POST`/`GET /wines/{id}/bild`, se Datamodell ovan
-- [ ] Excel-importskript (`tools/import-excel/`)
+- [x] Excel-importskript (`tools/import-excel/`) - fristående Maven-modul,
+      `Wine` utökad till 23 fält (`Rating`-enum m.m.) för att rymma hela
+      Vinlista.xlsx, verifierat lokalt - se "Import av befintlig Excel-data"
 - [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
       inte bara en admin-del, eftersom det inte finns någon publik läsvy
       här och appen redan var nåbar från nätet

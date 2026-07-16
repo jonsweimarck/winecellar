@@ -1,6 +1,8 @@
 package com.example.winecellar.infrastructure;
 
+import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.WineType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -10,6 +12,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+/**
+ * Entiteten har vuxit till att spegla hela Wine (se domain/Wine.java för
+ * varför) - konstrueras via no-arg-konstruktorn + paketprivata settrar
+ * istället för en positionell konstruktor med 20+ likartat typade
+ * String/BigDecimal-fält, som vore lätt att kasta om av misstag.
+ */
 @Entity
 @Table(name = "wines")
 public class WineEntity {
@@ -27,9 +38,49 @@ public class WineEntity {
 
     private String country;
 
+    @Column(columnDefinition = "text")
+    private String region;
+
+    @Column(columnDefinition = "text")
+    private String subregion;
+
+    @Column(columnDefinition = "text")
+    private String grapes;
+
     private int vintage;
 
+    private LocalDate purchaseDate;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal price;
+
     private int quantity;
+
+    @Column(columnDefinition = "text")
+    private String purchaseReason;
+
+    @Column(columnDefinition = "text")
+    private String tastingNotes;
+
+    @Enumerated(EnumType.STRING)
+    private Rating ownRating;
+
+    private String systembolagetProductNumber;
+
+    @Column(columnDefinition = "text")
+    private String systembolagetDescription;
+
+    @Column(columnDefinition = "text")
+    private String munskankarnaReview;
+
+    @Enumerated(EnumType.STRING)
+    private Rating munskankarnaRating;
+
+    @Column(precision = 2, scale = 1)
+    private BigDecimal vivinoRating;
+
+    @Column(columnDefinition = "text")
+    private String otherReference;
 
     private String location;
 
@@ -41,57 +92,195 @@ public class WineEntity {
     protected WineEntity() {
     }
 
-    WineEntity(Long id, String name, WineType wineType, String producer, String country, int vintage, int quantity,
-               String location, byte[] image, String imageMimeType) {
-        this.id = id;
-        this.name = name;
-        this.wineType = wineType;
-        this.producer = producer;
-        this.country = country;
-        this.vintage = vintage;
-        this.quantity = quantity;
-        this.location = location;
-        this.image = image;
-        this.imageMimeType = imageMimeType;
-    }
-
     Long getId() {
         return id;
+    }
+
+    void setId(Long id) {
+        this.id = id;
     }
 
     String getName() {
         return name;
     }
 
+    void setName(String name) {
+        this.name = name;
+    }
+
     WineType getWineType() {
         return wineType;
+    }
+
+    void setWineType(WineType wineType) {
+        this.wineType = wineType;
     }
 
     String getProducer() {
         return producer;
     }
 
+    void setProducer(String producer) {
+        this.producer = producer;
+    }
+
     String getCountry() {
         return country;
+    }
+
+    void setCountry(String country) {
+        this.country = country;
+    }
+
+    String getRegion() {
+        return region;
+    }
+
+    void setRegion(String region) {
+        this.region = region;
+    }
+
+    String getSubregion() {
+        return subregion;
+    }
+
+    void setSubregion(String subregion) {
+        this.subregion = subregion;
+    }
+
+    String getGrapes() {
+        return grapes;
+    }
+
+    void setGrapes(String grapes) {
+        this.grapes = grapes;
     }
 
     int getVintage() {
         return vintage;
     }
 
+    void setVintage(int vintage) {
+        this.vintage = vintage;
+    }
+
+    LocalDate getPurchaseDate() {
+        return purchaseDate;
+    }
+
+    void setPurchaseDate(LocalDate purchaseDate) {
+        this.purchaseDate = purchaseDate;
+    }
+
+    BigDecimal getPrice() {
+        return price;
+    }
+
+    void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
     int getQuantity() {
         return quantity;
+    }
+
+    void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
+    String getPurchaseReason() {
+        return purchaseReason;
+    }
+
+    void setPurchaseReason(String purchaseReason) {
+        this.purchaseReason = purchaseReason;
+    }
+
+    String getTastingNotes() {
+        return tastingNotes;
+    }
+
+    void setTastingNotes(String tastingNotes) {
+        this.tastingNotes = tastingNotes;
+    }
+
+    Rating getOwnRating() {
+        return ownRating;
+    }
+
+    void setOwnRating(Rating ownRating) {
+        this.ownRating = ownRating;
+    }
+
+    String getSystembolagetProductNumber() {
+        return systembolagetProductNumber;
+    }
+
+    void setSystembolagetProductNumber(String systembolagetProductNumber) {
+        this.systembolagetProductNumber = systembolagetProductNumber;
+    }
+
+    String getSystembolagetDescription() {
+        return systembolagetDescription;
+    }
+
+    void setSystembolagetDescription(String systembolagetDescription) {
+        this.systembolagetDescription = systembolagetDescription;
+    }
+
+    String getMunskankarnaReview() {
+        return munskankarnaReview;
+    }
+
+    void setMunskankarnaReview(String munskankarnaReview) {
+        this.munskankarnaReview = munskankarnaReview;
+    }
+
+    Rating getMunskankarnaRating() {
+        return munskankarnaRating;
+    }
+
+    void setMunskankarnaRating(Rating munskankarnaRating) {
+        this.munskankarnaRating = munskankarnaRating;
+    }
+
+    BigDecimal getVivinoRating() {
+        return vivinoRating;
+    }
+
+    void setVivinoRating(BigDecimal vivinoRating) {
+        this.vivinoRating = vivinoRating;
+    }
+
+    String getOtherReference() {
+        return otherReference;
+    }
+
+    void setOtherReference(String otherReference) {
+        this.otherReference = otherReference;
     }
 
     String getLocation() {
         return location;
     }
 
+    void setLocation(String location) {
+        this.location = location;
+    }
+
     byte[] getImage() {
         return image;
     }
 
+    void setImage(byte[] image) {
+        this.image = image;
+    }
+
     String getImageMimeType() {
         return imageMimeType;
+    }
+
+    void setImageMimeType(String imageMimeType) {
+        this.imageMimeType = imageMimeType;
     }
 }

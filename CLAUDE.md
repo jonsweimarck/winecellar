@@ -48,11 +48,16 @@ flaggade som gällande.
   slutna mängder - både som Java-enum och som `CHECK`-constraint i
   databasen. Lägg inte till en separat uppslagstabell för dessa - 29 fasta
   strängar är overengineering att normalisera bort.
-  **Status:** `WineType` är byggt - Hibernate genererar automatiskt en
-  `CHECK`-constraint för `wine_type` från `@Enumerated(EnumType.STRING)`,
-  även med `ddl-auto: update` (ingen manuell migrering behövdes). Betyg
-  (`own_rating`/`munskankarna_rating`) är fortfarande bara ett beslut, inte
-  byggt - ingen skriven Gherkin-scenario har krävt det än.
+  **Status: båda byggda.** Hibernate genererar automatiskt en
+  `CHECK`-constraint för `wine_type`/`own_rating`/`munskankarna_rating` från
+  `@Enumerated(EnumType.STRING)`, även med `ddl-auto: update` (ingen manuell
+  migrering behövdes). `Rating` (`domain/Rating.java`) följer samma mönster
+  som `WineType`: korta konstantnamn (`R16`, `R14_5`) som är det Postgres
+  faktiskt lagrar/CHECK-constraintar, med den fulla svenska etiketten som
+  ett separat `label`-fält - inte tvärtom. `Rating.fraEtikett(text)`
+  normaliserar mellanslag innan matchning, eftersom källfilens
+  `Listor`-flik har inkonsekvent dubbla mellanslag i några rader (uppenbara
+  inmatningsfel, inte meningsfulla skillnader).
 - **`WineService` har en enda `save`-metod, inte separata `addWine`/
   `updateWine`.** Domänlagret är tunt (se ovan) - det finns ingen skillnad
   i validering eller sidoeffekter mellan att skapa och uppdatera ett vin,
@@ -78,6 +83,15 @@ flaggade som gällande.
   Vinlistan bäddar aldrig in bilddata i själva HTML-fragmentet - `<img>`
   pekar mot `GET`-routen, så listrenderingen förblir lätt även när viner
   har bilder.
+- **`Wine` har 23 fält** (växte från ursprungliga sju via Excel-importen,
+  se README:s Datamodell) - en positionell record-konstruktor med den
+  längden vore oläsbar och lätt att kasta om av misstag. Använd
+  `Wine.builder()...build()` (och `vin.toBuilder()...build()` för
+  with-metoder) på alla anropsplatser, inte `new Wine(...)` direkt.
+  Motsvarande i `WineEntity`: no-arg-konstruktor + paketprivata settrar
+  istället för en lika lång positionell konstruktor - samma resonemang.
+  De flesta av de nyare fälten sätts bara av importskriptet; webb-UI:t
+  redigerar fortfarande bara de ursprungliga sju fälten plus bild.
 
 ## Säkerhet
 
@@ -104,8 +118,26 @@ flaggade som gällande.
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),
 inte en del av den körande applikationen. POI ska inte hamna som
-runtime-beroende i den deployade jaren - håll det i en egen katalog/modul
-som inte packas med i `spring-boot:run`.
+runtime-beroende i den deployade jaren - egen `pom.xml`, **inte** ett
+`<module>` av rot-pom.xml (skulle tvinga rotens packaging till "pom" och
+göra `clevercloud/maven.json`s `spring-boot:run`-mål meningslöst).
+
+**Status: byggt och verifierat lokalt (2026-07-17).** Beror på
+`com.example:winecellar` (rotens artefakt, `mvn install`-ad lokalt) för
+att återanvända `Wine`/`WineType`/`Rating` istället för att duplicera
+betygslistan. Detta krävde en ändring i **rotens** `pom.xml`:
+`spring-boot-maven-plugin` fick `<classifier>exec</classifier>` - utan
+den skriver `repackage` (bunden till `package`-fasen, körs alltid före
+`install`) över den vanliga jaren med en Boot-fatjar (klasser under
+`BOOT-INF/classes/...`), vilket gör den oanvändbar som ett vanligt
+Maven-beroende. Klassificeraren påverkar inte `spring-boot:run` (körs mot
+`target/classes`, aldrig mot den paketerade jaren) - Clever Cloud-deployen
+är opåverkad, verifierat genom en fullständig `mvn verify` efteråt.
+
+Skriver direkt via JDBC mot `wines`-tabellen, inte via `WineService`/HTTP.
+Bild-kolumnen (Excels "bild i cell", inbäddad rich data) importeras
+medvetet inte - se README:s "Import av befintlig Excel-data" för
+kommandon och `VinradParser`/`ImportExcel` för implementationen.
 
 ## Kända fällor att vara uppmärksam på (ärvda från roombooking, kan återkomma)
 

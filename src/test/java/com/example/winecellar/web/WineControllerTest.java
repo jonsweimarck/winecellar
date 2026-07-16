@@ -56,8 +56,10 @@ class WineControllerTest {
     @MockBean
     private WineService wineService;
 
-    private static final Wine BAROLO =
-            new Wine(new WineId(1L), "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1", null, null);
+    private static final Wine BAROLO = Wine.builder()
+            .id(new WineId(1L)).name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
+            .vintage(2018).quantity(3).location("Låda 1")
+            .build();
 
     @Nested
     @DisplayName("utan inloggning")
@@ -159,7 +161,10 @@ class WineControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("Barolo")));
 
-            verify(wineService).save(new Wine(null, "Barolo", WineType.RED, "Pio Cesare", "Italien", 2018, 3, "Låda 1", null, null));
+            verify(wineService).save(Wine.builder()
+                    .name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
+                    .vintage(2018).quantity(3).location("Låda 1")
+                    .build());
         }
     }
 
