@@ -178,16 +178,37 @@ att duplicera betygslistan och mappningslogiken. Roten måste därför vara
 i rot-`pom.xml`: utan den skriver `repackage` över den vanliga jaren med
 en Boot-fatjar som inte går att bero på som vanligt bibliotek.
 
-Kör en gång, manuellt, mot en riktig databas:
+Kör en gång, manuellt, mot en riktig databas. **I PowerShell** - sätt
+anslutningen som miljövariabler (samma namn som `application.yml` läser)
+och skicka bara filsökvägen som argument, annars trasslar PowerShells
+citattecken-hantering till ett `-Dexec.args` med flera mellanslagsskilda
+värden (Maven kan då tolka delar av strängen som ett plugin-koordinat och
+misslyckas med ett förvirrande "could not be resolved"-fel som inte har
+med själva filen eller databasen att göra):
 
-```
+```powershell
+cd C:\projects\winecellar
 mvn install -DskipTests                      # från repo-roten, en gång
-cd tools/import-excel
-mvn exec:java -Dexec.args="<sökväg-till-Vinlista.xlsx> [jdbc-url] [användare] [lösenord]"
+
+$env:POSTGRESQL_ADDON_HOST = "<host>"
+$env:POSTGRESQL_ADDON_PORT = "<port>"
+$env:POSTGRESQL_ADDON_DB = "<databasnamn>"
+$env:POSTGRESQL_ADDON_USER = "<användare>"
+$env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
+
+cd tools\import-excel
+mvn exec:java "-Dexec.args=C:\Users\jonsw\Documents\Vin\Vinlista.xlsx"
 ```
 
-Utan `jdbc-url`/`användare`/`lösenord` används `POSTGRESQL_ADDON_*`-
-miljövariablerna (samma konvention som `application.yml`), annars
+**I Bash** funkar det multi-värdesargumentet som tidigare stod här:
+
+```bash
+cd tools/import-excel
+mvn exec:java -Dexec.args="<sökväg-till-Vinlista.xlsx> <jdbc-url> <användare> <lösenord>"
+```
+
+Utan `jdbc-url`/`användare`/`lösenord` som argument används
+`POSTGRESQL_ADDON_*`-miljövariablerna, annars
 `localhost`/`winecellar`/`winecellar` (docker-compose-databasen).
 
 Kolumnlayouten (A-U på `Vin`-fliken) är hårdkodad i `VinradParser` - se

@@ -181,7 +181,13 @@ kommandon och `VinradParser`/`ImportExcel` för implementationen.
   "winecellar.admin.password=admin")` på `WineControllerTest` - pinnar
   testlösenordet oavsett vad miljön runt omkring råkar ha satt. Gäller varje
   ny `@WebMvcTest`-klass som autentiserar med hårdkodade testuppgifter.
-
-## Nästa steg
+- **PowerShell trasslar till `-Dexec.args="<flera mellanslagsskilda
+  värden>"`** på ett sätt som inte ger ett tydligt citattecken-fel, utan
+  ett förvirrande "Plugin ... could not be resolved" från Maven (delar av
+  den sönderslagna strängen tolkas som ett plugin-koordinat). Bash hanterar
+  samma syntax utan problem - det är PowerShell-specifikt. Lösning: sätt
+  flervärdesargument (t.ex. `ImportExcel`s jdbc-url/användare/lösenord) som
+  miljövariabler istället och skicka bara ett enda värde (utan mellanslag)
+  via `-Dexec.args`, se README:s "Import av befintlig Excel-data".
 
 Se README.md:s "Nästa steg"-sektion - hålls bara på ett ställe.
