@@ -92,11 +92,14 @@ flaggade som gällande.
   `@JdbcTypeCode(SqlTypes.VARBINARY)`, som ger en riktig `bytea`-kolumn.
   `ddl-auto: update` kan bara lägga till kolumner/tabeller, inte ändra en
   kolumns typ, så en engångsmigrering krävdes för redan existerande data
-  - se README:s "Import av befintlig Excel-data"-avsnitt för
-  migreringsskriptet och hur det kördes. Verifierat lokalt: en simulerad
-  "gammal" databas (riktig `oid` + `pg_largeobject`-post) migrerades
-  korrekt - bytes bevarade, `pg_largeobject` tomt efteråt, appen serverar
-  den migrerade bilden och sparar nya bilder som `bytea`.
+  - `db/migrations/2026-07-17-image-oid-to-bytea.sql`, se README:s
+  "Bilder i bytea, inte objektlagring" för kommandot. Verifierat lokalt:
+  en simulerad "gammal" databas (riktig `oid` + `pg_largeobject`-post)
+  migrerades korrekt - bytes bevarade, `pg_largeobject` tomt efteråt,
+  appen serverar den migrerade bilden och sparar nya bilder som `bytea`.
+  **Körd mot produktionsdatabasen (2026-07-17):** `UPDATE 0`/0 rader
+  `lo_unlink` - inga bilder fanns ännu i produktion, så det var en ren
+  typkonvertering utan data att flytta.
 - **`Wine` har 23 fält** (växte från ursprungliga sju via Excel-importen,
   se README:s Datamodell) - en positionell record-konstruktor med den
   längden vore oläsbar och lätt att kasta om av misstag. Använd

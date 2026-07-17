@@ -135,11 +135,10 @@ Get-Content db\migrations\2026-07-17-image-oid-to-bytea.sql -Raw |
          -U $env:POSTGRESQL_ADDON_USER -d $env:POSTGRESQL_ADDON_DB
 ```
 
-Kör den **innan** koden med `@JdbcTypeCode(SqlTypes.VARBINARY)` deployas
-(annars försöker den nya koden läsa/skriva `oid`-kolumnen med
-`bytea`-semantik under den korta gapet) - eller acceptera ett kort
-inkonsekvent fönster om det är enklare, eftersom det bara påverkar just
-bilduppladdning/-visning och appen har en enda användare.
+**Körd mot produktionsdatabasen (2026-07-17):** `UPDATE 0` och `lo_unlink`
+gav 0 rader - inga bilder hade laddats upp i produktion än, så
+migreringen var en ren typkonvertering utan data att flytta. `image` är
+nu `bytea` i produktion.
 
 **Uppladdning och visning (byggt):** bilden är sedan sist ett vanligt fält
 i `vin-formular.html` (fältnamn `bild`, `enctype="multipart/form-data"`)
