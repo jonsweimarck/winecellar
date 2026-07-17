@@ -37,8 +37,8 @@
         .vinkort dd { margin: 0; }
         .vinkort .vinkort-fot { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; margin-top: 0.75rem; }
 
-        .vinbild-tabell { width: 3rem; height: 4rem; object-fit: cover; border-radius: 0.25rem; display: block; }
-        .vinbild-kort { width: 100%; max-height: 12rem; object-fit: cover; border-radius: 0.5rem; display: block; margin-bottom: 0.5rem; }
+        .vinbild-tabell { width: 3rem; height: 4rem; object-fit: contain; background: #f0f0f0; border-radius: 0.25rem; display: block; }
+        .vinbild-kort { width: 100%; max-height: 12rem; object-fit: contain; background: #f0f0f0; border-radius: 0.5rem; display: block; margin-bottom: 0.5rem; }
         .vinbild-saknas { color: #999; font-size: 0.85rem; }
     </style>
 </head>
@@ -66,8 +66,10 @@
                 <tbody>
                     <tr th:each="vin : ${viner}">
                         <td>
-                            <img th:if="${vin.harBild()}" th:src="@{/wines/{id}/bild(id=${vin.id.value})}"
-                                 alt="Etikett" class="vinbild-tabell">
+                            <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
+                                <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}"
+                                     alt="Etikett" class="vinbild-tabell">
+                            </a>
                             <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
                         </td>
                         <td th:text="${vin.name}"></td>
@@ -98,8 +100,9 @@
 
         <div id="vinlista-kort" class="vinlista-kort">
             <div class="vinkort" th:each="vin : ${viner}">
-                <img th:if="${vin.harBild()}" th:src="@{/wines/{id}/bild(id=${vin.id.value})}"
-                     alt="Etikett" class="vinbild-kort">
+                <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
+                    <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}" alt="Etikett" class="vinbild-kort">
+                </a>
                 <strong th:text="${vin.name}"></strong>
                 <dl>
                     <dt>Typ</dt>

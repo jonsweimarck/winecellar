@@ -148,7 +148,11 @@ serverar bytes tillbaka med `Content-Type` satt från `image_mime_type`
 (404 om vinet saknar bild). `vinkallare.html` visar en `<img>`-tagg mot
 den GET-routen när `vin.harBild()` är sant, annars en textplatshållare -
 bilddatan skickas alltså aldrig inbäddad i själva listfragmentet, bara via
-webbläsarens egna bildförfrågningar.
+webbläsarens egna bildförfrågningar. Miniatyrerna i listan (tabell och
+kort) skalas med `object-fit: contain` - beskär alltså aldrig bort delar
+av etiketten - och är länkade till samma GET-route, så ett klick öppnar
+bilden i sin fulla storlek via webbläsarens egen bildvisning (ingen
+egenbyggd lightbox/JS).
 `spring.servlet.multipart.max-file-size`/`max-request-size` är satta till
 5 MB i `application.yml` som en enkel gräns mot orimligt stora
 uppladdningar.
