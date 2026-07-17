@@ -90,8 +90,15 @@ flaggade som gällande.
   with-metoder) på alla anropsplatser, inte `new Wine(...)` direkt.
   Motsvarande i `WineEntity`: no-arg-konstruktor + paketprivata settrar
   istället för en lika lång positionell konstruktor - samma resonemang.
-  De flesta av de nyare fälten sätts bara av importskriptet; webb-UI:t
-  redigerar fortfarande bara de ursprungliga sju fälten plus bild.
+  **Status:** alla fält är redigerbara i webb-UI:t (`GET`/`POST
+  /wines/{id}/redigera`, `redigera-vin.html`) - en egen sida, inte ett
+  htmx-fragment i listan, eftersom 23 fält i en radform vore ohanterligt.
+  Kontrollermetoden tar emot alla valfria fält som rå `String` och
+  tolkar dem själv (blankt fält → `null`) istället för att låta Spring
+  binda direkt till `Rating`/`LocalDate`/`BigDecimal` - annars kraschar
+  bindningen på en tom sträng från ett oifyllt formulärfält istället för
+  att ge `null`. Samma mönster som `VinradParser` använder för
+  Excel-celler.
 
 ## Säkerhet
 
@@ -198,5 +205,24 @@ dubbletter.
   flervärdesargument (t.ex. `ImportExcel`s jdbc-url/användare/lösenord) som
   miljövariabler istället och skicka bara ett enda värde (utan mellanslag)
   via `-Dexec.args`, se README:s "Import av befintlig Excel-data".
+- **Utan `<meta name="viewport" content="width=device-width,
+  initial-scale=1">` triggas aldrig CSS-brytpunkten på riktiga mobila
+  webbläsare.** `vinkallare.html` saknade taggen - riktiga telefoner
+  renderar då sidan mot en betydligt bredare virtuell yta (~980px, zoomat
+  ut) istället för mot den faktiska skärmbredden, så `max-width: 640px`
+  aldrig träffade och tabellvyn visades istället för kortvyn (upptäckt av
+  användaren på en riktig telefon, inte av `WineListResponsiveIT` - se
+  nästa punkt för varför testet missade det). Fixat genom att lägga till
+  taggen i `<head>`.
+- **Playwrights `setViewportSize(...)` ensamt räcker inte för att fånga
+  ovanstående klass av bugg.** Chromium respekterar bara den
+  mobilspecifika "ingen viewport-tagg → rendera brett och zooma ut"-
+  kvirken när `isMobile(true)` är satt på kontexten - en smal viewport
+  utan det flaggan renderar bara bokstavligen smalt, oavsett om HTML:en
+  har en viewport-tagg eller ej. `WineListResponsiveIT`s mobilkontext
+  hade bara `setViewportSize`, inte `isMobile(true)`, och missade därför
+  buggen ovan trots att testet var grönt. Sätt alltid `isMobile(true)`
+  (och gärna `setHasTouch(true)`) på mobilkontexter i UI-tester som ska
+  spegla en riktig telefon, inte bara en smal skärm.
 
 Se README.md:s "Nästa steg"-sektion - hålls bara på ett ställe.

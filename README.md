@@ -30,9 +30,12 @@ CSS media query vid 640px, verifierat av `WineListResponsiveIT`.
 `Wine` har vuxit till 23 fält i takt med att Excel-importen (se nedan)
 krävde dem - för många för en läsbar positionell record-konstruktor, så
 `Wine.builder()...build()` används på alla anropsplatser istället för
-`new Wine(...)`. De flesta av de nyare fälten (betyg, tasting notes,
-Systembolaget-info m.m.) sätts bara av importskriptet - webb-UI:t
-redigerar fortfarande bara de ursprungliga sju fälten plus bild.
+`new Wine(...)`. Alla fält är redigerbara i webb-UI:t via en separat
+sida (`GET`/`POST /wines/{id}/redigera`, `redigera-vin.html`) - för
+mycket för en radform i listan, så det är en egen sida istället för ett
+htmx-fragment som resten av appen. Snabbflödena i listan (ändra antal,
+ladda upp bild, ta bort) är kvar som htmx-fragment för de vanligaste
+åtgärderna.
 
 ## Datamodell
 
@@ -129,7 +132,11 @@ brytpunkt. Det är själva poängen med UI:t, så det har ett eget testlager:
   Playwright i två viewport-bredder (1280×800 för desktop, 375×667 för
   mobil) och verifierar vilket element (`#vinlista-tabell` respektive
   `#vinlista-kort`) som faktiskt är synligt vid respektive bredd. Egen
-  Testcontainers-Postgres, oberoende av Cucumber-suitens.
+  Testcontainers-Postgres, oberoende av Cucumber-suitens. Mobilkontexten
+  sätter `isMobile(true)`, inte bara en smal `setViewportSize` - se
+  CLAUDE.md för varför det gör skillnad (en riktig telefon visade
+  tabellvyn trots grönt test, innan `<meta name="viewport">` och
+  `isMobile(true)` fanns).
 - Kräver `com.microsoft.playwright:playwright` som testberoende, samt att
   webbläsarbinärerna installeras en gång lokalt (och som ett steg i CI
   innan `mvn verify`):

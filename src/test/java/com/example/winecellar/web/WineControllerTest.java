@@ -1,6 +1,7 @@
 package com.example.winecellar.web;
 
 import com.example.winecellar.application.WineService;
+import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 import com.example.winecellar.domain.WineType;
@@ -15,6 +16,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -112,6 +116,29 @@ class WineControllerTest {
         void skaBildvisningNekas() throws Exception {
             mockMvc.perform(get("/wines/1/bild"))
                     .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("ska redigeringsformuläret nekas")
+        void skaRedigeringsformuläretNekas() throws Exception {
+            mockMvc.perform(get("/wines/1/redigera"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("ska sparad redigering nekas")
+        void skaSparadRedigeringNekas() throws Exception {
+            mockMvc.perform(post("/wines/1/redigera")
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().isUnauthorized());
+
+            verify(wineService, never()).save(any());
         }
     }
 
@@ -249,6 +276,98 @@ class WineControllerTest {
 
             mockMvc.perform(get("/wines/1/bild").with(httpBasic("admin", "admin")))
                     .andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("när redigeringsformuläret visas")
+    class NärRedigeringsformuläretVisas {
+
+        @Test
+        @DisplayName("ska formuläret vara förifyllt med vinets uppgifter")
+        void skaFormuläretVaraFörifylltMedVinetsUppgifter() throws Exception {
+            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+
+            mockMvc.perform(get("/wines/1/redigera").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("value=\"Barolo\""),
+                            containsString("name=\"region\""),
+                            containsString("name=\"purchaseDate\""),
+                            containsString("name=\"price\""),
+                            containsString("name=\"ownRating\""),
+                            containsString("name=\"systembolagetProductNumber\""),
+                            containsString("name=\"munskankarnaRating\""),
+                            containsString("name=\"vivinoRating\""),
+                            containsString(Rating.R16.label())
+                    )));
+        }
+    }
+
+    @Nested
+    @DisplayName("när ett vin redigeras")
+    class NärEttVinRedigeras {
+
+        @Test
+        @DisplayName("ska alla fält skickas till WineService och sidan omdirigera till startsidan")
+        void skaAllaFältSkickasTillServiceOchOmdirigera() throws Exception {
+            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(httpBasic("admin", "admin"))
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("region", "Piemonte")
+                            .param("subregion", "Langhe")
+                            .param("grapes", "Nebbiolo")
+                            .param("vintage", "2018")
+                            .param("purchaseDate", "2024-03-15")
+                            .param("price", "450.00")
+                            .param("quantity", "3")
+                            .param("purchaseReason", "Rekommenderat")
+                            .param("tastingNotes", "Kraftfullt")
+                            .param("ownRating", "R16")
+                            .param("systembolagetProductNumber", "12345")
+                            .param("systembolagetDescription", "Beskrivning")
+                            .param("munskankarnaReview", "Recension")
+                            .param("munskankarnaRating", "R14_5")
+                            .param("vivinoRating", "4.1")
+                            .param("otherReference", "https://example.com")
+                            .param("location", "Låda 2"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+
+            verify(wineService).save(BAROLO.toBuilder()
+                    .region("Piemonte").subregion("Langhe").grapes("Nebbiolo")
+                    .purchaseDate(LocalDate.of(2024, 3, 15)).price(new BigDecimal("450.00"))
+                    .purchaseReason("Rekommenderat").tastingNotes("Kraftfullt")
+                    .ownRating(Rating.R16)
+                    .systembolagetProductNumber("12345").systembolagetDescription("Beskrivning")
+                    .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
+                    .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
+                    .location("Låda 2")
+                    .build());
+        }
+
+        @Test
+        @DisplayName("ska lämna valfria fält som null när de inte fylls i")
+        void skaLämnaValfriaFältSomNullNärDeInteFyllsI() throws Exception {
+            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(httpBasic("admin", "admin"))
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().is3xxRedirection());
+
+            verify(wineService).save(BAROLO);
         }
     }
 }

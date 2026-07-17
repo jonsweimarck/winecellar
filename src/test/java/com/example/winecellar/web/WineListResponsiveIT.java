@@ -81,7 +81,7 @@ class WineListResponsiveIT {
 
     @Test
     void skaVisaTabellPåDesktopOchDöljaKort() {
-        try (BrowserContext context = nyKontext(1280, 800)) {
+        try (BrowserContext context = nyKontext(1280, 800, false)) {
             Page page = öppnaVinkällaren(context);
 
             assertThat(page.locator("#vinlista-tabell").isVisible()).isTrue();
@@ -92,7 +92,13 @@ class WineListResponsiveIT {
 
     @Test
     void skaVisaKortPåMobilOchDöljaTabell() {
-        try (BrowserContext context = nyKontext(375, 667)) {
+        // isMobile(true) är avgörande, inte bara en smal setViewportSize: utan en
+        // <meta name="viewport">-tagg i HTML:en renderar riktiga mobila webbläsare
+        // sidan mot en betydligt bredare virtuell yta (~980px) och CSS-brytpunkten
+        // triggas aldrig - ett rent setViewportSize(375, ...) missar den kvirken
+        // helt (upptäcktes bara på en riktig telefon, inte av det här testet,
+        // innan isMobile(true) lades till - se CLAUDE.md).
+        try (BrowserContext context = nyKontext(375, 667, true)) {
             Page page = öppnaVinkällaren(context);
 
             assertThat(page.locator("#vinlista-kort").isVisible()).isTrue();
@@ -101,9 +107,11 @@ class WineListResponsiveIT {
         }
     }
 
-    private BrowserContext nyKontext(int bredd, int höjd) {
+    private BrowserContext nyKontext(int bredd, int höjd, boolean mobil) {
         return browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(bredd, höjd)
+                .setIsMobile(mobil)
+                .setHasTouch(mobil)
                 .setHttpCredentials(new HttpCredentials("admin", "admin")));
     }
 
