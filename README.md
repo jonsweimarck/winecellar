@@ -221,11 +221,19 @@ robust är inte värt det för ett engångsskript. Ladda upp etiketterna
 manuellt via webb-UI:t (`POST /wines/{id}/bild`) efteråt istället.
 
 Verifierat lokalt (2026-07-17) mot en tom docker-compose-databas: 28 av
-30 rader importerade (2 ofullständiga utkastrader korrekt överhoppade),
-alla fält - inklusive betyg, Systembolagets hopklistrade cell och
-prisceller med extra anteckningstext - stämde vid stickprov mot källfilen,
-och appen renderade listan felfritt efteråt. Inte körd mot
-produktionsdatabasen - det är ett medvetet separat, manuellt steg.
+30 rader importerade (2 dåvarande ofullständiga utkastrader korrekt
+överhoppade), alla fält - inklusive betyg, Systembolagets hopklistrade
+cell och prisceller med extra anteckningstext - stämde vid stickprov mot
+källfilen, och appen renderade listan felfritt efteråt.
+
+**Körd mot produktionsdatabasen (2026-07-17):** kördes lokalt (PowerShell,
+se kommandot ovan - Clever Cloud har inget CLI att köra verktyget *på*,
+och behövs inte heller, Postgres-tillägget är nåbart utifrån) mot
+produktionens `POSTGRESQL_ADDON_*`-uppgifter från Clever Cloud-konsolen.
+Sparade 30 viner utan fel - samtliga rader i källfilen hade alltså hunnit
+fyllas i komplett sedan den lokala testkörningen ovan. Verktyget har ingen
+dedupliceringslogik - kör inte importen igen mot samma databas, det skulle
+skapa dubbletter.
 
 ## Deploy
 
@@ -258,7 +266,8 @@ repot är delat.
       `POST`/`GET /wines/{id}/bild`, se Datamodell ovan
 - [x] Excel-importskript (`tools/import-excel/`) - fristående Maven-modul,
       `Wine` utökad till 23 fält (`Rating`-enum m.m.) för att rymma hela
-      Vinlista.xlsx, verifierat lokalt - se "Import av befintlig Excel-data"
+      Vinlista.xlsx, körd mot produktionsdatabasen - se "Import av
+      befintlig Excel-data"
 - [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
       inte bara en admin-del, eftersom det inte finns någon publik läsvy
       här och appen redan var nåbar från nätet
