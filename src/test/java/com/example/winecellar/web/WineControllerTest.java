@@ -140,6 +140,13 @@ class WineControllerTest {
 
             verify(wineService, never()).save(any());
         }
+
+        @Test
+        @DisplayName("ska formuläret för ett nytt vin nekas")
+        void skaFormuläretFörEttNyttVinNekas() throws Exception {
+            mockMvc.perform(get("/wines/nytt"))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
     @Nested
@@ -147,22 +154,34 @@ class WineControllerTest {
     class Startsidan {
 
         @Test
-        @DisplayName("ska visa formulärfält och lista befintliga viner")
-        void skaVisaFormulärfältOchListaBefintligaViner() throws Exception {
+        @DisplayName("ska lista befintliga viner och länka till formuläret för ett nytt vin")
+        void skaListaBefintligaVinerOchLänkaTillNyttVinFormulär() throws Exception {
             when(wineService.listWines()).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
-                            containsString("hx-post=\"/wines\""),
-                            containsString("name=\"name\""),
-                            containsString("name=\"wineType\""),
-                            containsString("name=\"producer\""),
-                            containsString("name=\"country\""),
-                            containsString("name=\"vintage\""),
-                            containsString("name=\"quantity\""),
-                            containsString("name=\"location\""),
+                            containsString("href=\"/wines/nytt\""),
                             containsString("Barolo")
+                    )));
+        }
+    }
+
+    @Nested
+    @DisplayName("när formuläret för ett nytt vin visas")
+    class NärFormuläretFörEttNyttVinVisas {
+
+        @Test
+        @DisplayName("ska formuläret vara tomt")
+        void skaFormuläretVaraTomt() throws Exception {
+            mockMvc.perform(get("/wines/nytt").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("action=\"/wines\""),
+                            containsString("name=\"name\""),
+                            containsString("name=\"region\""),
+                            containsString("name=\"ownRating\""),
+                            containsString("Lägg till")
                     )));
         }
     }
@@ -172,10 +191,8 @@ class WineControllerTest {
     class NärEttVinLäggsTill {
 
         @Test
-        @DisplayName("ska vinet skickas till WineService och listfragmentet visa det")
-        void skaSkickasTillServiceOchVisaDet() throws Exception {
-            when(wineService.listWines()).thenReturn(List.of(BAROLO));
-
+        @DisplayName("ska vinet skickas till WineService och sidan omdirigera till startsidan")
+        void skaSkickasTillServiceOchOmdirigera() throws Exception {
             mockMvc.perform(post("/wines")
                             .with(httpBasic("admin", "admin"))
                             .param("name", "Barolo")
@@ -185,8 +202,8 @@ class WineControllerTest {
                             .param("vintage", "2018")
                             .param("quantity", "3")
                             .param("location", "Låda 1"))
-                    .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("Barolo")));
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
 
             verify(wineService).save(Wine.builder()
                     .name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")

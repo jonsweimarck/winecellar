@@ -31,11 +31,16 @@ CSS media query vid 640px, verifierat av `WineListResponsiveIT`.
 krävde dem - för många för en läsbar positionell record-konstruktor, så
 `Wine.builder()...build()` används på alla anropsplatser istället för
 `new Wine(...)`. Alla fält är redigerbara i webb-UI:t via en separat
-sida (`GET`/`POST /wines/{id}/redigera`, `redigera-vin.html`) - för
-mycket för en radform i listan, så det är en egen sida istället för ett
-htmx-fragment som resten av appen. Snabbflödena i listan (ändra antal,
-ladda upp bild, ta bort) är kvar som htmx-fragment för de vanligaste
-åtgärderna.
+sida (`vin-formular.html`) - för mycket för en radform i listan, så det
+är en egen sida istället för ett htmx-fragment som resten av appen.
+Startsidan (`/`) är bara vinlistan; att lägga till och redigera ett vin
+sker på **samma** sida/mall (`GET /wines/nytt` respektive
+`GET /wines/{id}/redigera`) - fälten är identiska, det enda som skiljer
+är rubrik, submit-knapp och vart formuläret postar (`POST /wines` vid
+tillägg, `POST /wines/{id}/redigera` vid redigering), så två nästan
+identiska mallar hade bara varit dubblettunderhåll. Snabbflödena i
+listan (ändra antal, ladda upp bild, ta bort) är kvar som htmx-fragment
+för de vanligaste åtgärderna.
 
 ## Datamodell
 

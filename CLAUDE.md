@@ -90,11 +90,20 @@ flaggade som gällande.
   with-metoder) på alla anropsplatser, inte `new Wine(...)` direkt.
   Motsvarande i `WineEntity`: no-arg-konstruktor + paketprivata settrar
   istället för en lika lång positionell konstruktor - samma resonemang.
-  **Status:** alla fält är redigerbara i webb-UI:t (`GET`/`POST
-  /wines/{id}/redigera`, `redigera-vin.html`) - en egen sida, inte ett
-  htmx-fragment i listan, eftersom 23 fält i en radform vore ohanterligt.
-  Kontrollermetoden tar emot alla valfria fält som rå `String` och
-  tolkar dem själv (blankt fält → `null`) istället för att låta Spring
+  **Status:** alla fält är redigerbara i webb-UI:t via `vin-formular.html`
+  - en egen sida, inte ett htmx-fragment i listan, eftersom 23 fält i en
+  radform vore ohanterligt. **Samma mall och i praktiken samma sida
+  används för både tillägg och redigering** (`GET /wines/nytt` respektive
+  `GET /wines/{id}/redigera`), eftersom fälten är identiska - bara
+  rubrik/knapptext/formulärets `action` skiljer (avgörs av `vin.id ==
+  null` i mallen). Startsidan (`/`) har inget inbäddat formulär längre,
+  bara listan och en länk till `/wines/nytt`. `POST /wines` (tillägg) och
+  `POST /wines/{id}/redigera` delar en privat
+  `tillämpaFormulärfält(...)`-metod i `WineController` istället för att
+  duplicera fälttolkningen - skillnaden är bara vilken `Wine.Builder` de
+  startar från (`Wine.builder()` tomt vs `befintligt.toBuilder()`).
+  Kontrollermetoderna tar emot alla valfria fält som rå `String` och
+  tolkar dem själva (blankt fält → `null`) istället för att låta Spring
   binda direkt till `Rating`/`LocalDate`/`BigDecimal` - annars kraschar
   bindningen på en tom sträng från ett oifyllt formulärfält istället för
   att ge `null`. Samma mönster som `VinradParser` använder för

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Redigera vin</title>
+    <title th:text="${vin.id == null ? 'Lägg till vin' : 'Redigera vin'}"></title>
     <style>
         body { font-family: sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
         label { display: block; margin-top: 0.75rem; font-weight: bold; }
@@ -16,9 +16,10 @@
     </style>
 </head>
 <body>
-    <h1>Redigera <span th:text="${vin.name}"></span></h1>
+    <h1 th:text="${vin.id == null ? 'Lägg till vin' : 'Redigera ' + vin.name}"></h1>
 
-    <form method="post" th:action="@{/wines/{id}/redigera(id=${vin.id.value})}">
+    <form method="post"
+          th:action="${vin.id == null} ? @{/wines} : @{/wines/{id}/redigera(id=${vin.id.value})}">
         <fieldset>
             <legend>Grunduppgifter</legend>
             <label>Namn
@@ -26,11 +27,11 @@
             </label>
             <label>Typ
                 <select name="wineType">
-                    <option value="RED" th:selected="${vin.wineType.name() == 'RED'}">Rött</option>
-                    <option value="WHITE" th:selected="${vin.wineType.name() == 'WHITE'}">Vitt</option>
-                    <option value="ROSE" th:selected="${vin.wineType.name() == 'ROSE'}">Rosé</option>
-                    <option value="SPARKLING" th:selected="${vin.wineType.name() == 'SPARKLING'}">Mousserande</option>
-                    <option value="FORTIFIED" th:selected="${vin.wineType.name() == 'FORTIFIED'}">Starkvin</option>
+                    <option value="RED" th:selected="${vin.wineType != null and vin.wineType.name() == 'RED'}">Rött</option>
+                    <option value="WHITE" th:selected="${vin.wineType != null and vin.wineType.name() == 'WHITE'}">Vitt</option>
+                    <option value="ROSE" th:selected="${vin.wineType != null and vin.wineType.name() == 'ROSE'}">Rosé</option>
+                    <option value="SPARKLING" th:selected="${vin.wineType != null and vin.wineType.name() == 'SPARKLING'}">Mousserande</option>
+                    <option value="FORTIFIED" th:selected="${vin.wineType != null and vin.wineType.name() == 'FORTIFIED'}">Starkvin</option>
                 </select>
             </label>
             <label>Producent
@@ -49,13 +50,13 @@
                 <input type="text" name="grapes" th:value="${vin.grapes}">
             </label>
             <label>Årgång
-                <input type="number" name="vintage" th:value="${vin.vintage}" required>
+                <input type="number" name="vintage" th:value="${vin.vintage == 0 ? '' : vin.vintage}" required>
             </label>
             <label>Plats
                 <input type="text" name="location" th:value="${vin.location}" required>
             </label>
             <label>Antal flaskor
-                <input type="number" name="quantity" min="0" th:value="${vin.quantity}" required>
+                <input type="number" name="quantity" min="0" th:value="${vin.quantity == 0 ? '' : vin.quantity}" required>
             </label>
         </fieldset>
 
@@ -112,7 +113,7 @@
             </label>
         </fieldset>
 
-        <button type="submit">Spara</button>
+        <button type="submit" th:text="${vin.id == null ? 'Lägg till' : 'Spara'}"></button>
         <a class="knapp" href="/">Avbryt</a>
     </form>
 </body>

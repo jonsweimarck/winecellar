@@ -38,24 +38,44 @@ public class WineController {
         return "vinkallare";
     }
 
+    @GetMapping("/wines/nytt")
+    public String nyttVinFormulär(Model model) {
+        model.addAttribute("vin", Wine.builder().build());
+        model.addAttribute("betyg", Rating.values());
+        return "vin-formular";
+    }
+
     @PostMapping("/wines")
     public String läggTillVin(
             @RequestParam String name,
             @RequestParam WineType wineType,
             @RequestParam String producer,
             @RequestParam String country,
+            @RequestParam(required = false) String region,
+            @RequestParam(required = false) String subregion,
+            @RequestParam(required = false) String grapes,
             @RequestParam int vintage,
+            @RequestParam(required = false) String purchaseDate,
+            @RequestParam(required = false) String price,
             @RequestParam int quantity,
-            @RequestParam String location,
-            Model model
+            @RequestParam(required = false) String purchaseReason,
+            @RequestParam(required = false) String tastingNotes,
+            @RequestParam(required = false) String ownRating,
+            @RequestParam(required = false) String systembolagetProductNumber,
+            @RequestParam(required = false) String systembolagetDescription,
+            @RequestParam(required = false) String munskankarnaReview,
+            @RequestParam(required = false) String munskankarnaRating,
+            @RequestParam(required = false) String vivinoRating,
+            @RequestParam(required = false) String otherReference,
+            @RequestParam String location
     ) {
-        wineService.save(Wine.builder()
-                .name(name).wineType(wineType).producer(producer).country(country)
-                .vintage(vintage).quantity(quantity).location(location)
-                .build());
-        model.addAttribute("viner", wineService.listWines());
-        // Returnerar bara listfragmentet - htmx byter ut #vinlista, ingen sidladdning.
-        return "vinkallare :: lista";
+        wineService.save(tillämpaFormulärfält(Wine.builder(),
+                name, wineType, producer, country, region, subregion, grapes, vintage,
+                purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
+                systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
+                munskankarnaRating, vivinoRating, otherReference, location
+        ).build());
+        return "redirect:/";
     }
 
     @PostMapping("/wines/{id}/antal")
@@ -100,16 +120,9 @@ public class WineController {
                 .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
         model.addAttribute("vin", vin);
         model.addAttribute("betyg", Rating.values());
-        return "redigera-vin";
+        return "vin-formular";
     }
 
-    /**
-     * Tar emot alla fält som String/rått värde och tolkar dem själv istället
-     * för att låta Spring binda direkt till Rating/LocalDate/BigDecimal -
-     * ett tomt formulärfält (inget betyg valt, inget pris ifyllt) blir annars
-     * en tom sträng som Spring försöker binda rakt av och kraschar på, inte
-     * null. Samma sorts hantering som VinradParser gör för Excel-celler.
-     */
     @PostMapping("/wines/{id}/redigera")
     public String sparaRedigering(
             @PathVariable Long id,
@@ -137,7 +150,36 @@ public class WineController {
     ) {
         Wine befintligt = wineService.findById(new WineId(id))
                 .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
-        wineService.save(befintligt.toBuilder()
+        wineService.save(tillämpaFormulärfält(befintligt.toBuilder(),
+                name, wineType, producer, country, region, subregion, grapes, vintage,
+                purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
+                systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
+                munskankarnaRating, vivinoRating, otherReference, location
+        ).build());
+        return "redirect:/";
+    }
+
+    /**
+     * Delad av läggTillVin och sparaRedigering - båda formulären har samma
+     * fält, skillnaden är bara vilken Builder de startar från (tom vid
+     * tillägg, befintligt.toBuilder() vid redigering). Tar emot valfria
+     * fält som rå String och tolkar dem själv istället för att låta Spring
+     * binda direkt till Rating/LocalDate/BigDecimal - ett tomt formulärfält
+     * (inget betyg valt, inget pris ifyllt) blir annars en tom sträng som
+     * Spring försöker binda rakt av och kraschar på, inte null. Samma sorts
+     * hantering som VinradParser gör för Excel-celler.
+     */
+    private static Wine.Builder tillämpaFormulärfält(
+            Wine.Builder builder,
+            String name, WineType wineType, String producer, String country,
+            String region, String subregion, String grapes,
+            int vintage, String purchaseDate, String price, int quantity,
+            String purchaseReason, String tastingNotes, String ownRating,
+            String systembolagetProductNumber, String systembolagetDescription,
+            String munskankarnaReview, String munskankarnaRating, String vivinoRating,
+            String otherReference, String location
+    ) {
+        return builder
                 .name(name).wineType(wineType).producer(producer).country(country)
                 .region(tomBlirNull(region)).subregion(tomBlirNull(subregion)).grapes(tomBlirNull(grapes))
                 .vintage(vintage).purchaseDate(tolkaDatum(purchaseDate)).price(tolkaDecimal(price))
@@ -150,9 +192,7 @@ public class WineController {
                 .munskankarnaRating(tolkaBetyg(munskankarnaRating))
                 .vivinoRating(tolkaDecimal(vivinoRating))
                 .otherReference(tomBlirNull(otherReference))
-                .location(location)
-                .build());
-        return "redirect:/";
+                .location(location);
     }
 
     private static String tomBlirNull(String värde) {
