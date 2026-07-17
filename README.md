@@ -38,9 +38,12 @@ sker på **samma** sida/mall (`GET /wines/nytt` respektive
 `GET /wines/{id}/redigera`) - fälten är identiska, det enda som skiljer
 är rubrik, submit-knapp och vart formuläret postar (`POST /wines` vid
 tillägg, `POST /wines/{id}/redigera` vid redigering), så två nästan
-identiska mallar hade bara varit dubblettunderhåll. Snabbflödena i
-listan (ändra antal, ladda upp bild, ta bort) är kvar som htmx-fragment
-för de vanligaste åtgärderna.
+identiska mallar hade bara varit dubblettunderhåll. Formuläret postar
+`multipart/form-data` och tar emot en valfri bildfil (`bild`) tillsammans
+med alla andra fält i samma spar-anrop - ett tomt filfält skriver inte
+över en redan sparad bild. Ändra antal och ladda upp bild är alltså inte
+längre separata snabbåtgärder i listan; bara "Ta bort" är kvar som
+htmx-fragment där.
 
 ## Datamodell
 
@@ -96,20 +99,31 @@ matchar. `@Enumerated(EnumType.STRING)` gör att Hibernate genererar
 `CHECK`-constrainten automatiskt, precis som för `WineType`. Ingen separat
 uppslagstabell - 29 fasta strängar är overengineering att normalisera bort.
 
-**Bilder i `bytea`, inte objektlagring:** medvetet val för en samling i den
-här storleksordningen (se diskussion i chatten) - en datakälla, enklare
-backup, ingen extra molntjänst. Om samlingen och bildmängden växer kraftigt
-är det en isolerad migrering senare (flytta bara bilddatan), inte något vi
-bygger beredskap för nu.
+**Bilder i databasen, inte objektlagring:** medvetet val för en samling i
+den här storleksordningen (se diskussion i chatten) - en datakälla,
+enklare backup, ingen extra molntjänst. Om samlingen och bildmängden växer
+kraftigt är det en isolerad migrering senare (flytta bara bilddatan), inte
+något vi bygger beredskap för nu.
+**Känd avvikelse från planen:** `image`-kolumnen är i praktiken `oid`
+(Postgres large object), inte `bytea` som ursprungligen tänkt -
+`@Lob private byte[] image` mappar till `oid` med Hibernates
+standardinställningar mot Postgres. Fungerar korrekt för upp- och
+nedladdning (verifierat), men `oid`/large objects städas inte bort
+automatiskt när en rad tas bort eller bilden byts ut - ett vin som byter
+bild eller tas bort lämnar en föräldralös post i `pg_largeobject` kvar.
+Inte åtgärdat än (kräver `@JdbcTypeCode(SqlTypes.VARBINARY)` eller
+`columnDefinition = "bytea"` samt en migrering av redan sparade bilder) -
+se CLAUDE.md.
 
-**Uppladdning och visning (byggt):** `POST /wines/{id}/bild` tar emot en
-`multipart/form-data`-uppladdning (fältnamn `bild`), sätter `image` och
-`image_mime_type` från `MultipartFile` och sparar via `WineService.save`.
-`GET /wines/{id}/bild` serverar bytes tillbaka med `Content-Type` satt från
-`image_mime_type` (404 om vinet saknar bild). `vinkallare.html` visar en
-`<img>`-tagg mot den GET-routen när `vin.harBild()` är sant, annars en
-textplatshållare - bilddatan skickas alltså aldrig inbäddad i själva
-listfragmentet, bara via webbläsarens egna bildförfrågningar.
+**Uppladdning och visning (byggt):** bilden är sedan sist ett vanligt fält
+i `vin-formular.html` (fältnamn `bild`, `enctype="multipart/form-data"`)
+och sparas i samma `WineService.save`-anrop som resten av vinet - ett tomt
+filfält skriver inte över en redan sparad bild. `GET /wines/{id}/bild`
+serverar bytes tillbaka med `Content-Type` satt från `image_mime_type`
+(404 om vinet saknar bild). `vinkallare.html` visar en `<img>`-tagg mot
+den GET-routen när `vin.harBild()` är sant, annars en textplatshållare -
+bilddatan skickas alltså aldrig inbäddad i själva listfragmentet, bara via
+webbläsarens egna bildförfrågningar.
 `spring.servlet.multipart.max-file-size`/`max-request-size` är satta till
 5 MB i `application.yml` som en enkel gräns mot orimligt stora
 uppladdningar.
@@ -274,8 +288,8 @@ repot är delat.
 - [x] Responsiv table/card-mall + `WineListResponsiveIT` - `vinkallare.html`
       växlar mellan tabellvy och kortvy vid 640px, verifierat med Playwright
       i två viewport-bredder
-- [x] Bilduppladdning och -visning (`bytea` + `image_mime_type`) -
-      `POST`/`GET /wines/{id}/bild`, se Datamodell ovan
+- [x] Bilduppladdning och -visning (`image` + `image_mime_type`,
+      del av `vin-formular.html`) - se Datamodell ovan för `oid`-avvikelsen
 - [x] Excel-importskript (`tools/import-excel/`) - fristående Maven-modul,
       `Wine` utökad till 23 fält (`Rating`-enum m.m.) för att rymma hela
       Vinlista.xlsx, körd mot produktionsdatabasen - se "Import av

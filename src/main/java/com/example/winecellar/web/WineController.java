@@ -67,38 +67,22 @@ public class WineController {
             @RequestParam(required = false) String munskankarnaRating,
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
-            @RequestParam String location
-    ) {
-        wineService.save(tillämpaFormulärfält(Wine.builder(),
+            @RequestParam String location,
+            @RequestParam(value = "bild", required = false) MultipartFile bild
+    ) throws IOException {
+        Wine.Builder vin = tillämpaFormulärfält(Wine.builder(),
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                 systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
                 munskankarnaRating, vivinoRating, otherReference, location
-        ).build());
+        );
+        wineService.save(medBildOmVald(vin, bild).build());
         return "redirect:/";
-    }
-
-    @PostMapping("/wines/{id}/antal")
-    public String ändraAntal(@PathVariable Long id, @RequestParam int quantity, Model model) {
-        Wine vin = wineService.findById(new WineId(id))
-                .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
-        wineService.save(vin.withQuantity(quantity));
-        model.addAttribute("viner", wineService.listWines());
-        return "vinkallare :: lista";
     }
 
     @DeleteMapping("/wines/{id}")
     public String taBortVin(@PathVariable Long id, Model model) {
         wineService.removeWine(new WineId(id));
-        model.addAttribute("viner", wineService.listWines());
-        return "vinkallare :: lista";
-    }
-
-    @PostMapping("/wines/{id}/bild")
-    public String laddaUppBild(@PathVariable Long id, @RequestParam("bild") MultipartFile bild, Model model) throws IOException {
-        Wine vin = wineService.findById(new WineId(id))
-                .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
-        wineService.save(vin.withImage(bild.getBytes(), bild.getContentType()));
         model.addAttribute("viner", wineService.listWines());
         return "vinkallare :: lista";
     }
@@ -146,17 +130,34 @@ public class WineController {
             @RequestParam(required = false) String munskankarnaRating,
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
-            @RequestParam String location
-    ) {
+            @RequestParam String location,
+            @RequestParam(value = "bild", required = false) MultipartFile bild
+    ) throws IOException {
         Wine befintligt = wineService.findById(new WineId(id))
                 .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
-        wineService.save(tillämpaFormulärfält(befintligt.toBuilder(),
+        Wine.Builder vin = tillämpaFormulärfält(befintligt.toBuilder(),
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                 systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
                 munskankarnaRating, vivinoRating, otherReference, location
-        ).build());
+        );
+        wineService.save(medBildOmVald(vin, bild).build());
         return "redirect:/";
+    }
+
+    /**
+     * Bilduppladdning är en del av samma formulär/spara-anrop som allt annat
+     * nu (inte längre en separat POST /wines/{id}/bild) - ett tomt/oifyllt
+     * filfält ska inte nolla ut en redan sparad bild, så bara ett faktiskt
+     * valt filnamn (MultipartFile.isEmpty() == false) sätter image/
+     * imageMimeType. Annars behåller Builder:n vad den redan hade (null vid
+     * tillägg, befintlig bild vid redigering utan ny fil).
+     */
+    private static Wine.Builder medBildOmVald(Wine.Builder builder, MultipartFile bild) throws IOException {
+        if (bild != null && !bild.isEmpty()) {
+            return builder.image(bild.getBytes()).imageMimeType(bild.getContentType());
+        }
+        return builder;
     }
 
     /**

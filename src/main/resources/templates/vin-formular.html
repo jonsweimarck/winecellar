@@ -13,17 +13,23 @@
         .knapp { display: inline-block; text-decoration: none; color: inherit; border: 1px solid #999; border-radius: 0.25rem; }
         fieldset { margin-top: 1.5rem; border: 1px solid #ddd; border-radius: 0.25rem; }
         legend { font-weight: bold; padding: 0 0.5rem; }
+        .vinbild-formular { max-width: 10rem; max-height: 12rem; display: block; margin-bottom: 0.5rem; border-radius: 0.25rem; }
     </style>
 </head>
 <body>
     <h1 th:text="${vin.id == null ? 'Lägg till vin' : 'Redigera ' + vin.name}"></h1>
 
-    <form method="post"
+    <form method="post" enctype="multipart/form-data"
           th:action="${vin.id == null} ? @{/wines} : @{/wines/{id}/redigera(id=${vin.id.value})}">
         <fieldset>
             <legend>Grunduppgifter</legend>
             <label>Namn
                 <input type="text" name="name" th:value="${vin.name}" required>
+            </label>
+            <label>Etikett
+                <img th:if="${vin.harBild()}" th:src="@{/wines/{id}/bild(id=${vin.id.value})}"
+                     alt="Nuvarande etikett" class="vinbild-formular">
+                <input type="file" name="bild" accept="image/*">
             </label>
             <label>Typ
                 <select name="wineType">

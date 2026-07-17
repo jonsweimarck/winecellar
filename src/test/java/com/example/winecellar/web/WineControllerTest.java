@@ -102,16 +102,6 @@ class WineControllerTest {
         }
 
         @Test
-        @DisplayName("ska bilduppladdning nekas")
-        void skaBilduppladdningNekas() throws Exception {
-            mockMvc.perform(multipart("/wines/1/bild")
-                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3})))
-                    .andExpect(status().isUnauthorized());
-
-            verify(wineService, never()).save(any());
-        }
-
-        @Test
         @DisplayName("ska bildvisning nekas")
         void skaBildvisningNekas() throws Exception {
             mockMvc.perform(get("/wines/1/bild"))
@@ -178,9 +168,11 @@ class WineControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("action=\"/wines\""),
+                            containsString("enctype=\"multipart/form-data\""),
                             containsString("name=\"name\""),
                             containsString("name=\"region\""),
                             containsString("name=\"ownRating\""),
+                            containsString("name=\"bild\""),
                             containsString("Lägg till")
                     )));
         }
@@ -210,25 +202,29 @@ class WineControllerTest {
                     .vintage(2018).quantity(3).location("Låda 1")
                     .build());
         }
-    }
-
-    @Nested
-    @DisplayName("när antalet flaskor ändras")
-    class NärAntaletFlaskorÄndras {
 
         @Test
-        @DisplayName("ska den uppdaterade mängden skickas till WineService")
-        void skaDenUppdateradeMängdenSkickasTillService() throws Exception {
-            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
-            when(wineService.listWines()).thenReturn(List.of(BAROLO.withQuantity(2)));
+        @DisplayName("ska bilden sparas tillsammans med resten av vinet om en fil valdes")
+        void skaBildenSparasTillsammansMedResten() throws Exception {
+            byte[] bilddata = new byte[]{1, 2, 3};
 
-            mockMvc.perform(post("/wines/1/antal")
+            mockMvc.perform(multipart("/wines")
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", bilddata))
                             .with(httpBasic("admin", "admin"))
-                            .param("quantity", "2"))
-                    .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("Barolo")));
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().is3xxRedirection());
 
-            verify(wineService).save(BAROLO.withQuantity(2));
+            verify(wineService).save(Wine.builder()
+                    .name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
+                    .vintage(2018).quantity(3).location("Låda 1")
+                    .image(bilddata).imageMimeType("image/jpeg")
+                    .build());
         }
     }
 
@@ -245,27 +241,6 @@ class WineControllerTest {
                     .andExpect(status().isOk());
 
             verify(wineService).removeWine(new WineId(1L));
-        }
-    }
-
-    @Nested
-    @DisplayName("när en bild laddas upp")
-    class NärEnBildLaddasUpp {
-
-        @Test
-        @DisplayName("ska bilden och dess MIME-typ skickas till WineService")
-        void skaBildenOchMimeTypenSkickasTillService() throws Exception {
-            byte[] bilddata = new byte[]{1, 2, 3};
-            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
-            when(wineService.listWines()).thenReturn(List.of(BAROLO.withImage(bilddata, "image/jpeg")));
-
-            mockMvc.perform(multipart("/wines/1/bild")
-                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", bilddata))
-                            .with(httpBasic("admin", "admin")))
-                    .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("Barolo")));
-
-            verify(wineService).save(BAROLO.withImage(bilddata, "image/jpeg"));
         }
     }
 
@@ -308,6 +283,7 @@ class WineControllerTest {
             mockMvc.perform(get("/wines/1/redigera").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
+                            containsString("enctype=\"multipart/form-data\""),
                             containsString("value=\"Barolo\""),
                             containsString("name=\"region\""),
                             containsString("name=\"purchaseDate\""),
@@ -316,6 +292,7 @@ class WineControllerTest {
                             containsString("name=\"systembolagetProductNumber\""),
                             containsString("name=\"munskankarnaRating\""),
                             containsString("name=\"vivinoRating\""),
+                            containsString("name=\"bild\""),
                             containsString(Rating.R16.label())
                     )));
         }
@@ -385,6 +362,48 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection());
 
             verify(wineService).save(BAROLO);
+        }
+
+        @Test
+        @DisplayName("ska ersätta bilden om en ny fil väljs")
+        void skaErsättaBildenOmEnNyFilVäljs() throws Exception {
+            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+            byte[] nyBilddata = new byte[]{4, 5, 6};
+
+            mockMvc.perform(multipart("/wines/1/redigera")
+                            .file(new MockMultipartFile("bild", "ny-etikett.jpg", "image/jpeg", nyBilddata))
+                            .with(httpBasic("admin", "admin"))
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().is3xxRedirection());
+
+            verify(wineService).save(BAROLO.withImage(nyBilddata, "image/jpeg"));
+        }
+
+        @Test
+        @DisplayName("ska behålla befintlig bild om ingen ny fil väljs")
+        void skaBehållaBefintligBildOmIngenNyFilVäljs() throws Exception {
+            byte[] befintligBilddata = new byte[]{1, 2, 3};
+            Wine vinMedBild = BAROLO.withImage(befintligBilddata, "image/jpeg");
+            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(vinMedBild));
+
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(httpBasic("admin", "admin"))
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().is3xxRedirection());
+
+            verify(wineService).save(vinMedBild);
         }
     }
 }

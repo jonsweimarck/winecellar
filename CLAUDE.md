@@ -71,18 +71,29 @@ flaggade som gällande.
   Medvetet inget förbrukningslogg (datum när en flaska dracks) - om det
   blir aktuellt senare är det en ny, separat tabell (`wine_consumptions`
   eller liknande), inte en ombyggnad av `wines`.
-- **Bilder lagras som `bytea` + `image_mime_type` direkt i `wines`-tabellen**,
+- **Bilder lagras direkt i `wines`-tabellen** (`image` + `image_mime_type`),
   inte i extern objektlagring (se README för avvägningen).
-  **Status: byggt** (`POST`/`GET /wines/{id}/bild`, se README:s
-  Datamodell-avsnitt) och verifierat lokalt end-to-end (uppladdad och
-  hämtad bild har identiska bytes, `Content-Type` stämmer). Viktig detalj
-  som höll på att glömmas vid implementationen: `image_mime_type` måste
-  sättas från `MultipartFile.getContentType()` vid uppladdning, och samma
-  värde användas som `Content-Type`-header när bilden serveras tillbaka -
-  annars visar webbläsaren inte bilden trots att bytes finns i databasen.
-  Vinlistan bäddar aldrig in bilddata i själva HTML-fragmentet - `<img>`
-  pekar mot `GET`-routen, så listrenderingen förblir lätt även när viner
-  har bilder.
+  **Status: byggt**, del av `vin-formular.html` (inte längre en separat
+  `POST /wines/{id}/bild` - se nedan), och verifierat lokalt end-to-end
+  (uppladdad och hämtad bild har identiska bytes, `Content-Type` stämmer).
+  Viktig detalj som höll på att glömmas vid implementationen:
+  `image_mime_type` måste sättas från `MultipartFile.getContentType()` vid
+  uppladdning, och samma värde användas som `Content-Type`-header när
+  bilden serveras tillbaka - annars visar webbläsaren inte bilden trots
+  att bytes finns i databasen. Vinlistan bäddar aldrig in bilddata i
+  själva HTML-fragmentet - `<img>` pekar mot `GET /wines/{id}/bild`, så
+  listrenderingen förblir lätt även när viner har bilder.
+  **Känd avvikelse, inte åtgärdad:** `image`-kolumnen blev i praktiken
+  `oid` (Postgres large object), inte `bytea` - `@Lob private byte[]`
+  mappar till `oid` med Hibernates standardinställningar mot Postgres,
+  upptäckt via `\d wines` (inte något som syntes i den ursprungliga
+  end-to-end-verifieringen, som bara jämförde bytes via HTTP, inte
+  kolumntypen). Fungerar korrekt för upp-/nedladdning, men Postgres
+  städar inte bort `oid`/large objects automatiskt när en rad tas bort
+  eller bilden byts ut - lämnar föräldralösa poster i `pg_largeobject`.
+  Fix: `@JdbcTypeCode(SqlTypes.VARBINARY)` eller
+  `@Column(columnDefinition = "bytea")` på `image`-fältet, plus en
+  migrering av redan sparade bilder till den nya kolumntypen.
 - **`Wine` har 23 fält** (växte från ursprungliga sju via Excel-importen,
   se README:s Datamodell) - en positionell record-konstruktor med den
   längden vore oläsbar och lätt att kasta om av misstag. Använd
@@ -107,7 +118,16 @@ flaggade som gällande.
   binda direkt till `Rating`/`LocalDate`/`BigDecimal` - annars kraschar
   bindningen på en tom sträng från ett oifyllt formulärfält istället för
   att ge `null`. Samma mönster som `VinradParser` använder för
-  Excel-celler.
+  Excel-celler. Formuläret är `multipart/form-data` och tar emot en
+  valfri `MultipartFile bild` i samma anrop - `medBildOmVald(...)` sätter
+  bara `image`/`imageMimeType` om en fil faktiskt valdes
+  (`!bild.isEmpty()`), annars behåller Builder:n vad den redan hade
+  (oförändrad bild vid redigering, ingen bild vid tillägg). De tidigare
+  separata `POST /wines/{id}/antal` och `POST /wines/{id}/bild` - och
+  motsvarande snabbformulär i `vinkallare.html` - är borttagna; ändra
+  antal och ladda upp bild sker numera bara via det gemensamma
+  formuläret. `GET /wines/{id}/bild` (visning) finns kvar, den behövs för
+  `<img>`-taggarna i både listan och formuläret.
 
 ## Säkerhet
 
@@ -233,5 +253,17 @@ dubbletter.
   buggen ovan trots att testet var grönt. Sätt alltid `isMobile(true)`
   (och gärna `setHasTouch(true)`) på mobilkontexter i UI-tester som ska
   spegla en riktig telefon, inte bara en smal skärm.
+- **`@Lob private byte[] fält` mappar till Postgres `oid` (large object)
+  med Hibernates standardinställningar, inte `bytea`.** Upptäckt via
+  `\d wines` i den här sessionen - `image`-kolumnen är `oid`, trots att
+  README/CLAUDE.md hela tiden sagt `bytea`. Fungerar transparent för
+  upp-/nedladdning via JDBC (bytes stämmer), så det syns inte i en
+  end-to-end-verifiering som bara testar HTTP-beteendet - bara genom att
+  faktiskt inspektera kolumntypen. Risken är föräldralösa poster i
+  `pg_largeobject` (Postgres städar inte bort dem automatiskt när raden
+  tas bort eller bilden byts ut). Inte åtgärdat än, se Datamodell-avsnittet
+  ovan för fixen. Kom ihåg att kontrollera detta explicit (`\d
+  <tabell>`) för framtida `@Lob byte[]`-fält, inte bara lita på att
+  applikationsbeteendet ser rätt ut.
 
 Se README.md:s "Nästa steg"-sektion - hålls bara på ett ställe.
