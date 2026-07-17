@@ -99,21 +99,47 @@ matchar. `@Enumerated(EnumType.STRING)` gör att Hibernate genererar
 `CHECK`-constrainten automatiskt, precis som för `WineType`. Ingen separat
 uppslagstabell - 29 fasta strängar är overengineering att normalisera bort.
 
-**Bilder i databasen, inte objektlagring:** medvetet val för en samling i
+**Bilder i `bytea`, inte objektlagring:** medvetet val för en samling i
 den här storleksordningen (se diskussion i chatten) - en datakälla,
 enklare backup, ingen extra molntjänst. Om samlingen och bildmängden växer
 kraftigt är det en isolerad migrering senare (flytta bara bilddatan), inte
 något vi bygger beredskap för nu.
-**Känd avvikelse från planen:** `image`-kolumnen är i praktiken `oid`
-(Postgres large object), inte `bytea` som ursprungligen tänkt -
+
+**`oid`-avvikelsen är fixad (2026-07-17):** `image`-kolumnen blev i
+praktiken `oid` (Postgres large object) istället för `bytea` -
 `@Lob private byte[] image` mappar till `oid` med Hibernates
-standardinställningar mot Postgres. Fungerar korrekt för upp- och
-nedladdning (verifierat), men `oid`/large objects städas inte bort
-automatiskt när en rad tas bort eller bilden byts ut - ett vin som byter
-bild eller tas bort lämnar en föräldralös post i `pg_largeobject` kvar.
-Inte åtgärdat än (kräver `@JdbcTypeCode(SqlTypes.VARBINARY)` eller
-`columnDefinition = "bytea"` samt en migrering av redan sparade bilder) -
-se CLAUDE.md.
+standardinställningar mot Postgres, upptäckt via `\d wines` (syntes inte
+i den ursprungliga end-to-end-verifieringen, som bara testade
+HTTP-beteendet). `WineEntity.image` har bytt från `@Lob` till
+`@JdbcTypeCode(SqlTypes.VARBINARY)`, som ger en riktig `bytea`-kolumn.
+`ddl-auto: update` kan bara lägga till kolumner/tabeller, inte ändra en
+kolumns typ, så en engångsmigrering krävdes: `db/migrations/2026-07-17-image-oid-to-bytea.sql`
+kopierar bilddata från de gamla large objects till en ny `bytea`-kolumn,
+städar bort large objects med `lo_unlink` (annars läcker de) och byter
+namn på kolumnen. Verifierat lokalt mot en simulerad "gammal" databas -
+bytes bevarade, `pg_largeobject` tomt efteråt.
+
+Körs en gång, manuellt, mot en riktig databas (samma mönster som
+Excel-importen ovan):
+
+```powershell
+$env:POSTGRESQL_ADDON_HOST = "<host>"
+$env:POSTGRESQL_ADDON_PORT = "<port>"
+$env:POSTGRESQL_ADDON_DB = "<databasnamn>"
+$env:POSTGRESQL_ADDON_USER = "<användare>"
+$env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
+
+Get-Content db\migrations\2026-07-17-image-oid-to-bytea.sql -Raw |
+  docker run --rm -i -e PGPASSWORD=$env:POSTGRESQL_ADDON_PASSWORD postgres:16 `
+    psql -h $env:POSTGRESQL_ADDON_HOST -p $env:POSTGRESQL_ADDON_PORT `
+         -U $env:POSTGRESQL_ADDON_USER -d $env:POSTGRESQL_ADDON_DB
+```
+
+Kör den **innan** koden med `@JdbcTypeCode(SqlTypes.VARBINARY)` deployas
+(annars försöker den nya koden läsa/skriva `oid`-kolumnen med
+`bytea`-semantik under den korta gapet) - eller acceptera ett kort
+inkonsekvent fönster om det är enklare, eftersom det bara påverkar just
+bilduppladdning/-visning och appen har en enda användare.
 
 **Uppladdning och visning (byggt):** bilden är sedan sist ett vanligt fält
 i `vin-formular.html` (fältnamn `bild`, `enctype="multipart/form-data"`)

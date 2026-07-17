@@ -9,8 +9,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -84,7 +85,14 @@ public class WineEntity {
 
     private String location;
 
-    @Lob
+    /**
+     * @Lob byte[] mappar till Postgres oid (large object) med Hibernates
+     * standardinställningar, inte bytea - se CLAUDE.md. JdbcTypeCode(VARBINARY)
+     * tvingar fram en riktig bytea-kolumn istället. Kräver en engångsmigrering
+     * för redan existerande data - ddl-auto: update kan inte ändra en
+     * kolumns typ, bara lägga till nya kolumner/tabeller.
+     */
+    @JdbcTypeCode(SqlTypes.VARBINARY)
     private byte[] image;
 
     private String imageMimeType;

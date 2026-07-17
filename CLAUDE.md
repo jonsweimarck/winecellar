@@ -83,17 +83,20 @@ flaggade som gällande.
   att bytes finns i databasen. Vinlistan bäddar aldrig in bilddata i
   själva HTML-fragmentet - `<img>` pekar mot `GET /wines/{id}/bild`, så
   listrenderingen förblir lätt även när viner har bilder.
-  **Känd avvikelse, inte åtgärdad:** `image`-kolumnen blev i praktiken
-  `oid` (Postgres large object), inte `bytea` - `@Lob private byte[]`
-  mappar till `oid` med Hibernates standardinställningar mot Postgres,
-  upptäckt via `\d wines` (inte något som syntes i den ursprungliga
+  **`oid`-avvikelsen är fixad (2026-07-17):** `image`-kolumnen var i
+  praktiken `oid` (Postgres large object), inte `bytea` - `@Lob private
+  byte[]` mappar till `oid` med Hibernates standardinställningar mot
+  Postgres, upptäckt via `\d wines` (syntes inte i den ursprungliga
   end-to-end-verifieringen, som bara jämförde bytes via HTTP, inte
-  kolumntypen). Fungerar korrekt för upp-/nedladdning, men Postgres
-  städar inte bort `oid`/large objects automatiskt när en rad tas bort
-  eller bilden byts ut - lämnar föräldralösa poster i `pg_largeobject`.
-  Fix: `@JdbcTypeCode(SqlTypes.VARBINARY)` eller
-  `@Column(columnDefinition = "bytea")` på `image`-fältet, plus en
-  migrering av redan sparade bilder till den nya kolumntypen.
+  kolumntypen). `WineEntity.image` har bytt från `@Lob` till
+  `@JdbcTypeCode(SqlTypes.VARBINARY)`, som ger en riktig `bytea`-kolumn.
+  `ddl-auto: update` kan bara lägga till kolumner/tabeller, inte ändra en
+  kolumns typ, så en engångsmigrering krävdes för redan existerande data
+  - se README:s "Import av befintlig Excel-data"-avsnitt för
+  migreringsskriptet och hur det kördes. Verifierat lokalt: en simulerad
+  "gammal" databas (riktig `oid` + `pg_largeobject`-post) migrerades
+  korrekt - bytes bevarade, `pg_largeobject` tomt efteråt, appen serverar
+  den migrerade bilden och sparar nya bilder som `bytea`.
 - **`Wine` har 23 fält** (växte från ursprungliga sju via Excel-importen,
   se README:s Datamodell) - en positionell record-konstruktor med den
   längden vore oläsbar och lätt att kasta om av misstag. Använd
@@ -255,15 +258,15 @@ dubbletter.
   spegla en riktig telefon, inte bara en smal skärm.
 - **`@Lob private byte[] fält` mappar till Postgres `oid` (large object)
   med Hibernates standardinställningar, inte `bytea`.** Upptäckt via
-  `\d wines` i den här sessionen - `image`-kolumnen är `oid`, trots att
-  README/CLAUDE.md hela tiden sagt `bytea`. Fungerar transparent för
-  upp-/nedladdning via JDBC (bytes stämmer), så det syns inte i en
-  end-to-end-verifiering som bara testar HTTP-beteendet - bara genom att
-  faktiskt inspektera kolumntypen. Risken är föräldralösa poster i
-  `pg_largeobject` (Postgres städar inte bort dem automatiskt när raden
-  tas bort eller bilden byts ut). Inte åtgärdat än, se Datamodell-avsnittet
-  ovan för fixen. Kom ihåg att kontrollera detta explicit (`\d
-  <tabell>`) för framtida `@Lob byte[]`-fält, inte bara lita på att
-  applikationsbeteendet ser rätt ut.
+  `\d wines` - `image`-kolumnen var `oid`, trots att README/CLAUDE.md
+  hela tiden sagt `bytea`. Fungerar transparent för upp-/nedladdning via
+  JDBC (bytes stämmer), så det syns inte i en end-to-end-verifiering som
+  bara testar HTTP-beteendet - bara genom att faktiskt inspektera
+  kolumntypen. Risken var föräldralösa poster i `pg_largeobject`
+  (Postgres städar inte bort dem automatiskt när raden tas bort eller
+  bilden byts ut). Fixat 2026-07-17, se Datamodell-avsnittet ovan. Kom
+  ihåg att kontrollera detta explicit (`\d <tabell>`) för framtida
+  `@Lob byte[]`-fält, inte bara lita på att applikationsbeteendet ser
+  rätt ut.
 
 Se README.md:s "Nästa steg"-sektion - hålls bara på ett ställe.
