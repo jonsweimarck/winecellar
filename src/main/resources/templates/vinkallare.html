@@ -131,39 +131,50 @@
             column-gap: 1.5rem;
         }
         .vk-topp { grid-template-rows: auto auto; row-gap: 0.75rem; }
-        /* Bilden är medvetet smalare än sin kolumn (6rem via max-width) -
-           kolumnbredden själv lämnas orörd eftersom Inköpsdatum i
-           .vk-info-rad delar samma kolumn och behöver bredden för att
-           inte radbryta datumvärden. grid-row: 1 / 3 + align-self:
-           stretch spänner både text- och betygsraden och fyller hela
-           den ytan (inte bara begränsad storlek positionerad i ena
-           änden som tidigare iterationer) - så bildytan är alignad mot
-           både producentnamnets överkant och Vivino-värdets underkant.
-           object-fit: contain skalar bilden proportionerligt inom den
-           ytan (ingen distorsion), men ytan i sig växer med hur mycket
-           text vinet har - en medveten avvägning för att kunna alignas
-           mot båda kanterna samtidigt. `a`-taggen runt <img> måste
-           också vara block/100% hög, annars bryts height:100%-kedjan
-           eftersom en vanlig inline <a> inte har någon egen höjd.
+        /* Bilden är medvetet smalare än sin kolumn (6rem) - kolumnbredden
+           själv lämnas orörd eftersom Inköpsdatum i .vk-info-rad delar
+           samma kolumn och behöver bredden för att inte radbryta
+           datumvärden. grid-row: 1 / 3 + align-self: stretch spänner
+           både text- och betygsraden, så bildytan är alignad mot både
+           producentnamnets överkant och Vivino-värdets underkant.
 
-           object-position: bottom är nödvändigt för att en RIKTIG
-           flaskbild ska följa bildytans underkant - platshållarrutan
-           ("Ingen bild") har ingen egen bildförhållande och fyller
-           alltid hela ytan trivialt, men en riktig bild med contain
-           centreras (standard object-position: 50% 50%) inom sin box
-           när bildens eget höjd/bredd-förhållande inte matchar boxens,
-           vilket lämnar tomrum både ovanför och under bilden istället
-           för bara ovanför. Upptäckt av användaren mot den riktiga
-           deployen (en platshållare i lokal testning dolde buggen). */
-        .vk-bildyta { grid-column: 1; grid-row: 1 / 3; align-self: stretch; }
-        .vk-bildyta a { display: block; height: 100%; }
+           TVÅ MISSLYCKADE FÖRSÖK innan den här lösningen (viktigt att
+           inte återupprepa): en riktig flaskbild (till skillnad från
+           "Ingen bild"-platshållaren, som saknar eget bildförhållande)
+           kunde tvinga upp hela rad 1+2 till BILDENS egen höjd istället
+           för textens/betygets, trots height: 100% på <img> (en
+           procentandel som "borde" vara ofarlig). Grid-/flex-item har
+           min-height: auto som standard, vilket låter deras eget
+           innehålls naturliga storlek räknas in i hur höga
+           "auto"-raderna blir - ett första försök att nollställa detta
+           med min-height: 0 på .vk-bildyta räckte INTE (verifierat med
+           en smal/hög testbild och ett vin med lite text, där buggen
+           kvarstod även efter den fixen).
+
+           Den robusta lösningen: ta bilden helt ur det normala
+           dokumentflödet med position: absolute (inset: 0 fyller hela
+           .vk-bildytas yta). Absolutpositionerade element kan aldrig
+           bidra till sin förälders/grid-radens automatiska
+           storleksberäkning, oavsett bildens eget bildförhållande -
+           till skillnad från min-height: 0, som bara justerar en
+           tröskel men inte helt kopplar bort bidraget. .vk-bildyta
+           behöver position: relative för att fungera som
+           positioneringskontext åt <a>/<img>/platshållaren.
+
+           object-position: bottom är dessutom nödvändigt för att
+           bilden ska följa bildytans underkant istället för att
+           centreras (standard object-position: 50% 50%) när bildens
+           eget höjd/bredd-förhållande inte fyller hela ytan - annars
+           blir det tomrum både ovanför och under bilden. */
+        .vk-bildyta { grid-column: 1; grid-row: 1 / 3; align-self: stretch; position: relative; }
+        .vk-bildyta a { position: absolute; inset: 0; display: block; }
         .vk-bildyta img {
-            width: 100%; max-width: 6rem; height: 100%; object-fit: contain;
+            position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
             object-position: center bottom;
             border-radius: 0.25rem; background: #f0f0f0; display: block;
         }
         .vk-bildplatshallare {
-            width: 100%; max-width: 6rem; height: 100%; border-radius: 0.25rem; background: #f0f0f0;
+            position: absolute; inset: 0; border-radius: 0.25rem; background: #f0f0f0;
             display: flex; align-items: center; justify-content: center;
             color: #999; font-size: 0.7rem; text-align: center; padding: 0 0.2rem;
         }

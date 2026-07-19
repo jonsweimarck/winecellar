@@ -418,17 +418,49 @@ flaggade som gällande.
      till hands), inte bara mot "Ingen bild"-fallet, när en ändring rör
      `.vk-bildyta img`. Fixat med `object-position: center bottom` -
      tvingar `contain` att lägga eventuellt överskottsutrymme högst upp
-     istället för att dela det mellan topp och botten. **Kvarstående,
-     medveten avvägning:** en riktig bild kan bara garanterat nå **en**
-     kant fullständigt eftersom dess bildförhållande är fast medan
-     boxen växer med textmängden - underkanten (mot Vivino-värdet)
-     prioriterades eftersom det var det uttryckliga, senast angivna
-     kravet. Överkanten kan fortfarande ha ett tomrum för viner med
-     mycket text.
-  Verifierat manuellt vid 1280px efter alla fem omgångarna, sista
-  gången med en riktig (lokalt genererad) flaskbild på ett vin med
-  tillräckligt mycket text för att boxen ska bli högre än bildens eget
-  bredd/höjd-förhållande kräver.
+     istället för att dela det mellan topp och botten. **"Kvarstående
+     avvägning" som dokumenterades här var feldiagnostiserad - se steg 6,
+     det var inte bara ett litet tomrum ovanför.**
+  6. **Sjätte omgången: `position: absolute` - den verkliga boven.**
+     Användaren rapporterade (ny skärmdump) att underkanten fortfarande
+     inte alignade efter steg 5 - efter hård refresh och test i en annan
+     webbläsare (uteslöt cache/deploy-fördröjning) gick det att
+     återskapa lokalt, men bara med **både** en smal/hög testbild
+     (200×1000, smalare än steg 4/5:s 300×900) **och** ett vin med
+     **lite text** (kort producent/namn/ursprung, inga druvor) samtidigt.
+     Med lite text är textens/betygets egna naturliga höjd liten, så
+     bildens naturliga bildförhållande-höjd blir lättare den dominerande
+     faktorn - och en riktig, smal/hög flaskbild kunde då tvinga upp
+     **hela rad 1+2:s höjd** till bildens egen höjd, trots `height:
+     100%` på `<img>` (en procentandel som "borde" vara ofarlig).
+     Grid-/flex-item har `min-height: auto` som standard, vilket låter
+     deras eget innehålls naturliga storlek räknas in i hur höga
+     "auto"-raderna blir. **Ett första försök att nollställa detta med
+     `min-height: 0` på `.vk-bildyta` räckte INTE** - verifierat med
+     samma stress-test (smal/hög bild + lite text) som avslöjade buggen;
+     den kvarstod oförändrad efter den fixen. Den robusta lösningen: ta
+     bilden helt ur det normala dokumentflödet med `position: absolute`
+     (`inset: 0` fyller hela `.vk-bildyta`s yta; `.vk-bildyta` fick
+     `position: relative` som positioneringskontext åt `<a>`/`<img>`/
+     platshållaren). Absolutpositionerade element kan **aldrig** bidra
+     till sin förälders/grid-radens automatiska storleksberäkning,
+     oavsett bildens eget bildförhållande - till skillnad från
+     `min-height: 0`, som bara justerar en tröskel (`min-content`-bidrag)
+     men inte helt kopplar bort bidraget till track-sizing-algoritmen.
+     `max-width: 6rem` på `<img>`/platshållaren blev överflödig och togs
+     bort - `.vk-bildyta`s grid-kolumn är redan exakt `6rem`, och
+     `inset: 0` fyller den bredden ändå.
+     **Lärdom om testmetodik, viktig för framtida `.vk-bildyta`-ändringar:**
+     omgång fyra/fem verifierades bara med EN bildproportion (300×900)
+     på ett vin med MYCKET text - inte extremt nog för att avslöja
+     buggen. Verifiera alltid med **både** en ovanligt smal/hög
+     testbild **och** ett vin med minimal text samtidigt (den
+     kombination som gör bildens eget bidrag till radhöjden som störst
+     relativt textens) - inte bara mot "Ingen bild"-platshållaren eller
+     en enda "typisk" bild/textkombination.
+  Verifierat manuellt vid 1280px efter alla sex omgångarna, sista
+  gången med både en riktig (lokalt genererad, 200×1000) flaskbild och
+  ett textfattigt vin, plus regressionskoll av "Ingen bild"-fallet.
 
 ## Säkerhet
 

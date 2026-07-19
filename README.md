@@ -259,6 +259,36 @@ underkanten (mot Vivino-värdet, det uttryckliga kravet) prioriterades.
 mycket text, där boxen blir högre än vad bildens eget
 bredd/höjd-förhållande kräver.
 
+**Sjätte omgången: `position: absolute` - den verkliga boven, inte bara
+ett litet tomrum ovanför.** Femte omgångens "kvarstående avvägning"
+ovan visade sig vara feldiagnostiserad. Användaren rapporterade
+(med ny skärmdump) att underkanten fortfarande inte alignade efter
+`object-position`-fixen ovan - och efter en hård refresh och test i en
+annan webbläsare (uteslöt cache/deploy-fördröjning) gick det att
+återskapa lokalt: en riktig, smal/hög flaskbild kunde tvinga upp **hela
+rad 1+2:s höjd** till bildens egen bildförhållande-höjd, inte bara
+lämna ett litet tomrum. Tydligast för viner med **lite text** (kort
+producent/namn/ursprung, inga druvor) - då är textens/betygets egna
+naturliga höjd liten, så bildens naturliga höjd blir lättare den
+dominerande faktorn. Grid-/flex-item har `min-height: auto` som
+standard, vilket låter deras eget innehålls naturliga storlek räknas
+in i hur höga "auto"-raderna blir, **även med `height: 100%`** på
+`<img>` - ett första försök att nollställa detta med `min-height: 0`
+på `.vk-bildyta` räckte **inte** (verifierat med samma smala/höga
+testbild som avslöjade buggen - den kvarstod). Den robusta lösningen:
+ta bilden helt ur det normala dokumentflödet med `position: absolute`
+(`inset: 0` fyller hela `.vk-bildyta`s yta, som i sin tur får
+`position: relative` som positioneringskontext). Absolutpositionerade
+element kan aldrig bidra till sin förälders storleksberäkning, oavsett
+bildens eget bildförhållande - till skillnad från `min-height: 0`, som
+bara justerar en tröskel men inte helt kopplar bort bidraget.
+**Lärdom om testmetodik:** det första verifieringspasset (omgång
+fyra) använde bara en bild med aspect ratio 300×900 (1:3) på ett vin
+med mycket text - inte tillräckligt extremt för att avslöja buggen.
+Omgång sex verifierades med både en smalare/högre testbild (200×1000)
+**och** ett vin med minimal text samtidigt - den kombinationen som
+faktiskt triggar problemet.
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):
