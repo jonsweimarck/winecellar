@@ -218,6 +218,25 @@ Verifierat manuellt vid 1280px med både ett vin med lång text och ett
 med kort text: bildens underkant linjerar med Vivino-värdet i båda
 fallen, och Inköpsdatum/betygsvärdena radbryter fortfarande inte.
 
+**Fjärde omgången: både överkant och underkant, tillbaka till
+`stretch`** - användaren ville att bilden även skulle linjera mot
+producentnamnets överkant, inte bara mot Vivino-värdets underkant.
+Att vara alignad i **båda** ändarna samtidigt går bara med `align-self:
+stretch` (bilden fyller hela den spända ytan, `grid-row: 1 / 3`) -
+`end` (föregående omgång) och `start` (omgången innan dess) kan bara
+träffa en kant i taget, eftersom en begränsad storlek som inte fyller
+hela ytan alltid lämnar tomrum någonstans. `.vk-bildyta img`/
+`.vk-bildplatshallare` gick från `max-height` till `height: 100%`
+(fortfarande `max-width: 6rem` för bredden) - `object-fit: contain`
+skalar innehållet proportionerligt utan distorsion, men själva ytan
+(och därmed hur hög bilden faktiskt blir) växer nu med hur mycket text
+vinet har, en medveten avvägning för att kunna alignas mot båda
+kanterna. `<a>`-taggen som omsluter `<img>` fick också
+`display: block; height: 100%` - annars bryts `height: 100%`-kedjan
+eftersom en vanlig inline `<a>` inte har någon egen resolverbar höjd.
+Verifierat manuellt vid 1280px med både lång och kort text: bilden
+linjerar mot båda kanterna i båda fallen, och ingenting annat radbryter.
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):

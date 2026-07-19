@@ -343,9 +343,9 @@ flaggade som gällande.
     `WineControllerTest` fick `skaRenderaBredaKortMedAllaFältSynliga`,
     som bland annat verifierar att `<table>` och `vinbild-tabell`
     **inte** längre förekommer i den renderade HTML:en.
-  **Bildens storlek/position justerad i tre omgångar (2026-07-20)**,
+  **Bildens storlek/position justerad i fyra omgångar (2026-07-20)**,
   efter att användaren tyckte den var onödigt stor och sedan ville ha
-  underkanten linjerad mot betygsraden. Kolumnbredden (`6rem`) i
+  under- och till sist överkanten linjerad. Kolumnbredden (`6rem`) i
   `grid-template-columns` rördes **inte** i någon av omgångarna - den
   delas med Inköpsdatum i `.vk-info-rad`, som behöver bredden för att
   `"2026-04-18"`-liknande datumvärden inte ska radbryta. Istället
@@ -380,10 +380,28 @@ flaggade som gällande.
      - bilden förblir liten (styrd av `max-width`/`max-height`) men dess
      underkant hamnar ändå i linje med betygsradens underkant (samma
      höjd som Vivino-värdet), eftersom båda ligger i samma grid-area.
-  Verifierat manuellt vid 1280px efter alla tre omgångarna, sista
-  gången med både ett vin med lång text och ett med kort text (för att
-  se att bottenjusteringen ser rimlig ut oavsett hur hög textkolumnen
-  råkar bli).
+  4. **Fjärde omgången: både överkant och underkant.** Användaren
+     ville att bilden även skulle linjera mot producentnamnets överkant,
+     inte bara mot Vivino-värdets underkant. Att träffa **båda** kanterna
+     samtidigt går bara med `align-self: stretch` tillbaka - `end` (steg
+     3) och `start` (steg 1) kan bara träffa en kant i taget, eftersom en
+     begränsad storlek som inte fyller hela ytan alltid lämnar tomrum
+     någonstans. `.vk-bildyta img`/`.vk-bildplatshallare` gick från
+     `max-height` till `height: 100%` (fortsatt `max-width: 6rem` för
+     bredden) - `object-fit: contain` skalar innehållet proportionerligt
+     utan distorsion, men ytan (och därmed hur hög bilden faktiskt blir)
+     växer nu med textmängden, en medveten avvägning för att klara båda
+     kanterna samtidigt - i praktiken samma CSS som den allra första
+     "för stora" versionen i steg 3 ovan. **Ny fälla som dök upp här:**
+     `<a>`-taggen som omsluter `<img>` när vinet har en bild är
+     `display: inline` som standard, vilket saknar en egen resolverbar
+     höjd - `height: 100%` på `<img>` gick då inte igenom kedjan
+     korrekt. Fixat med `.vk-bildyta a { display: block; height: 100%
+     }`. Behövdes inte i steg 1-3, eftersom `max-height` i rem-enheter
+     inte är beroende av att föräldraelementet har en resolverbar
+     procentuell höjd.
+  Verifierat manuellt vid 1280px efter alla fyra omgångarna, sista
+  gången med både ett vin med lång text och ett med kort text.
 
 ## Säkerhet
 

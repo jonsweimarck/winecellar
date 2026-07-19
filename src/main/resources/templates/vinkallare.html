@@ -131,21 +131,28 @@
             column-gap: 1.5rem;
         }
         .vk-topp { grid-template-rows: auto auto; row-gap: 0.75rem; }
-        /* Bilden är medvetet mindre än sin kolumn (6rem) - kolumnbredden
-           lämnas orörd eftersom Inköpsdatum i .vk-info-rad delar samma
-           kolumn och behöver bredden för att inte radbryta datumvärden.
-           grid-row: 1 / 3 + align-self: end spänner både text- och
-           betygsraden men bottenjusterar bilden istället för att
-           sträcka den (stretch) - så bildens underkant hamnar i linje
-           med Vivino-värdets underkant, men storleken begränsas
-           fortfarande av max-width/max-height, inte av radernas höjd. */
-        .vk-bildyta { grid-column: 1; grid-row: 1 / 3; align-self: end; }
+        /* Bilden är medvetet smalare än sin kolumn (6rem via max-width) -
+           kolumnbredden själv lämnas orörd eftersom Inköpsdatum i
+           .vk-info-rad delar samma kolumn och behöver bredden för att
+           inte radbryta datumvärden. grid-row: 1 / 3 + align-self:
+           stretch spänner både text- och betygsraden och fyller hela
+           den ytan (inte bara begränsad storlek positionerad i ena
+           änden som tidigare iterationer) - så bilden är alignad mot
+           både producentnamnets överkant och Vivino-värdets underkant.
+           object-fit: contain skalar bilden proportionerligt inom den
+           ytan (ingen distorsion), men ytan i sig växer med hur mycket
+           text vinet har - en medveten avvägning för att kunna alignas
+           mot båda kanterna samtidigt. `a`-taggen runt <img> måste
+           också vara block/100% hög, annars bryts height:100%-kedjan
+           eftersom en vanlig inline <a> inte har någon egen höjd. */
+        .vk-bildyta { grid-column: 1; grid-row: 1 / 3; align-self: stretch; }
+        .vk-bildyta a { display: block; height: 100%; }
         .vk-bildyta img {
-            width: 100%; max-width: 6rem; max-height: 9rem; object-fit: contain;
+            width: 100%; max-width: 6rem; height: 100%; object-fit: contain;
             border-radius: 0.25rem; background: #f0f0f0; display: block;
         }
         .vk-bildplatshallare {
-            width: 100%; max-width: 6rem; height: 9rem; border-radius: 0.25rem; background: #f0f0f0;
+            width: 100%; max-width: 6rem; height: 100%; border-radius: 0.25rem; background: #f0f0f0;
             display: flex; align-items: center; justify-content: center;
             color: #999; font-size: 0.7rem; text-align: center; padding: 0 0.2rem;
         }
