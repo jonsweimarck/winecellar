@@ -182,9 +182,16 @@ flaggade som gällande.
   bredd att fördela fälten på två kolumner istället för kortvyns en.
   **Kortmallen designad om efter en PNG-mockup (2026-07-19), avgränsad
   till kortvyn - tabellvyn rörs inte.** `.vinkort` gick från ett
-  vertikalt stack med `<dl>`-fältetiketter till en flex-rad: en smal
-  bildkolumn (`.vinkort-bildyta`, `flex: 0 0 5.5rem`) och en
-  textkolumn. De flesta fälten (producent, namn+årgång, ursprung,
+  vertikalt stack med `<dl>`-fältetiketter till en tvådelad layout:
+  `.vinkort-topp` är en flex-rad med en smal bildkolumn
+  (`.vinkort-bildyta`, `flex: 0 0 5.5rem`) och en textkolumn, medan
+  betygen, `<details>` och `.vinkort-fot` (Redigera/Ta bort) ligger som
+  egna block **direkt under** `.vinkort` (utanför `.vinkort-topp`) och
+  därmed spänner hela kortets bredd. Den uppdelningen kom i en andra
+  omgång, efter att användaren påpekade att en flaskbild ofta slutar
+  ungefär vid druvor-raden - att låta betyg/Detaljer/knapparna ligga
+  kvar i den smala textkolumnen bredvid bilden slösade bort utrymmet
+  under bilden. De flesta fälten (producent, namn+årgång, ursprung,
   vintyp, druvor) visas som löpande text utan fältetiketter -
   medvetet inkonsekvent med tabellvyns kolumnrubriker, eftersom
   mockupen uttryckligen ville ha den stilen bara på kortet. Betygen

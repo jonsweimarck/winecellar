@@ -66,22 +66,29 @@ deployen, fixat 2026-07-19).
 
 **Kortmallen fick en egen designomgång (2026-07-19)**, styrd av en PNG-
 mockup användaren ritade upp (bild vänster, text höger, inga fältetiketter
-för de flesta fälten). `.vinkort` är nu ett flex-radlayout: en smal
+för de flesta fälten). `.vinkort-topp` är en flex-rad med en smal
 bildkolumn (`.vinkort-bildyta`, `flex: 0 0 5.5rem`) och en textkolumn
-till höger. Producent visas utan egen etikett, namn och årgång på samma
+till höger - producent visas utan egen etikett, namn och årgång på samma
 rad (`<strong>Namn</strong> Årgång`), ursprung (land/region/underregion)
 som en löpande rad utan fältetiketter, vintyp inom parentes på egen rad
 med extra luft ovanför, druvor på egen rad. Betygen (eget, Munskänkarnas,
-Vivino) grupperas under en egen rubrikfri sektion med etiketten *ovanför*
-sitt värde (inte på samma rad) - annars radbröts långa betygstexter
-(t.ex. Munskänkarnas fulla etikett) mitt i på ett sätt som såg trasigt
-ut. Antal flaskor är inte med i mockupen men löstes som en rund badge i
-kortets övre högra hörn (`.flaskor-badge`, `position: absolute`) efter
-en avstämning med användaren - central information för en vinkällarapp
-som annars hade krävt en utfällning för att se. "Detaljer" är en vanlig
-`<summary>` men styld som en understruken länk (`text-decoration:
-underline; font-weight: normal`) istället för tabellvyns fetstilta
-knapputseende, för att matcha mockupens länkkänsla. Tabellvyn är
+Vivino), "Detaljer" och knapparna (Redigera/Ta bort) ligger däremot
+**utanför** `.vinkort-topp`, som egna block direkt under `.vinkort` -
+de spänner alltså hela kortets bredd istället för att trängas i den
+smala textkolumnen. Ändringen kom efter att användaren påpekade att
+bilden (t.ex. en flaskfoto) ofta slutar ungefär vid druvor-raden, så
+utrymmet under bilden stod oanvänt när resten av kortet klämdes in i
+textkolumnen bredvid. Betygen grupperas under en egen rubrikfri sektion
+med etiketten *ovanför* sitt värde (inte på samma rad) - annars radbröts
+långa betygstexter (t.ex. Munskänkarnas fulla etikett) mitt i på ett
+sätt som såg trasigt ut. Antal flaskor är inte med i mockupen men
+löstes som en rund badge i kortets övre högra hörn (`.flaskor-badge`,
+`position: absolute`) efter en avstämning med användaren - central
+information för en vinkällarapp som annars hade krävt en utfällning
+för att se. "Detaljer" är en vanlig `<summary>` men styld som en
+understruken länk (`text-decoration: underline; font-weight: normal`)
+istället för tabellvyns fetstilta knapputseende, för att matcha
+mockupens länkkänsla. Tabellvyn är
 oförändrad - designomgången är avgränsad till kortmallen, tabellen får
 sin egen omgång senare.
 

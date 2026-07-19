@@ -27,9 +27,8 @@
             border-radius: 0.5rem;
             padding: 1rem;
             margin-top: 1rem;
-            display: flex;
-            gap: 1rem;
         }
+        .vinkort-topp { display: flex; gap: 1rem; }
         .vinkort-bildyta { flex: 0 0 5.5rem; }
         .vinkort-text { flex: 1 1 auto; min-width: 0; }
         .vinkort-producent { margin: 0; }
@@ -199,41 +198,43 @@
         <div id="vinlista-kort" class="vinlista-kort">
             <div class="vinkort" th:each="vin : ${viner}">
                 <span class="flaskor-badge" th:text="${vin.quantity}" title="Antal flaskor"></span>
-                <div class="vinkort-bildyta">
-                    <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
-                        <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}" alt="Etikett" class="vinbild-kort">
-                    </a>
-                    <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
+                <div class="vinkort-topp">
+                    <div class="vinkort-bildyta">
+                        <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
+                            <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}" alt="Etikett" class="vinbild-kort">
+                        </a>
+                        <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
+                    </div>
+                    <div class="vinkort-text">
+                        <p class="vinkort-producent" th:text="${vin.producer}"></p>
+                        <p class="vinkort-namn"><strong th:text="${vin.name}"></strong> <span th:text="${vin.vintage}"></span></p>
+                        <p class="vinkort-ursprung">
+                            <span th:text="${vin.country}"></span>
+                            <span th:if="${vin.region != null}" th:text="${vin.region}"></span>
+                            <span th:if="${vin.subregion != null}" th:text="${vin.subregion}"></span>
+                        </p>
+                        <p class="vinkort-typ">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
+                        <p class="vinkort-druvor" th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
+                    </div>
                 </div>
-                <div class="vinkort-text">
-                    <p class="vinkort-producent" th:text="${vin.producer}"></p>
-                    <p class="vinkort-namn"><strong th:text="${vin.name}"></strong> <span th:text="${vin.vintage}"></span></p>
-                    <p class="vinkort-ursprung">
-                        <span th:text="${vin.country}"></span>
-                        <span th:if="${vin.region != null}" th:text="${vin.region}"></span>
-                        <span th:if="${vin.subregion != null}" th:text="${vin.subregion}"></span>
-                    </p>
-                    <p class="vinkort-typ">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
-                    <p class="vinkort-druvor" th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
-                    <div class="vinkort-betyg">
-                        <p th:if="${vin.ownRating != null}"><span class="betyg-label">Eget betyg</span><span class="betyg-varde" th:text="${vin.ownRating.label()}"></span></p>
-                        <p th:if="${vin.munskankarnaRating != null}"><span class="betyg-label">Munskänkarna</span><span class="betyg-varde" th:text="${vin.munskankarnaRating.label()}"></span></p>
-                        <p th:if="${vin.vivinoRating != null}"><span class="betyg-label">Vivino</span><span class="betyg-varde" th:text="${vin.vivinoRating}"></span></p>
-                    </div>
-                    <details>
-                        <summary>Detaljer</summary>
-                        <dl>
-                            <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
-                        </dl>
-                    </details>
-                    <div class="vinkort-fot">
-                        <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
-                        <button type="button"
-                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
-                                hx-target="#vinlista" hx-swap="outerHTML">
-                            Ta bort
-                        </button>
-                    </div>
+                <div class="vinkort-betyg">
+                    <p th:if="${vin.ownRating != null}"><span class="betyg-label">Eget betyg</span><span class="betyg-varde" th:text="${vin.ownRating.label()}"></span></p>
+                    <p th:if="${vin.munskankarnaRating != null}"><span class="betyg-label">Munskänkarna</span><span class="betyg-varde" th:text="${vin.munskankarnaRating.label()}"></span></p>
+                    <p th:if="${vin.vivinoRating != null}"><span class="betyg-label">Vivino</span><span class="betyg-varde" th:text="${vin.vivinoRating}"></span></p>
+                </div>
+                <details>
+                    <summary>Detaljer</summary>
+                    <dl>
+                        <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
+                    </dl>
+                </details>
+                <div class="vinkort-fot">
+                    <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
+                    <button type="button"
+                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                            hx-target="#vinlista" hx-swap="outerHTML">
+                        Ta bort
+                    </button>
                 </div>
             </div>
         </div>
