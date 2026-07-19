@@ -180,6 +180,28 @@ flaggade som gällande.
   (`.detaljlista-bred`, `grid-template-columns: repeat(2, auto 1fr)`)
   istället för kortvyns `.vinkort dl`, eftersom den nu har gott om
   bredd att fördela fälten på två kolumner istället för kortvyns en.
+  **Kortmallen designad om efter en PNG-mockup (2026-07-19), avgränsad
+  till kortvyn - tabellvyn rörs inte.** `.vinkort` gick från ett
+  vertikalt stack med `<dl>`-fältetiketter till en flex-rad: en smal
+  bildkolumn (`.vinkort-bildyta`, `flex: 0 0 5.5rem`) och en
+  textkolumn. De flesta fälten (producent, namn+årgång, ursprung,
+  vintyp, druvor) visas som löpande text utan fältetiketter -
+  medvetet inkonsekvent med tabellvyns kolumnrubriker, eftersom
+  mockupen uttryckligen ville ha den stilen bara på kortet. Betygen
+  fick etiketten *ovanför* värdet (`.betyg-label`/`.betyg-varde`,
+  båda `display: block`) istället för på samma rad - en första
+  version med etikett och värde på samma rad gav radbrytning mitt i
+  långa betygstexter (t.ex. `Munskänkarnas betyg`s fulla svenska
+  etikett), vilket användaren bad om att få fixat. Antal flaskor
+  (inte med i mockupen) löstes efter en avstämning som en badge i
+  kortets övre högra hörn (`.flaskor-badge`, `position: absolute;
+  top/right: -0.6rem` - flyttades dit från övre vänstra hörnet efter
+  en första feedback-runda). "Detaljer" är fortfarande en vanlig
+  `<summary>`, men stylad som en understruken länk
+  (`.vinkort summary { text-decoration: underline; font-weight:
+  normal }`) istället för tabellvyns fetstilta variant, för att matcha
+  mockupens länkkänsla - scopead till `.vinkort` så tabellens
+  `<summary>` inte påverkas.
 
 ## Säkerhet
 

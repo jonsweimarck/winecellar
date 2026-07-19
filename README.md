@@ -64,6 +64,27 @@ smala kolumner - annars klämdes de uppfällda fälten in i en enda smal
 kolumn även på en stor skärm (upptäckt av användaren mot den riktiga
 deployen, fixat 2026-07-19).
 
+**Kortmallen fick en egen designomgång (2026-07-19)**, styrd av en PNG-
+mockup användaren ritade upp (bild vänster, text höger, inga fältetiketter
+för de flesta fälten). `.vinkort` är nu ett flex-radlayout: en smal
+bildkolumn (`.vinkort-bildyta`, `flex: 0 0 5.5rem`) och en textkolumn
+till höger. Producent visas utan egen etikett, namn och årgång på samma
+rad (`<strong>Namn</strong> Årgång`), ursprung (land/region/underregion)
+som en löpande rad utan fältetiketter, vintyp inom parentes på egen rad
+med extra luft ovanför, druvor på egen rad. Betygen (eget, Munskänkarnas,
+Vivino) grupperas under en egen rubrikfri sektion med etiketten *ovanför*
+sitt värde (inte på samma rad) - annars radbröts långa betygstexter
+(t.ex. Munskänkarnas fulla etikett) mitt i på ett sätt som såg trasigt
+ut. Antal flaskor är inte med i mockupen men löstes som en rund badge i
+kortets övre högra hörn (`.flaskor-badge`, `position: absolute`) efter
+en avstämning med användaren - central information för en vinkällarapp
+som annars hade krävt en utfällning för att se. "Detaljer" är en vanlig
+`<summary>` men styld som en understruken länk (`text-decoration:
+underline; font-weight: normal`) istället för tabellvyns fetstilta
+knapputseende, för att matcha mockupens länkkänsla. Tabellvyn är
+oförändrad - designomgången är avgränsad till kortmallen, tabellen får
+sin egen omgång senare.
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):

@@ -22,11 +22,27 @@
             .vinlista-kort { display: block; }
         }
         .vinkort {
+            position: relative;
             border: 1px solid #ddd;
             border-radius: 0.5rem;
             padding: 1rem;
             margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
         }
+        .vinkort-bildyta { flex: 0 0 5.5rem; }
+        .vinkort-text { flex: 1 1 auto; min-width: 0; }
+        .vinkort-producent { margin: 0; }
+        .vinkort-namn { margin: 0.15rem 0 0; font-size: 1.1rem; }
+        .vinkort-ursprung { margin: 0.15rem 0 0; }
+        .vinkort-typ { margin: 0.75rem 0 0; }
+        .vinkort-druvor { margin: 0.15rem 0 0; }
+        .vinkort-betyg { margin-top: 0.75rem; }
+        .vinkort-betyg p { margin: 0 0 0.4rem; }
+        .vinkort-betyg p:last-child { margin-bottom: 0; }
+        .vinkort-betyg .betyg-label, .vinkort-betyg .betyg-varde { display: block; }
+        .vinkort details { margin-top: 0.75rem; }
+        .vinkort summary { text-decoration: underline; font-weight: normal; cursor: pointer; }
         .vinkort dl {
             display: grid;
             grid-template-columns: auto 1fr;
@@ -37,8 +53,26 @@
         .vinkort dd { margin: 0; }
         .vinkort .vinkort-fot { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; margin-top: 0.75rem; }
 
+        .flaskor-badge {
+            position: absolute;
+            top: -0.6rem;
+            right: -0.6rem;
+            min-width: 1.75rem;
+            height: 1.75rem;
+            padding: 0 0.35rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #333;
+            color: #fff;
+            font-weight: bold;
+            font-size: 0.85rem;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
         .vinbild-tabell { width: 3rem; height: 4rem; object-fit: contain; background: #f0f0f0; border-radius: 0.25rem; display: block; }
-        .vinbild-kort { width: 100%; max-height: 12rem; object-fit: contain; background: #f0f0f0; border-radius: 0.5rem; display: block; margin-bottom: 0.5rem; }
+        .vinbild-kort { width: 100%; max-height: 12rem; object-fit: contain; background: #f0f0f0; border-radius: 0.5rem; display: block; }
         .vinbild-saknas { color: #999; font-size: 0.85rem; }
 
         /* Detaljer utöver överbliksfälten - infällda per rad/kort, se
@@ -164,53 +198,42 @@
 
         <div id="vinlista-kort" class="vinlista-kort">
             <div class="vinkort" th:each="vin : ${viner}">
-                <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
-                    <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}" alt="Etikett" class="vinbild-kort">
-                </a>
-                <strong th:text="${vin.name}"></strong>
-                <dl>
-                    <dt>Typ</dt>
-                    <dd th:switch="${vin.wineType.name()}">
-                        <span th:case="'RED'">Rött</span>
-                        <span th:case="'WHITE'">Vitt</span>
-                        <span th:case="'ROSE'">Rosé</span>
-                        <span th:case="'SPARKLING'">Mousserande</span>
-                        <span th:case="'FORTIFIED'">Starkvin</span>
-                    </dd>
-                    <dt>Producent</dt>
-                    <dd th:text="${vin.producer}"></dd>
-                    <dt>Land</dt>
-                    <dd th:text="${vin.country}"></dd>
-                    <dt>Region</dt>
-                    <dd th:text="${vin.region}"></dd>
-                    <dt>Underregion</dt>
-                    <dd th:text="${vin.subregion}"></dd>
-                    <dt>Druvor</dt>
-                    <dd th:text="${vin.grapes}"></dd>
-                    <dt>Årgång</dt>
-                    <dd th:text="${vin.vintage}"></dd>
-                    <dt>Flaskor</dt>
-                    <dd th:text="${vin.quantity}"></dd>
-                    <dt>Eget betyg</dt>
-                    <dd th:text="${vin.ownRating != null ? vin.ownRating.label() : ''}"></dd>
-                    <dt>Munskänkarnas betyg</dt>
-                    <dd th:text="${vin.munskankarnaRating != null ? vin.munskankarnaRating.label() : ''}"></dd>
-                    <dt>Vivino-betyg</dt>
-                    <dd th:text="${vin.vivinoRating}"></dd>
-                </dl>
-                <details>
-                    <summary>Detaljer</summary>
-                    <dl>
-                        <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
-                    </dl>
-                </details>
-                <div class="vinkort-fot">
-                    <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
-                    <button type="button"
-                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
-                            hx-target="#vinlista" hx-swap="outerHTML">
-                        Ta bort
-                    </button>
+                <span class="flaskor-badge" th:text="${vin.quantity}" title="Antal flaskor"></span>
+                <div class="vinkort-bildyta">
+                    <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
+                        <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}" alt="Etikett" class="vinbild-kort">
+                    </a>
+                    <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
+                </div>
+                <div class="vinkort-text">
+                    <p class="vinkort-producent" th:text="${vin.producer}"></p>
+                    <p class="vinkort-namn"><strong th:text="${vin.name}"></strong> <span th:text="${vin.vintage}"></span></p>
+                    <p class="vinkort-ursprung">
+                        <span th:text="${vin.country}"></span>
+                        <span th:if="${vin.region != null}" th:text="${vin.region}"></span>
+                        <span th:if="${vin.subregion != null}" th:text="${vin.subregion}"></span>
+                    </p>
+                    <p class="vinkort-typ">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
+                    <p class="vinkort-druvor" th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
+                    <div class="vinkort-betyg">
+                        <p th:if="${vin.ownRating != null}"><span class="betyg-label">Eget betyg</span><span class="betyg-varde" th:text="${vin.ownRating.label()}"></span></p>
+                        <p th:if="${vin.munskankarnaRating != null}"><span class="betyg-label">Munskänkarna</span><span class="betyg-varde" th:text="${vin.munskankarnaRating.label()}"></span></p>
+                        <p th:if="${vin.vivinoRating != null}"><span class="betyg-label">Vivino</span><span class="betyg-varde" th:text="${vin.vivinoRating}"></span></p>
+                    </div>
+                    <details>
+                        <summary>Detaljer</summary>
+                        <dl>
+                            <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
+                        </dl>
+                    </details>
+                    <div class="vinkort-fot">
+                        <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
+                        <button type="button"
+                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                                hx-target="#vinlista" hx-swap="outerHTML">
+                            Ta bort
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
