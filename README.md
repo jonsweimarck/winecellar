@@ -124,6 +124,11 @@ samma fragment kan fortsätta återanvändas av tabellens
 `.detaljlista-bred`, som behåller sin egen (ursprungliga)
 dokumentordning helt opåverkad av kortvyns omordning.
 
+**Annan referens fick samma stapling (2026-07-20):** låg kvar i
+sida-vid-sida-läget efter föregående omgång, vilket visade sig vara
+lika inkonsekvent som Varför köpt hade varit - samma fix (`grid-column:
+1 / -1` på `fd-annan-referens`, scopeat under `.vinkort dl`).
+
 **Systembolagets produktnummer slogs ihop med beskrivningsraden
 (2026-07-19), i både tabell- och kortvyn:** visades tidigare som en
 egen `dt`/`dd`-rad (`fd-sb-nummer`); den klassen och raden är nu

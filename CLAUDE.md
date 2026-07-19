@@ -256,6 +256,12 @@ flaggade som gällande.
   `<span>`-uppdelning av label/värde (till skillnad från
   `.betyg-label`/`.betyg-varde`-mönstret som användes för betygsraderna
   tidigare, där käll-HTML:en själv behövde två separata element).
+  **Annan referens fick samma stapling (2026-07-20)**, efter att
+  användaren påpekade att den - liksom Varför köpt i föregående
+  justering - var inkonsekvent kvar i sida-vid-sida-läget. `fd-annan-
+  referens { order: 90 }` fick `grid-column: 1 / -1` tillagt, exakt
+  samma mönster som de fyra övriga staplade fälten - inga andra
+  ändringar behövdes.
   **Systembolagets produktnummer slogs ihop med beskrivningsraden
   (2026-07-19), i BÅDA vyerna - till skillnad från
   ordningsjusteringen/staplingen ovan, som bara gäller kortvyn.**
