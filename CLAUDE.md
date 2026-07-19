@@ -156,6 +156,23 @@ flaggade som gällande.
   `th:insert="~{::detaljfalt(${vin})}"` binder parametern korrekt vid
   faktiska anrop, så vaktklausulen slår bara till vid den oavsiktliga
   direktrenderingen.
+  **Tabellvyns detaljrad fick egen `<tr>` (fixat 2026-07-19):** den
+  ursprungliga varianten la `<details>` i tabellradens sista `<td>`, så
+  det uppfällda innehållet klämdes in i den smala kolumnens bredd även
+  på en stor skärm - upptäckt av användaren mot den riktiga deployen.
+  Fixat genom att låta varje vin rendera **två** `<tr>` (huvudrad +
+  `<tr class="detaljrad">` med en enda `<td colspan="9">` som spänner
+  hela tabellbredden), grupperade med `<th:block th:each="vin :
+  ${viner}">` runt båda raderna - `th:block` renderar ingen egen tagg,
+  så resultatet blir en platt sekvens av `<tr>`-element direkt under
+  `<tbody>`, vilket är det enda giltiga sättet att upprepa flera
+  syskon-rader per Thymeleaf-iteration. `colspan="9"` måste hållas i
+  synk med antalet `<th>` i `<thead>` (Bild/Namn/Typ/Producent/Land/
+  Årgång/Flaskor/Plats/åtgärdskolumnen) - ändra båda om en kolumn läggs
+  till eller tas bort. Detaljernas `<dl>` använder en egen klass
+  (`.detaljlista-bred`, `grid-template-columns: repeat(2, auto 1fr)`)
+  istället för kortvyns `.vinkort dl`, eftersom den nu har gott om
+  bredd att fördela fälten på två kolumner istället för kortvyns en.
 
 ## Säkerhet
 

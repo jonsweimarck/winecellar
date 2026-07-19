@@ -43,13 +43,15 @@
 
         /* Detaljer utöver överbliksfälten - infällda per rad/kort, se
            detaljfalt-fragmentet nedan som delas mellan tabell- och kortvyn.
-           .vinkort dl-reglerna ovan täcker redan dt/dd-utseendet här också,
-           eftersom detaljernas <dl> alltid är en efterkommande till antingen
-           .vinkort eller en tabellcell. */
+           .vinkort dl-reglerna ovan täcker redan dt/dd-utseendet i kortvyn.
+           I tabellvyn ligger detaljraden i en egen <tr> som spänner över
+           hela tabellbredden (colspan) istället för att klämmas in i en
+           enda smal kolumn - annars hamnar alla fält i en och samma smala
+           kolumn även på en stor skärm. */
         details summary { cursor: pointer; font-weight: bold; }
-        td details dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; margin: 0.5rem 0; }
-        td details dt { font-weight: bold; }
-        td details dd { margin: 0; }
+        .detaljlista-bred { display: grid; grid-template-columns: repeat(2, auto 1fr); column-gap: 2rem; row-gap: 0.25rem; margin: 0.5rem 0; }
+        .detaljlista-bred dt { font-weight: bold; }
+        .detaljlista-bred dd { margin: 0; }
         .vinkort details { margin-top: 0.75rem; }
     </style>
 </head>
@@ -115,49 +117,52 @@
                         <th>Årgång</th>
                         <th>Flaskor</th>
                         <th>Plats</th>
-                        <th>Detaljer</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="vin : ${viner}">
-                        <td>
-                            <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
-                                <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}"
-                                     alt="Etikett" class="vinbild-tabell">
-                            </a>
-                            <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
-                        </td>
-                        <td th:text="${vin.name}"></td>
-                        <td th:switch="${vin.wineType.name()}">
-                            <span th:case="'RED'">Rött</span>
-                            <span th:case="'WHITE'">Vitt</span>
-                            <span th:case="'ROSE'">Rosé</span>
-                            <span th:case="'SPARKLING'">Mousserande</span>
-                            <span th:case="'FORTIFIED'">Starkvin</span>
-                        </td>
-                        <td th:text="${vin.producer}"></td>
-                        <td th:text="${vin.country}"></td>
-                        <td th:text="${vin.vintage}"></td>
-                        <td th:text="${vin.quantity}"></td>
-                        <td th:text="${vin.location}"></td>
-                        <td>
-                            <details>
-                                <summary>Detaljer</summary>
-                                <dl>
-                                    <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
-                                </dl>
-                            </details>
-                        </td>
-                        <td>
-                            <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
-                            <button type="button"
-                                    th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
-                                    hx-target="#vinlista" hx-swap="outerHTML">
-                                Ta bort
-                            </button>
-                        </td>
-                    </tr>
+                    <th:block th:each="vin : ${viner}">
+                        <tr>
+                            <td>
+                                <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
+                                    <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}"
+                                         alt="Etikett" class="vinbild-tabell">
+                                </a>
+                                <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
+                            </td>
+                            <td th:text="${vin.name}"></td>
+                            <td th:switch="${vin.wineType.name()}">
+                                <span th:case="'RED'">Rött</span>
+                                <span th:case="'WHITE'">Vitt</span>
+                                <span th:case="'ROSE'">Rosé</span>
+                                <span th:case="'SPARKLING'">Mousserande</span>
+                                <span th:case="'FORTIFIED'">Starkvin</span>
+                            </td>
+                            <td th:text="${vin.producer}"></td>
+                            <td th:text="${vin.country}"></td>
+                            <td th:text="${vin.vintage}"></td>
+                            <td th:text="${vin.quantity}"></td>
+                            <td th:text="${vin.location}"></td>
+                            <td>
+                                <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
+                                <button type="button"
+                                        th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                                        hx-target="#vinlista" hx-swap="outerHTML">
+                                    Ta bort
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="detaljrad">
+                            <td colspan="9">
+                                <details>
+                                    <summary>Detaljer</summary>
+                                    <dl class="detaljlista-bred">
+                                        <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
+                                    </dl>
+                                </details>
+                            </td>
+                        </tr>
+                    </th:block>
                 </tbody>
             </table>
         </div>
