@@ -554,10 +554,40 @@ Kolumnlayouten (A-U på `Vin`-fliken) är hårdkodad i `VinradParser` - se
 README:s Datamodell-avsnitt för vilket fält varje kolumn motsvarar.
 Rader som saknar vintyp, land, producent eller namn hoppas över med en
 utskriven varning (ofullständiga utkastrader förekommer i källfilen).
-Etikett-kolumnen (`Bild`) importeras **inte** - Excels "bild i cell" är
-inbäddad rich data, inte ett vanligt cellvärde, och att extrahera den
-robust är inte värt det för ett engångsskript. Ladda upp etiketterna
-manuellt via webb-UI:t (`POST /wines/{id}/bild`) efteråt istället.
+Etikett-kolumnen (`Bild`) i själva Excel-filen läses **fortfarande inte**
+- Excels "bild i cell" är inbäddad rich data, inte ett vanligt cellvärde,
+och att extrahera den robust är inte värt det för ett engångsskript.
+
+**Etiketter kan istället importeras från en vanlig bildmapp (byggt
+2026-07-19):** sätt miljövariabeln `WINECELLAR_IMPORT_IMAGE_FOLDER` till
+sökvägen till en mapp där varje bildfil är döpt exakt som vinets
+`name`-fält (t.ex. `Barolo.jpg` för ett vin med namnet "Barolo") -
+`jpg`/`jpeg`/`png`/`gif`/`webp` känns igen, MIME-typen sätts utifrån
+filändelsen. `Bildmatchare` (`tools/import-excel/`) matchar filnamnets
+stam (utan ändelse) mot varje vins namn **exakt**, ingen normalisering av
+mellanslag/skiftläge. Två fällor hanteras explicit, med utskrivna
+varningar istället för att gissa:
+- Flera bildfiler med samma stam men olika ändelse (t.ex. både
+  `Barolo.jpg` och `Barolo.png`) - tvetydigt vilken som ska användas,
+  den stammen hoppas över helt.
+- Flera viner med exakt samma namn i Excel-filen (t.ex. samma vin köpt i
+  flera årgångar) - samma bildfil kopplas då till alla, med en varning
+  utskriven så det inte sker i tysthet. Om det är fel för ett enskilt
+  vin går det att rätta i efterhand via webb-UI:ts redigeringsformulär.
+
+Miljövariabel istället för ett nytt positionellt argument, av samma skäl
+som `jdbc-url`/`användare`/`lösenord` redan är miljövariabler ovan -
+undviker PowerShells trassel med flervärdesargument i `-Dexec.args`.
+Variabeln är helt valfri - utan den beter sig importen precis som förut,
+ingen bild kopplas till något vin.
+
+```powershell
+$env:WINECELLAR_IMPORT_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"
+```
+
+Om ingen fil matchar ett visst vin kopplas helt enkelt ingen bild till
+det vinet (precis som innan denna funktion fanns) - det går fint att
+ladda upp den etiketten manuellt via webb-UI:t efteråt istället.
 
 Verifierat lokalt (2026-07-17) mot en tom docker-compose-databas: 28 av
 30 rader importerade (2 dåvarande ofullständiga utkastrader korrekt
@@ -610,6 +640,9 @@ repot är delat.
       `Wine` utökad till 23 fält (`Rating`-enum m.m.) för att rymma hela
       Vinlista.xlsx, körd mot produktionsdatabasen - se "Import av
       befintlig Excel-data"
+- [x] Etikettimport från en bildmapp som ett tillägg till Excel-importen
+      (`Bildmatchare`, `WINECELLAR_IMPORT_IMAGE_FOLDER`) - matchar
+      filnamn mot vinnamn, se "Import av befintlig Excel-data"
 - [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
       inte bara en admin-del, eftersom det inte finns någon publik läsvy
       här och appen redan var nåbar från nätet

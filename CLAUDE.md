@@ -535,9 +535,29 @@ Maven-beroende. Klassificeraren påverkar inte `spring-boot:run` (körs mot
 är opåverkad, verifierat genom en fullständig `mvn verify` efteråt.
 
 Skriver direkt via JDBC mot `wines`-tabellen, inte via `WineService`/HTTP.
-Bild-kolumnen (Excels "bild i cell", inbäddad rich data) importeras
-medvetet inte - se README:s "Import av befintlig Excel-data" för
-kommandon och `VinradParser`/`ImportExcel` för implementationen.
+Bild-kolumnen i själva Excel-filen (Excels "bild i cell", inbäddad rich
+data) importeras fortfarande medvetet inte - se README:s "Import av
+befintlig Excel-data" för kommandon och `VinradParser`/`ImportExcel` för
+implementationen.
+
+**Etikettimport från en bildmapp (byggt 2026-07-19).** Separat väg in för
+bilder: `Bildmatchare` (ny klass i samma modul) matchar filer i en mapp
+(`WINECELLAR_IMPORT_IMAGE_FOLDER`, valfri miljövariabel - miljövariabel
+istället för ett nytt positionellt argument av samma PowerShell-
+citattecken-skäl som `jdbc-url`/`användare`/`lösenord`) mot varje vins
+`name`-fält, exakt filnamnsmatchning (stam utan ändelse, känner igen
+jpg/jpeg/png/gif/webp). `ImportExcel.main` kopplar bilden på varje
+`Wine` via `withImage(...)` **innan** insert, så `INSERT_SQL` fick två
+nya kolumner (`image`, `image_mime_type`) - enklare än att göra en andra
+databasrunda som matchar tillbaka mot redan infogade rader (som hade
+krävt `RETURN_GENERATED_KEYS` eller en efterföljande `UPDATE...WHERE
+name=`). Två tvetydighetsfall hanteras explicit med utskrivna varningar
+istället för att gissa, eftersom verktyget skriver direkt mot
+produktionsdata utan granskningssteg: samma filnamnsstam med flera
+ändelser (hoppas över) och flera viner med exakt samma namn i
+Excel-filen (samma bild kopplas till alla, varning skrivs ut så det
+syns). `BildmatchareTest` täcker matchning, MIME-typer per ändelse,
+okänd filändelse och båda tvetydighetsfallen.
 
 **Körd mot produktionsdatabasen (2026-07-17), 30 viner sparade utan fel.**
 Klever Cloud har inget CLI/konsol att köra verktyget *på* - det behövs

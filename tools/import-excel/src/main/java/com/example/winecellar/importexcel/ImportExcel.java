@@ -10,6 +10,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
@@ -18,6 +19,8 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Engångsimport av Vinlista.xlsx -> wines-tabellen. Körs manuellt, se
@@ -26,8 +29,12 @@ import java.util.List;
  * gång mot en redan existerande databas (samma tabell som appen använder
  * via JpaWineRepository), inte en del av den körande applikationen.
  *
- * Bild-kolumnen importeras medvetet inte, se VinradParser - ladda upp
- * etiketter manuellt via webb-UI:t (POST /wines/{id}/bild) efteråt.
+ * Etiketter kan valfritt importeras samtidigt: sätt miljövariabeln
+ * WINECELLAR_IMPORT_IMAGE_FOLDER till en mapp med bildfiler döpta exakt
+ * som respektive vins name-fält (t.ex. "Barolo.jpg"), se Bildmatchare.
+ * Miljövariabel istället för ett positionellt argument, av samma skäl som
+ * POSTGRESQL_ADDON_*-uppgifterna nedan - undviker PowerShells trassel med
+ * flervärdesargument i -Dexec.args (se README).
  */
 public final class ImportExcel {
 
@@ -38,23 +45,29 @@ public final class ImportExcel {
                 name, wine_type, producer, country, region, subregion, grapes, vintage,
                 purchase_date, price, quantity, purchase_reason, tasting_notes, own_rating,
                 systembolaget_product_number, systembolaget_description, munskankarna_review,
-                munskankarna_rating, vivino_rating, other_reference, location
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                munskankarna_rating, vivino_rating, other_reference, location, image, image_mime_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
             System.err.println("Användning: ImportExcel <sökväg-till-vinlista.xlsx> [jdbc-url] [användare] [lösenord]");
             System.err.println("Utan jdbc-url/användare/lösenord används POSTGRESQL_ADDON_*-miljövariabler (samma konvention som application.yml), annars localhost/winecellar.");
+            System.err.println("Sätt WINECELLAR_IMPORT_IMAGE_FOLDER för att även koppla etiketter från en bildmapp, se README.");
             System.exit(1);
         }
         String excelSökväg = args[0];
         String jdbcUrl = args.length > 1 ? args[1] : jdbcUrlFrånMiljö();
         String användare = args.length > 2 ? args[2] : miljövariabelEllerStandard("POSTGRESQL_ADDON_USER", "winecellar");
         String lösenord = args.length > 3 ? args[3] : miljövariabelEllerStandard("POSTGRESQL_ADDON_PASSWORD", "winecellar");
+        String bildmappSökväg = System.getenv("WINECELLAR_IMPORT_IMAGE_FOLDER");
+        Bildmatchare bildmatchare = bildmappSökväg == null || bildmappSökväg.isBlank()
+                ? null
+                : new Bildmatchare(Path.of(bildmappSökväg));
 
         List<Wine> viner = new ArrayList<>();
         int överhoppade = 0;
+        int bilderMatchade = 0;
         VinradParser parser = new VinradParser();
 
         try (InputStream in = new FileInputStream(excelSökväg); Workbook workbook = WorkbookFactory.create(in)) {
@@ -67,7 +80,15 @@ public final class ImportExcel {
                     continue; // rubrikrad
                 }
                 try {
-                    viner.add(parser.parse(row));
+                    Wine vin = parser.parse(row);
+                    if (bildmatchare != null) {
+                        Bildmatchare.Bild bild = bildmatchare.hittaBild(vin.name());
+                        if (bild != null) {
+                            vin = vin.withImage(bild.data(), bild.mimeType());
+                            bilderMatchade++;
+                        }
+                    }
+                    viner.add(vin);
                 } catch (VinradParser.RadSaknarObligatoriskaFältException e) {
                     System.out.println("Hoppar över: " + e.getMessage());
                     överhoppade++;
@@ -76,6 +97,10 @@ public final class ImportExcel {
         }
 
         System.out.println("Tolkade " + viner.size() + " viner från " + excelSökväg + " (" + överhoppade + " rader överhoppade).");
+        if (bildmatchare != null) {
+            System.out.println(bilderMatchade + " av " + viner.size() + " viner fick en etikett kopplad från " + bildmappSökväg + ".");
+            varnaOmDubblettnamnMedBild(viner);
+        }
 
         try (Connection connection = DriverManager.getConnection(jdbcUrl, användare, lösenord)) {
             connection.setAutoCommit(false);
@@ -113,7 +138,20 @@ public final class ImportExcel {
         settNullbartBetyg(statement, i++, vin.munskankarnaRating());
         settNullbarBigDecimal(statement, i++, vin.vivinoRating());
         settNullbarSträng(statement, i++, vin.otherReference());
-        settNullbarSträng(statement, i, vin.location());
+        settNullbarSträng(statement, i++, vin.location());
+        settNullbarBild(statement, i++, vin.image());
+        settNullbarSträng(statement, i, vin.imageMimeType());
+    }
+
+    private static void varnaOmDubblettnamnMedBild(List<Wine> viner) {
+        Map<String, Long> antalPerNamn = viner.stream()
+                .filter(Wine::harBild)
+                .collect(Collectors.groupingBy(Wine::name, Collectors.counting()));
+        antalPerNamn.forEach((namn, antal) -> {
+            if (antal > 1) {
+                System.out.println("Varning: " + antal + " viner heter \"" + namn + "\" - samma etikett kopplades till alla.");
+            }
+        });
     }
 
     private static void settNullbarSträng(PreparedStatement statement, int index, String värde) throws java.sql.SQLException {
@@ -133,6 +171,14 @@ public final class ImportExcel {
             statement.setNull(index, Types.NUMERIC);
         } else {
             statement.setBigDecimal(index, värde);
+        }
+    }
+
+    private static void settNullbarBild(PreparedStatement statement, int index, byte[] bild) throws java.sql.SQLException {
+        if (bild == null) {
+            statement.setNull(index, Types.BINARY);
+        } else {
+            statement.setBytes(index, bild);
         }
     }
 

@@ -24,7 +24,9 @@ import java.util.regex.Pattern;
  * Wine-fält varje kolumn motsvarar. Bild-kolumnen (I) hoppas medvetet
  * över: bilderna är inbäddade som Excels "bild i cell" (rich data), inte
  * vanliga cellvärden, och att extrahera dem robust är inte värt det för
- * ett engångsskript - ladda upp dem manuellt via webb-UI:t efteråt.
+ * ett engångsskript. Etiketter kan istället importeras separat från en
+ * vanlig bildmapp - se {@link Bildmatchare} och ImportExcel - eller laddas
+ * upp manuellt via webb-UI:t (vin-formuläret) efteråt.
  */
 final class VinradParser {
 
