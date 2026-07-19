@@ -61,14 +61,8 @@
     <a class="knapp" href="/wines/nytt">Lägg till vin</a>
 
     <th:block th:fragment="detaljfalt(vin)" th:if="${vin != null}">
-        <dt th:if="${vin.region != null}">Region</dt>
-        <dd th:if="${vin.region != null}" th:text="${vin.region}"></dd>
-
-        <dt th:if="${vin.subregion != null}">Underregion</dt>
-        <dd th:if="${vin.subregion != null}" th:text="${vin.subregion}"></dd>
-
-        <dt th:if="${vin.grapes != null}">Druvor</dt>
-        <dd th:if="${vin.grapes != null}" th:text="${vin.grapes}"></dd>
+        <dt>Plats</dt>
+        <dd th:text="${vin.location}"></dd>
 
         <dt th:if="${vin.purchaseDate != null}">Inköpsdatum</dt>
         <dd th:if="${vin.purchaseDate != null}" th:text="${vin.purchaseDate}"></dd>
@@ -82,9 +76,6 @@
         <dt th:if="${vin.tastingNotes != null}">Tasting notes</dt>
         <dd th:if="${vin.tastingNotes != null}" th:text="${vin.tastingNotes}"></dd>
 
-        <dt th:if="${vin.ownRating != null}">Eget betyg</dt>
-        <dd th:if="${vin.ownRating != null}" th:text="${vin.ownRating.label()}"></dd>
-
         <dt th:if="${vin.systembolagetProductNumber != null}">Systembolagets produktnummer</dt>
         <dd th:if="${vin.systembolagetProductNumber != null}" th:text="${vin.systembolagetProductNumber}"></dd>
 
@@ -93,12 +84,6 @@
 
         <dt th:if="${vin.munskankarnaReview != null}">Munskänkarnas bedömning</dt>
         <dd th:if="${vin.munskankarnaReview != null}" th:text="${vin.munskankarnaReview}"></dd>
-
-        <dt th:if="${vin.munskankarnaRating != null}">Munskänkarnas betyg</dt>
-        <dd th:if="${vin.munskankarnaRating != null}" th:text="${vin.munskankarnaRating.label()}"></dd>
-
-        <dt th:if="${vin.vivinoRating != null}">Vivino-betyg</dt>
-        <dd th:if="${vin.vivinoRating != null}" th:text="|${vin.vivinoRating} / 5|"></dd>
 
         <dt th:if="${vin.otherReference != null}">Annan referens</dt>
         <dd th:if="${vin.otherReference != null}" th:text="${vin.otherReference}"></dd>
@@ -114,9 +99,14 @@
                         <th>Typ</th>
                         <th>Producent</th>
                         <th>Land</th>
+                        <th>Region</th>
+                        <th>Underregion</th>
+                        <th>Druvor</th>
                         <th>Årgång</th>
                         <th>Flaskor</th>
-                        <th>Plats</th>
+                        <th>Eget betyg</th>
+                        <th>Munskänkarnas betyg</th>
+                        <th>Vivino-betyg</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -140,9 +130,14 @@
                             </td>
                             <td th:text="${vin.producer}"></td>
                             <td th:text="${vin.country}"></td>
+                            <td th:text="${vin.region}"></td>
+                            <td th:text="${vin.subregion}"></td>
+                            <td th:text="${vin.grapes}"></td>
                             <td th:text="${vin.vintage}"></td>
                             <td th:text="${vin.quantity}"></td>
-                            <td th:text="${vin.location}"></td>
+                            <td th:text="${vin.ownRating != null ? vin.ownRating.label() : ''}"></td>
+                            <td th:text="${vin.munskankarnaRating != null ? vin.munskankarnaRating.label() : ''}"></td>
+                            <td th:text="${vin.vivinoRating}"></td>
                             <td>
                                 <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                                 <button type="button"
@@ -153,7 +148,7 @@
                             </td>
                         </tr>
                         <tr class="detaljrad">
-                            <td colspan="9">
+                            <td colspan="14">
                                 <details>
                                     <summary>Detaljer</summary>
                                     <dl class="detaljlista-bred">
@@ -186,12 +181,22 @@
                     <dd th:text="${vin.producer}"></dd>
                     <dt>Land</dt>
                     <dd th:text="${vin.country}"></dd>
+                    <dt>Region</dt>
+                    <dd th:text="${vin.region}"></dd>
+                    <dt>Underregion</dt>
+                    <dd th:text="${vin.subregion}"></dd>
+                    <dt>Druvor</dt>
+                    <dd th:text="${vin.grapes}"></dd>
                     <dt>Årgång</dt>
                     <dd th:text="${vin.vintage}"></dd>
                     <dt>Flaskor</dt>
                     <dd th:text="${vin.quantity}"></dd>
-                    <dt>Plats</dt>
-                    <dd th:text="${vin.location}"></dd>
+                    <dt>Eget betyg</dt>
+                    <dd th:text="${vin.ownRating != null ? vin.ownRating.label() : ''}"></dd>
+                    <dt>Munskänkarnas betyg</dt>
+                    <dd th:text="${vin.munskankarnaRating != null ? vin.munskankarnaRating.label() : ''}"></dd>
+                    <dt>Vivino-betyg</dt>
+                    <dd th:text="${vin.vivinoRating}"></dd>
                 </dl>
                 <details>
                     <summary>Detaljer</summary>

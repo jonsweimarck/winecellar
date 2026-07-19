@@ -157,8 +157,8 @@ class WineControllerTest {
         }
 
         @Test
-        @DisplayName("ska visa fälten utöver överblicken infällt under \"Detaljer\"")
-        void skaVisaÖvrigaFältUnderDetaljer() throws Exception {
+        @DisplayName("ska visa geografi- och betygsfält i översikten, resten infällt under \"Detaljer\"")
+        void skaVisaFältUppdeladeMellanÖversiktOchDetaljer() throws Exception {
             Wine barolo = BAROLO.toBuilder()
                     .region("Piemonte").subregion("Langhe").grapes("Nebbiolo")
                     .purchaseDate(LocalDate.of(2024, 3, 15)).price(new BigDecimal("450.00"))
@@ -173,20 +173,23 @@ class WineControllerTest {
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
-                            containsString("Detaljer"),
+                            // Översikten - region/underregion/druvor och betyg
                             containsString("Piemonte"),
                             containsString("Langhe"),
                             containsString("Nebbiolo"),
+                            containsString(Rating.R16.label()),
+                            containsString(Rating.R14_5.label()),
+                            containsString("4.1"),
+                            // Infällt under "Detaljer" - plats och övriga fält
+                            containsString("Detaljer"),
+                            containsString("Låda 1"),
                             containsString("2024-03-15"),
                             containsString("450.00 kr"),
                             containsString("Rekommenderat"),
                             containsString("Kraftfullt"),
-                            containsString(Rating.R16.label()),
                             containsString("12345"),
                             containsString("Beskrivning"),
                             containsString("Recension"),
-                            containsString(Rating.R14_5.label()),
-                            containsString("4.1 / 5"),
                             containsString("https://example.com")
                     )));
         }

@@ -45,18 +45,24 @@ med alla andra fält i samma spar-anrop - ett tomt filfält skriver inte
 längre separata snabbåtgärder i listan; bara "Ta bort" är kvar som
 htmx-fragment där.
 
-Vinlistan visar bara en kort överblick per vin i grundläget (samma fält
-som tidigare - bild, namn, typ, producent, land, årgång, flaskor,
-plats). Övriga fält (region, underregion, druvor, inköpsdatum, pris,
-inköpsanledning, tasting notes, eget betyg, Systembolagets
-produktnummer/beskrivning, Munskänkarnas bedömning/betyg, Vivino-betyg,
-annan referens - alltså allt utom `id`, `image`/`image_mime_type` och de
-ännu obyggda `created_at`/`updated_at`) visas infällt under en
-"Detaljer"-knapp per rad/kort med `<details>` - inga extra kolumner i
-grundtabellen, ingen JS. Fälten delas mellan tabell- och kortvyn via ett
-gemensamt Thymeleaf-fragment (`detaljfalt(vin)`) istället för att
-dupliceras, och varje fält visas bara om det faktiskt är satt
-(`th:if="${vin.X != null}"`).
+Vinlistan visar en överblick per vin i grundläget: bild, namn, typ,
+producent, land, region, underregion, druvor, årgång, flaskor, eget
+betyg, Munskänkarnas betyg och Vivino-betyg (`plats` flyttades härifrån
+till detaljvyn 2026-07-19, se nedan). Övriga fält (plats, inköpsdatum,
+pris, inköpsanledning, tasting notes, Systembolagets
+produktnummer/beskrivning, Munskänkarnas bedömning, annan referens -
+alltså allt utom `id`, `image`/`image_mime_type` och de ännu obyggda
+`created_at`/`updated_at`) visas infällt under en "Detaljer"-knapp per
+rad/kort med `<details>`, ingen JS. Fälten delas mellan tabell- och
+kortvyn via ett gemensamt Thymeleaf-fragment (`detaljfalt(vin)`) istället
+för att dupliceras, och de flesta av dem visas bara om de faktiskt är
+satta (`th:if="${vin.X != null}"`) - plats är alltid satt (obligatoriskt
+fält) och visas därför ovillkorligt, som resten av översiktsfälten.
+I tabellvyn ligger den infällda detaljraden i en egen `<tr>` med
+`colspan` som spänner hela tabellbredden, inte i en av översiktens
+smala kolumner - annars klämdes de uppfällda fälten in i en enda smal
+kolumn även på en stor skärm (upptäckt av användaren mot den riktiga
+deployen, fixat 2026-07-19).
 
 ## Datamodell
 

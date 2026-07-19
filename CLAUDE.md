@@ -134,16 +134,22 @@ flaggade som gällande.
   antal och ladda upp bild sker numera bara via det gemensamma
   formuläret. `GET /wines/{id}/bild` (visning) finns kvar, den behövs för
   `<img>`-taggarna i både listan och formuläret.
-  **Vinlistan visar alla icke-tekniska fält (byggt 2026-07-19):**
-  grundöverblicken i tabell/kort är oförändrad (bild, namn, typ,
-  producent, land, årgång, flaskor, plats), men resterande fält (region,
-  underregion, druvor, inköpsdatum, pris, inköpsanledning, tasting
-  notes, eget betyg, Systembolagets produktnummer/beskrivning,
-  Munskänkarnas bedömning/betyg, Vivino-betyg, annan referens) är nu
-  synliga infällt under en `<details>`-baserad "Detaljer"-sektion per
-  rad/kort - `id`, `image`/`image_mime_type` (redan täckta av
+  **Vinlistan visar alla icke-tekniska fält (byggt 2026-07-19, fältfördelningen
+  justerad samma dag efter användarfeedback):** översikten i tabell/kort
+  visar bild, namn, typ, producent, land, region, underregion, druvor,
+  årgång, flaskor, eget betyg, Munskänkarnas betyg och Vivino-betyg -
+  geografi- och betygsfälten flyttades hit från detaljvyn eftersom
+  användaren vill se dem utan att fälla ut något extra. Resterande fält
+  (plats, inköpsdatum, pris, inköpsanledning, tasting notes,
+  Systembolagets produktnummer/beskrivning, Munskänkarnas bedömning,
+  annan referens - plats flyttades hit från översikten i samma
+  ändring) är infällda under en `<details>`-baserad "Detaljer"-sektion
+  per rad/kort - `id`, `image`/`image_mime_type` (redan täckta av
   bildminiatyren) och de ännu obyggda `created_at`/`updated_at` är
-  medvetet exkluderade. Ett delat Thymeleaf-fragment
+  medvetet exkluderade helt. Plats visas ovillkorligt i detaljfragmentet
+  (obligatoriskt fält, aldrig `null`), till skillnad från de flesta andra
+  detaljfälten som bara visas om de faktiskt är satta. Ett delat
+  Thymeleaf-fragment
   (`th:fragment="detaljfalt(vin)"` i `vinkallare.html`) återanvänds av
   både tabell- och kortvyn istället för att duplicera fältuppräkningen;
   varje fält visas bara om det är satt (`th:if="${vin.X != null}"`).
@@ -161,14 +167,15 @@ flaggade som gällande.
   det uppfällda innehållet klämdes in i den smala kolumnens bredd även
   på en stor skärm - upptäckt av användaren mot den riktiga deployen.
   Fixat genom att låta varje vin rendera **två** `<tr>` (huvudrad +
-  `<tr class="detaljrad">` med en enda `<td colspan="9">` som spänner
+  `<tr class="detaljrad">` med en enda `<td colspan="14">` som spänner
   hela tabellbredden), grupperade med `<th:block th:each="vin :
   ${viner}">` runt båda raderna - `th:block` renderar ingen egen tagg,
   så resultatet blir en platt sekvens av `<tr>`-element direkt under
   `<tbody>`, vilket är det enda giltiga sättet att upprepa flera
-  syskon-rader per Thymeleaf-iteration. `colspan="9"` måste hållas i
+  syskon-rader per Thymeleaf-iteration. `colspan="14"` måste hållas i
   synk med antalet `<th>` i `<thead>` (Bild/Namn/Typ/Producent/Land/
-  Årgång/Flaskor/Plats/åtgärdskolumnen) - ändra båda om en kolumn läggs
+  Region/Underregion/Druvor/Årgång/Flaskor/Eget betyg/Munskänkarnas
+  betyg/Vivino-betyg/åtgärdskolumnen) - ändra båda om en kolumn läggs
   till eller tas bort. Detaljernas `<dl>` använder en egen klass
   (`.detaljlista-bred`, `grid-template-columns: repeat(2, auto 1fr)`)
   istället för kortvyns `.vinkort dl`, eftersom den nu har gott om
