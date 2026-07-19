@@ -45,6 +45,19 @@ med alla andra fält i samma spar-anrop - ett tomt filfält skriver inte
 längre separata snabbåtgärder i listan; bara "Ta bort" är kvar som
 htmx-fragment där.
 
+Vinlistan visar bara en kort överblick per vin i grundläget (samma fält
+som tidigare - bild, namn, typ, producent, land, årgång, flaskor,
+plats). Övriga fält (region, underregion, druvor, inköpsdatum, pris,
+inköpsanledning, tasting notes, eget betyg, Systembolagets
+produktnummer/beskrivning, Munskänkarnas bedömning/betyg, Vivino-betyg,
+annan referens - alltså allt utom `id`, `image`/`image_mime_type` och de
+ännu obyggda `created_at`/`updated_at`) visas infällt under en
+"Detaljer"-knapp per rad/kort med `<details>` - inga extra kolumner i
+grundtabellen, ingen JS. Fälten delas mellan tabell- och kortvyn via ett
+gemensamt Thymeleaf-fragment (`detaljfalt(vin)`) istället för att
+dupliceras, och varje fält visas bara om det faktiskt är satt
+(`th:if="${vin.X != null}"`).
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):

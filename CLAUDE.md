@@ -134,6 +134,28 @@ flaggade som gällande.
   antal och ladda upp bild sker numera bara via det gemensamma
   formuläret. `GET /wines/{id}/bild` (visning) finns kvar, den behövs för
   `<img>`-taggarna i både listan och formuläret.
+  **Vinlistan visar alla icke-tekniska fält (byggt 2026-07-19):**
+  grundöverblicken i tabell/kort är oförändrad (bild, namn, typ,
+  producent, land, årgång, flaskor, plats), men resterande fält (region,
+  underregion, druvor, inköpsdatum, pris, inköpsanledning, tasting
+  notes, eget betyg, Systembolagets produktnummer/beskrivning,
+  Munskänkarnas bedömning/betyg, Vivino-betyg, annan referens) är nu
+  synliga infällt under en `<details>`-baserad "Detaljer"-sektion per
+  rad/kort - `id`, `image`/`image_mime_type` (redan täckta av
+  bildminiatyren) och de ännu obyggda `created_at`/`updated_at` är
+  medvetet exkluderade. Ett delat Thymeleaf-fragment
+  (`th:fragment="detaljfalt(vin)"` i `vinkallare.html`) återanvänds av
+  både tabell- och kortvyn istället för att duplicera fältuppräkningen;
+  varje fält visas bara om det är satt (`th:if="${vin.X != null}"`).
+  **Fälla:** `th:fragment` döljer inte elementet från normal
+  toppnedrendering av sidan - fragmentet ligger som ett syskon till
+  `th:fragment="lista"`-diven, utanför alla `th:each`, så utan en extra
+  vaktklausul (`th:if="${vin != null}"` på fragmentets rotelement)
+  kraschar helsideslaster (`GET /`) med `EL1007E: Property or field
+  'region' cannot be found on null`, eftersom `vin` inte är bundet där.
+  `th:insert="~{::detaljfalt(${vin})}"` binder parametern korrekt vid
+  faktiska anrop, så vaktklausulen slår bara till vid den oavsiktliga
+  direktrenderingen.
 
 ## Säkerhet
 

@@ -155,6 +155,41 @@ class WineControllerTest {
                             containsString("Barolo")
                     )));
         }
+
+        @Test
+        @DisplayName("ska visa fälten utöver överblicken infällt under \"Detaljer\"")
+        void skaVisaÖvrigaFältUnderDetaljer() throws Exception {
+            Wine barolo = BAROLO.toBuilder()
+                    .region("Piemonte").subregion("Langhe").grapes("Nebbiolo")
+                    .purchaseDate(LocalDate.of(2024, 3, 15)).price(new BigDecimal("450.00"))
+                    .purchaseReason("Rekommenderat").tastingNotes("Kraftfullt")
+                    .ownRating(Rating.R16)
+                    .systembolagetProductNumber("12345").systembolagetDescription("Beskrivning")
+                    .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
+                    .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
+                    .build();
+            when(wineService.listWines()).thenReturn(List.of(barolo));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Detaljer"),
+                            containsString("Piemonte"),
+                            containsString("Langhe"),
+                            containsString("Nebbiolo"),
+                            containsString("2024-03-15"),
+                            containsString("450.00 kr"),
+                            containsString("Rekommenderat"),
+                            containsString("Kraftfullt"),
+                            containsString(Rating.R16.label()),
+                            containsString("12345"),
+                            containsString("Beskrivning"),
+                            containsString("Recension"),
+                            containsString(Rating.R14_5.label()),
+                            containsString("4.1 / 5"),
+                            containsString("https://example.com")
+                    )));
+        }
     }
 
     @Nested
