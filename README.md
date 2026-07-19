@@ -289,6 +289,19 @@ Omgång sex verifierades med både en smalare/högre testbild (200×1000)
 **och** ett vin med minimal text samtidigt - den kombinationen som
 faktiskt triggar problemet.
 
+**Kortvyn (mobil) fick samma dämpade label-stil som de breda korten
+(2026-07-20).** Betygsraderna (`.betyg-label`) och Detaljer-fälten
+(`.vinkort dt`) i mobilvyn använde tidigare två olika äldre stilar -
+plain/odämpad text för betyg respektive fetstil för Detaljer-fälten -
+kvar sedan innan den dämpade label-stilen (`.vk-label`: liten, grå
+`#767676`, `font-weight: 400`) togs fram för de breda korten. Justerat
+så `.vinkort-betyg .betyg-label` och `.vinkort dt`/`.vinkort dd` har
+exakt samma deklarationer som `.vk-label`/`.vk-value` - separata
+CSS-regler (inte samma klassnamn återanvänt) eftersom kortvyn
+fortfarande har sina egna `betyg-label`/`dt`/`dd`-element, bara med
+matchande utseende nu. Verifierat manuellt vid 375px med Detaljer
+uppfälld: samma dämpade stil på både betygsraderna och Detaljer-fälten.
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):

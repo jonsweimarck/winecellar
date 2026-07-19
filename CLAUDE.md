@@ -461,6 +461,18 @@ flaggade som gällande.
   Verifierat manuellt vid 1280px efter alla sex omgångarna, sista
   gången med både en riktig (lokalt genererad, 200×1000) flaskbild och
   ett textfattigt vin, plus regressionskoll av "Ingen bild"-fallet.
+  **Kortvyns (mobil) label-stil enhetligad med de breda korten
+  (2026-07-20).** `.vinkort-betyg .betyg-label` (tidigare odämpad,
+  ingen egen font-stil alls) och `.vinkort dt`/`.vinkort dd` (tidigare
+  `font-weight: bold` på `dt`) fick samma deklarationer som
+  `.vk-label`/`.vk-value` (`font-size: 0.78rem; color: #767676;
+  font-weight: 400` för labels, `font-size: 0.95rem; color: #1a1a1a;
+  line-height: 1.4` för värden) - kopierade deklarationer på egna
+  klasser/selektorer, inte samma klassnamn återanvänt, eftersom
+  kortvyn behåller sina egna `betyg-label`/`dt`/`dd`-element (den
+  delade `detaljfalt`-fragmentets `fd-*`-klasser för ordning/stapling
+  påverkas inte av detta). Verifierat manuellt vid 375px med Detaljer
+  uppfälld.
 
 ## Säkerhet
 

@@ -45,7 +45,11 @@
         .vinkort-betyg { margin-top: 0.75rem; }
         .vinkort-betyg p { margin: 0 0 0.4rem; }
         .vinkort-betyg p:last-child { margin-bottom: 0; }
-        .vinkort-betyg .betyg-label, .vinkort-betyg .betyg-varde { display: block; }
+        /* Samma dämpade label-stil som de breda korten (.vk-label/
+           .vk-value nedan) - inte fetstil/vanlig text som tidigare,
+           så båda vyerna ser likadana ut oavsett skärmstorlek. */
+        .vinkort-betyg .betyg-label { display: block; font-size: 0.78rem; color: #767676; font-weight: 400; margin-bottom: 0.15rem; }
+        .vinkort-betyg .betyg-varde { display: block; font-size: 0.95rem; color: #1a1a1a; line-height: 1.4; }
         .vinkort details { margin-top: 0.75rem; }
         .vinkort summary { text-decoration: underline; font-weight: normal; cursor: pointer; }
         .vinkort dl {
@@ -54,8 +58,8 @@
             gap: 0.25rem 1rem;
             margin: 0.5rem 0;
         }
-        .vinkort dt { font-weight: bold; }
-        .vinkort dd { margin: 0; }
+        .vinkort dt { font-size: 0.78rem; color: #767676; font-weight: 400; }
+        .vinkort dd { margin: 0; font-size: 0.95rem; color: #1a1a1a; line-height: 1.4; }
 
         /* Ordningen på Detaljer-fälten och "etikett ovanför värde" för de
            tre sista gäller bara kortvyn (liten skärm) - satt via CSS
