@@ -237,6 +237,28 @@ eftersom en vanlig inline `<a>` inte har någon egen resolverbar höjd.
 Verifierat manuellt vid 1280px med både lång och kort text: bilden
 linjerar mot båda kanterna i båda fallen, och ingenting annat radbryter.
 
+**Femte omgången: `object-position: bottom` - en riktig flaskbild följde
+inte underkanten trots `height: 100%`.** Upptäckt av användaren mot den
+riktiga deployen (skärmdump bifogad): en riktig bild (till skillnad
+från "Ingen bild"-platshållaren) centrerades istället inom sin box
+(standard `object-position: 50% 50%`) när bildens eget höjd/bredd-
+förhållande inte fyllde hela den spända ytan - det lämnade tomrum både
+ovanför **och** under bilden, inte bara ovanför. Platshållarrutan har
+inget eget bildförhållande och fyller alltid hela sin box trivialt, så
+den lokala testningen (som bara använt "Ingen bild"-vinet) missade
+buggen helt - fixat genom att faktiskt ladda upp en riktig (genererad)
+flaskbild lokalt och verifiera mot den, inte bara platshållaren.
+Fixat med `object-position: center bottom` på `.vk-bildyta img` - tvingar
+`object-fit: contain` att alltid lägga eventuellt överskottsutrymme
+högst upp istället för att dela det mellan topp och botten.
+**Kvarstående avvägning, inte en bugg:** eftersom en riktig bild har
+ett fast bildförhållande som inte alltid matchar boxens (som växer med
+textmängden), kan bilden bara garanterat nå **en** kant fullständigt -
+underkanten (mot Vivino-värdet, det uttryckliga kravet) prioriterades.
+Överkanten kan fortfarande ha ett litet tomrum ovanför för viner med
+mycket text, där boxen blir högre än vad bildens eget
+bredd/höjd-förhållande kräver.
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):

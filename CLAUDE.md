@@ -400,8 +400,35 @@ flaggade som gällande.
      }`. Behövdes inte i steg 1-3, eftersom `max-height` i rem-enheter
      inte är beroende av att föräldraelementet har en resolverbar
      procentuell höjd.
-  Verifierat manuellt vid 1280px efter alla fyra omgångarna, sista
-  gången med både ett vin med lång text och ett med kort text.
+  5. **Femte omgången: `object-position: center bottom`.** Steg 4
+     verifierades bara mot "Ingen bild"-platshållaren (en vanlig
+     `<div>` utan eget bildförhållande, som trivialt fyller hela sin
+     `height: 100%`-box) - **inte mot en riktig uppladdad bild.**
+     Användaren upptäckte mot den riktiga deployen att en riktig
+     flaskbild inte alls följde underkanten: `object-fit: contain`
+     centrerar bildens innehåll inom sin box som standard
+     (`object-position: 50% 50%`) när bildens eget höjd/bredd-
+     förhållande inte fyller hela den spända ytan, vilket lämnade
+     tomrum både ovanför **och** under bilden. **Testfälla att komma
+     ihåg:** platshållaren och en riktig bild beter sig olika med
+     `object-fit`/`object-position` just eftersom bara den senare har
+     ett eget, fast bildförhållande - verifiera alltid mot en faktiskt
+     uppladdad bild (t.ex. genererad lokalt med Pillow,
+     `python -m pip install pillow`, om ingen riktig flaskbild finns
+     till hands), inte bara mot "Ingen bild"-fallet, när en ändring rör
+     `.vk-bildyta img`. Fixat med `object-position: center bottom` -
+     tvingar `contain` att lägga eventuellt överskottsutrymme högst upp
+     istället för att dela det mellan topp och botten. **Kvarstående,
+     medveten avvägning:** en riktig bild kan bara garanterat nå **en**
+     kant fullständigt eftersom dess bildförhållande är fast medan
+     boxen växer med textmängden - underkanten (mot Vivino-värdet)
+     prioriterades eftersom det var det uttryckliga, senast angivna
+     kravet. Överkanten kan fortfarande ha ett tomrum för viner med
+     mycket text.
+  Verifierat manuellt vid 1280px efter alla fem omgångarna, sista
+  gången med en riktig (lokalt genererad) flaskbild på ett vin med
+  tillräckligt mycket text för att boxen ska bli högre än bildens eget
+  bredd/höjd-förhållande kräver.
 
 ## Säkerhet
 

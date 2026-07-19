@@ -137,18 +137,29 @@
            inte radbryta datumvärden. grid-row: 1 / 3 + align-self:
            stretch spänner både text- och betygsraden och fyller hela
            den ytan (inte bara begränsad storlek positionerad i ena
-           änden som tidigare iterationer) - så bilden är alignad mot
+           änden som tidigare iterationer) - så bildytan är alignad mot
            både producentnamnets överkant och Vivino-värdets underkant.
            object-fit: contain skalar bilden proportionerligt inom den
            ytan (ingen distorsion), men ytan i sig växer med hur mycket
            text vinet har - en medveten avvägning för att kunna alignas
            mot båda kanterna samtidigt. `a`-taggen runt <img> måste
            också vara block/100% hög, annars bryts height:100%-kedjan
-           eftersom en vanlig inline <a> inte har någon egen höjd. */
+           eftersom en vanlig inline <a> inte har någon egen höjd.
+
+           object-position: bottom är nödvändigt för att en RIKTIG
+           flaskbild ska följa bildytans underkant - platshållarrutan
+           ("Ingen bild") har ingen egen bildförhållande och fyller
+           alltid hela ytan trivialt, men en riktig bild med contain
+           centreras (standard object-position: 50% 50%) inom sin box
+           när bildens eget höjd/bredd-förhållande inte matchar boxens,
+           vilket lämnar tomrum både ovanför och under bilden istället
+           för bara ovanför. Upptäckt av användaren mot den riktiga
+           deployen (en platshållare i lokal testning dolde buggen). */
         .vk-bildyta { grid-column: 1; grid-row: 1 / 3; align-self: stretch; }
         .vk-bildyta a { display: block; height: 100%; }
         .vk-bildyta img {
             width: 100%; max-width: 6rem; height: 100%; object-fit: contain;
+            object-position: center bottom;
             border-radius: 0.25rem; background: #f0f0f0; display: block;
         }
         .vk-bildplatshallare {
