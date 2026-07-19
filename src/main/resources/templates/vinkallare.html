@@ -50,6 +50,24 @@
         }
         .vinkort dt { font-weight: bold; }
         .vinkort dd { margin: 0; }
+
+        /* Ordningen på Detaljer-fälten och "etikett ovanför värde" för de
+           tre sista gäller bara kortvyn (liten skärm) - satt via CSS
+           order/grid-column, inte genom att ändra fragmentets DOM-ordning,
+           så tabellvynens Detaljer (.detaljlista-bred) behåller sin egen
+           ordning opåverkad. Klasserna (fd-*) sitter på samma element i
+           båda vyerna eftersom de delar detaljfalt-fragmentet - bara denna
+           .vinkort dl-scopeade regel gör dem synliga i utseende. */
+        .vinkort dl .fd-inkopsdatum { order: 10; }
+        .vinkort dl .fd-pris { order: 20; }
+        .vinkort dl .fd-sb-nummer { order: 30; }
+        .vinkort dl .fd-plats { order: 40; }
+        .vinkort dl .fd-varfor-kopt { order: 50; }
+        .vinkort dl .fd-tasting { order: 60; grid-column: 1 / -1; }
+        .vinkort dl .fd-sb-beskrivning { order: 70; grid-column: 1 / -1; }
+        .vinkort dl .fd-munskankarna { order: 80; grid-column: 1 / -1; }
+        .vinkort dl .fd-annan-referens { order: 90; }
+
         .detalj-atgarder { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
 
         .flaskor-badge {
@@ -94,32 +112,32 @@
     <a class="knapp" href="/wines/nytt">Lägg till vin</a>
 
     <th:block th:fragment="detaljfalt(vin)" th:if="${vin != null}">
-        <dt>Plats</dt>
-        <dd th:text="${vin.location}"></dd>
+        <dt class="fd-plats">Plats</dt>
+        <dd class="fd-plats" th:text="${vin.location}"></dd>
 
-        <dt th:if="${vin.purchaseDate != null}">Inköpsdatum</dt>
-        <dd th:if="${vin.purchaseDate != null}" th:text="${vin.purchaseDate}"></dd>
+        <dt class="fd-inkopsdatum" th:if="${vin.purchaseDate != null}">Inköpsdatum</dt>
+        <dd class="fd-inkopsdatum" th:if="${vin.purchaseDate != null}" th:text="${vin.purchaseDate}"></dd>
 
-        <dt th:if="${vin.price != null}">Pris</dt>
-        <dd th:if="${vin.price != null}" th:text="|${vin.price} kr|"></dd>
+        <dt class="fd-pris" th:if="${vin.price != null}">Pris</dt>
+        <dd class="fd-pris" th:if="${vin.price != null}" th:text="|${vin.price} kr|"></dd>
 
-        <dt th:if="${vin.purchaseReason != null}">Varför köpt</dt>
-        <dd th:if="${vin.purchaseReason != null}" th:text="${vin.purchaseReason}"></dd>
+        <dt class="fd-varfor-kopt" th:if="${vin.purchaseReason != null}">Varför köpt</dt>
+        <dd class="fd-varfor-kopt" th:if="${vin.purchaseReason != null}" th:text="${vin.purchaseReason}"></dd>
 
-        <dt th:if="${vin.tastingNotes != null}">Tasting notes</dt>
-        <dd th:if="${vin.tastingNotes != null}" th:text="${vin.tastingNotes}"></dd>
+        <dt class="fd-tasting" th:if="${vin.tastingNotes != null}">Tasting notes</dt>
+        <dd class="fd-tasting" th:if="${vin.tastingNotes != null}" th:text="${vin.tastingNotes}"></dd>
 
-        <dt th:if="${vin.systembolagetProductNumber != null}">Systembolagets produktnummer</dt>
-        <dd th:if="${vin.systembolagetProductNumber != null}" th:text="${vin.systembolagetProductNumber}"></dd>
+        <dt class="fd-sb-nummer" th:if="${vin.systembolagetProductNumber != null}">Systembolagets produktnummer</dt>
+        <dd class="fd-sb-nummer" th:if="${vin.systembolagetProductNumber != null}" th:text="${vin.systembolagetProductNumber}"></dd>
 
-        <dt th:if="${vin.systembolagetDescription != null}">Systembolagets beskrivning</dt>
-        <dd th:if="${vin.systembolagetDescription != null}" th:text="${vin.systembolagetDescription}"></dd>
+        <dt class="fd-sb-beskrivning" th:if="${vin.systembolagetDescription != null}">Systembolagets beskrivning</dt>
+        <dd class="fd-sb-beskrivning" th:if="${vin.systembolagetDescription != null}" th:text="${vin.systembolagetDescription}"></dd>
 
-        <dt th:if="${vin.munskankarnaReview != null}">Munskänkarnas bedömning</dt>
-        <dd th:if="${vin.munskankarnaReview != null}" th:text="${vin.munskankarnaReview}"></dd>
+        <dt class="fd-munskankarna" th:if="${vin.munskankarnaReview != null}">Munskänkarnas bedömning</dt>
+        <dd class="fd-munskankarna" th:if="${vin.munskankarnaReview != null}" th:text="${vin.munskankarnaReview}"></dd>
 
-        <dt th:if="${vin.otherReference != null}">Annan referens</dt>
-        <dd th:if="${vin.otherReference != null}" th:text="${vin.otherReference}"></dd>
+        <dt class="fd-annan-referens" th:if="${vin.otherReference != null}">Annan referens</dt>
+        <dd class="fd-annan-referens" th:if="${vin.otherReference != null}" th:text="${vin.otherReference}"></dd>
     </th:block>
 
     <div id="vinlista" th:fragment="lista">

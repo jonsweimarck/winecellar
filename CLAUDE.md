@@ -226,6 +226,32 @@ flaggade som gällande.
   sträcker sig utanför tabellen om det är för högt) - lätt att missa
   eftersom det inte ger något kompilatorfel, bara ett tyst
   layoutproblem som bara syns visuellt.
+  **Detaljer-fältens ordning omarbetad, scopead till bara kortvyn
+  (2026-07-19).** Ny ordning: Inköpsdatum, Pris, Systembolagets
+  produktnummer, Plats, Varför köpt, Tasting notes, Systembolagets
+  beskrivning, Munskänkarnas bedömning, Annan referens (oförändrad
+  sistplacering). De tre sista (Tasting notes, Systembolagets
+  beskrivning, Munskänkarnas bedömning) visar värdet under etiketten
+  istället för bredvid. Medvetet **inte** löst genom att ändra
+  `detaljfalt`-fragmentets DOM-ordning eller duplicera det till en
+  kort-specifik variant - det hade återinfört exakt den
+  dubbleringsrisk fragmentet ursprungligen skulle undvika. Istället
+  fick varje `dt`/`dd`-par en `fd-*`-klass (`fd-inkopsdatum`, `fd-pris`,
+  `fd-sb-nummer`, `fd-plats`, `fd-varfor-kopt`, `fd-tasting`,
+  `fd-sb-beskrivning`, `fd-munskankarna`, `fd-annan-referens`), och CSS
+  `order` sätts på dessa klasser **scopeat under `.vinkort dl`** (inte
+  globalt) - fragmentets faktiska DOM-ordning i källkoden är alltjämt
+  den ursprungliga (Plats först). Tabellvyns `.detaljlista-bred` har
+  ingen matchande `order`-regel och behåller därför sin egen
+  dokumentordning helt opåverkad, trots att båda vyerna renderar exakt
+  samma `dt`/`dd`-element via samma `th:insert`-anrop. De tre
+  staplade fälten kombinerar `order` med `grid-column: 1 / -1` - att
+  låta både `dt` och dess `dd` spänna hela grid-bredden tvingar
+  auto-placeringsalgoritmen att lägga dem på varsin egen rad (`dt`
+  följt av `dd` direkt under), vilket ger stapling utan någon extra
+  `<span>`-uppdelning av label/värde (till skillnad från
+  `.betyg-label`/`.betyg-varde`-mönstret som användes för betygsraderna
+  tidigare, där käll-HTML:en själv behövde två separata element).
 
 ## Säkerhet
 

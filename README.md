@@ -104,6 +104,20 @@ så `colspan` på detaljraden sänktes från `14` till `13` för att matcha
 det nya antalet översiktskolumner (håll dem i synk om en kolumn läggs
 till eller tas bort).
 
+**Detaljer-fältens ordning justerad, bara för kortvyn (2026-07-19):**
+den nya ordningen är Inköpsdatum, Pris, Systembolagets produktnummer,
+Plats, Varför köpt, Tasting notes, Systembolagets beskrivning,
+Munskänkarnas bedömning (Annan referens ligger kvar sist, oförändrad).
+De tre sista (Tasting notes, Systembolagets beskrivning, Munskänkarnas
+bedömning) visar dessutom värdet *under* etiketten istället för bredvid
+den. Löst utan att duplicera `detaljfalt`-fragmentet eller ändra dess
+DOM-ordning: varje `dt`/`dd`-par har fått en `fd-*`-klass (t.ex.
+`fd-inkopsdatum`), och CSS `order` (plus `grid-column: 1 / -1` för de
+tre som ska staplas) sätts bara under `.vinkort dl`-selektorn - så
+samma fragment kan fortsätta återanvändas av tabellens
+`.detaljlista-bred`, som behåller sin egen (ursprungliga)
+dokumentordning helt opåverkad av kortvyns omordning.
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):
