@@ -209,6 +209,23 @@ flaggade som gällande.
   normal }`) istället för tabellvyns fetstilta variant, för att matcha
   mockupens länkkänsla - scopead till `.vinkort` så tabellens
   `<summary>` inte påverkas.
+  **Redigera/Ta bort flyttade in i Detaljer, högerjusterade (2026-07-19,
+  gäller både tabell- och kortvyn - till skillnad från de tidigare
+  kortspecifika omgångarna).** Låg tidigare alltid synliga i
+  översikten: en egen `<td>`/kolumn i tabellraden, `.vinkort-fot` som
+  en vänsterjusterad kolumn under kortet. Ligger nu sist i den infällda
+  `<details>`-sektionen i en delad `.detalj-atgarder`-`<div>`
+  (`display: flex; justify-content: flex-end`), återanvänd i både
+  tabellens och kortets Detaljer istället för separata layouter.
+  Eftersom hela åtgärdskolumnen försvann ur tabellens `<thead>` och
+  huvudrad sänktes `colspan` på detaljraden från `14` till `13` - en
+  lätt fälla att missa om man bara ändrar en av de två platserna.
+  **Fälla att komma ihåg för nästa kolumnändring:** `colspan` måste
+  alltid matcha exakt antalet `<th>` i `<thead>`, annars blir
+  detaljradens `<td>` fel bred (för smal om `colspan` är för lågt, eller
+  sträcker sig utanför tabellen om det är för högt) - lätt att missa
+  eftersom det inte ger något kompilatorfel, bara ett tyst
+  layoutproblem som bara syns visuellt.
 
 ## Säkerhet
 

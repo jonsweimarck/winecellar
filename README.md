@@ -92,6 +92,18 @@ mockupens länkkänsla. Tabellvyn är
 oförändrad - designomgången är avgränsad till kortmallen, tabellen får
 sin egen omgång senare.
 
+**Redigera/Ta bort flyttade till Detaljer, högerjusterade (2026-07-19,
+gäller både tabell- och kortvyn):** låg tidigare alltid synliga i
+översikten (en egen kolumn i tabellen, `.vinkort-fot` under kortet).
+Ligger nu istället längst ner i den infällda "Detaljer"-sektionen, i en
+delad `.detalj-atgarder`-`<div>` (`display: flex; justify-content:
+flex-end`) - samma klass återanvänds i både tabellens `<td colspan>`
+och kortets `<details>` istället för att duplicera layouten. I
+tabellvyn försvann därmed hela åtgärdskolumnen ur `<thead>`/huvudraden,
+så `colspan` på detaljraden sänktes från `14` till `13` för att matcha
+det nya antalet översiktskolumner (håll dem i synk om en kolumn läggs
+till eller tas bort).
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):
