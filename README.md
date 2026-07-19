@@ -23,9 +23,12 @@ web/             Controller + Thymeleaf/htmx
 
 Till skillnad från `roombooking` finns här inga affärsregler att tala om -
 domänlagret är tunt. Det som gör UI-lagret svårare är istället
-responsiviteten, se "UI-test" nedan - `vinkallare.html` renderar både en
-tabellvy och en kortvy i samma HTML-fragment och växlar mellan dem med en
-CSS media query vid 640px, verifierat av `WineListResponsiveIT`.
+responsiviteten, se "UI-test" nedan - `vinkallare.html` renderar två
+kortlayouter i samma HTML-fragment och växlar mellan dem med en CSS media
+query vid 960px, verifierat av `WineListResponsiveIT`: breda kort på
+desktop (`#vinlista-tabell` - namnet är kvar av historiska skäl, se
+"Tabellvyns designomgång" nedan) och smala kort med en infälld
+"Detaljer"-sektion på mobil (`#vinlista-kort`).
 
 `Wine` har vuxit till 23 fält i takt med att Excel-importen (se nedan)
 krävde dem - för många för en läsbar positionell record-konstruktor, så
@@ -88,9 +91,10 @@ information för en vinkällarapp som annars hade krävt en utfällning
 för att se. "Detaljer" är en vanlig `<summary>` men styld som en
 understruken länk (`text-decoration: underline; font-weight: normal`)
 istället för tabellvyns fetstilta knapputseende, för att matcha
-mockupens länkkänsla. Tabellvyn är
-oförändrad - designomgången är avgränsad till kortmallen, tabellen får
-sin egen omgång senare.
+mockupens länkkänsla. Tabellvyn var vid det här laget fortfarande
+oförändrad - designomgången var avgränsad till kortmallen. Tabellvyn
+fick sin egen omgång strax efter, se "Tabellvyns designomgång" längre
+ner - och ersattes då helt av samma sorts kort, fast bredare.
 
 **Redigera/Ta bort flyttade till Detaljer, högerjusterade (2026-07-19,
 gäller både tabell- och kortvyn):** låg tidigare alltid synliga i
@@ -135,6 +139,56 @@ styr båda). Medvetet vald avvägning, inte ett förbiseende - om det
 visar sig vara ett problem i praktiken (produktnummer utan beskrivning
 förekommer) är det en enkel ändring att lägga till en fallback-rad för
 det fallet.
+
+**Tabellvyns designomgång (2026-07-19/20) - den gamla `<table>` är helt
+borttagen.** Styrd av en PNG-mockup användaren ritade upp
+(`Vinlista.png`) och en Artifact-jämförelse som itererades i flera
+omgångar (dämpade labels, betygsraden flyttad upp bredvid bilden,
+omordning, labels linjerade på samma höjd, fasta betygskolumnbredder)
+innan den byggdes på riktigt. Beslutet var uttryckligen att **inte**
+ha någon infälld Detaljer på desktop - alla fält visas alltid,
+inklusive `otherReference` ("Annan referens"), som varken den gamla
+tabellen eller kortvyns Detaljer råkade visa förut (ett fält som fanns
+i datamodellen men aldrig syntes någonstans i listan - upptäcktes när
+allt skulle visas samtidigt).
+
+- **`#vinlista-tabell` innehåller nu breda kort (`.vinkort-bred`),
+  inte en `<table>`** - namnet på `id`:t/klassen är kvar av historiska
+  skäl (CSS-brytpunkten och `WineListResponsiveIT` pekar redan på det),
+  men det är samma sorts kort som `#vinlista-kort` (mobil), bara
+  bredare och utan `<details>`. `vinbild-tabell`, `.detaljlista-bred`
+  och `<tr class="detaljrad"> / colspan` (dokumenterat ovan) är alla
+  borttagna tillsammans med `<table>`:n.
+- **Fyra kolumner delas av tre radgrupper** (`.vk-topp`, `.vk-info-rad`,
+  `.vk-text-rad`) via samma `grid-template-columns`, så Inköpsdatum
+  hamnar under bilden, Pris under textblocket, Varför köpt under
+  Munskänkarna och Plats under Eget betyg. Varje fält har ett
+  **explicit `grid-column`** (inte auto-placering) - annars skulle t.ex.
+  Pris hoppa in i Inköpsdatums kolumn för ett vin som saknar
+  inköpsdatum, eftersom CSS Grids auto-placering fyller nästa lediga
+  cell i dokumentordning oavsett vilket fält som faktiskt saknas.
+- **Betygsraden (Vivino/Munskänkarna/Eget betyg) är en egen grid-rad**
+  (`grid-row: 2`) bredvid bilden, som spänner båda raderna
+  (`grid-row: 1 / 3`) och stretchar till samma höjd. Alla tre labels
+  börjar därför på exakt samma höjd oavsett hur långt respektive värde
+  råkar vara.
+- **Munskänkarna/Eget betyg-kolumnerna har fast bredd (`18rem`), inte
+  `fr`** - de måste rymma det längsta möjliga betygsvärdet (någon av
+  de 29 Rating-etiketterna, t.ex. `"12,5 (12 - 14,5 Bra till mycket
+  bra vin)"`) oavsett vilket av de två fälten som råkar ha ett långt
+  värde. Verifierat med båda fälten satta till den längsta etiketten
+  samtidigt.
+- **Sidan blev bredare för att detta skulle få plats:** `body`s
+  `max-width` höjdes från `48rem` till `70rem`, och CSS-brytpunkten
+  mellan bred kortvy och mobil kortvy höjdes från `640px` till `960px`
+  - de fasta 18rem-kolumnerna kan inte krympa, så under ~960px svämmar
+  layouten över om inte mobilvyn tar över istället. Verifierat manuellt
+  vid 900px (mobilkort, ingen överflödning) och 1280px (breda kort,
+  inga betygsvärden radbryter).
+- Redigera/Ta bort ligger direkt i kortet (`.detalj-atgarder`, samma
+  klass som kortvyn återanvänder för sin infällda variant) - inte
+  infällt bakom något klick, eftersom hela poängen med omgången var att
+  slippa en Detaljer-sektion på desktop.
 
 ## Datamodell
 
@@ -282,23 +336,33 @@ brytpunkt. Det är själva poängen med UI:t, så det har ett eget testlager:
   ```
   mvn org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.classpathScope=test -Dexec.args="install"
   ```
-- **Utökad efter kortmall-/Detaljer-omdesignen (2026-07-19)** med två nya
-  `WineListResponsiveIT`-tester: att Redigera/Ta bort är dolda tills
-  "Detaljer" fälls ut (klick på `<summary>`), i både tabell- och
-  kortvyn, samt att flaskbadgen visar rätt antal i kortvyn - inget av
+- **Utökad efter kortmall-/Detaljer-omdesignen (2026-07-19)** med
+  `WineListResponsiveIT`-tester för att Redigera/Ta bort är dolda tills
+  "Detaljer" fälls ut, och att flaskbadgen visar rätt antal - inget av
   detta kan `@WebMvcTest`/MockMvc verifiera, eftersom det är CSS
   (`<details>` utan `open`) som gömmer innehållet, inte serverlogik.
-  `WineControllerTest` fick samtidigt ett nytt test
-  (`skaRenderaKortvynsNyaStruktur`) som verifierar att de strukturella
-  hakarna för kortets nya utseende faktiskt finns i den renderade
-  HTML:en - klassnamnen `flaskor-badge`, `vinkort-producent`,
-  `vinkort-namn`, `betyg-label`/`betyg-varde`, `fd-*` (ordnings-/
-  staplingsklasserna) och `detalj-atgarder`, samt att tabellens
-  detaljrad har `colspan="13"`. Det är medvetet bara ett strukturellt
-  test - det bekräftar att hakarna CSS:en är beroende av finns kvar i
-  HTML:en, inte att CSS:en faktiskt renderar dem rätt (det täcks av
-  Playwright-testerna ovan för de delarna som är synliga/dolda-
-  beteende, inte pixel-exakt layout).
+  `WineControllerTest` fick samtidigt ett strukturellt test
+  (`skaRenderaKortvynsNyaStruktur`) som verifierar att klassnamnen
+  kortets utseende är beroende av faktiskt finns i den renderade
+  HTML:en (`flaskor-badge`, `vinkort-producent`, `vinkort-namn`,
+  `betyg-label`/`betyg-varde`, `fd-*`, `detalj-atgarder`) - ett rent
+  strukturellt test, inte ett bevis på att CSS:en renderar rätt (det
+  täcks av Playwright-testerna för synlig/dold-beteende, inte
+  pixel-exakt layout).
+- **Uppdaterad efter tabellvyns designomgång (2026-07-19/20):** de
+  breda korten (`#vinlista-tabell`) har ingen Detaljer längre, så
+  `skaDöljaRedigeraOchTaBortTillsDetaljerFällsUtPåDesktop` byttes mot
+  `skaVisaRedigeraOchTaBortDirektPåDesktop` (inget klick behövs -
+  åtgärderna är synliga direkt) plus
+  `skaVisaAllaFältDirektPåDesktopUtanAttFällaUtNågot` (ett fält som
+  `tastingNotes` är synligt utan interaktion). Readonly-kontots test
+  (`skaDöljaLäggTillRedigeraOchTaBortFörReadonlyKontot`) tappade sitt
+  klick på `"Detaljer"` av samma skäl. `WineControllerTest` fick ett
+  nytt strukturellt test (`skaRenderaBredaKortMedAllaFältSynliga`) som
+  verifierar att `<table>` och `vinbild-tabell` är helt borta, att de
+  nya `vk-*`-klasserna finns, och att alla fält - inklusive `Annan
+  referens`, som aldrig syntes i den gamla tabellen eller kortvyns
+  Detaljer - renderas.
 
 ## Köra lokalt
 
@@ -422,9 +486,12 @@ repot är delat.
       testad med Testcontainers, se `vin-persistens.feature`)
 - [x] Grundläggande webblager (`WineController` + `vinkallare.html`,
       htmx-fragment för lägg till/ändra antal/ta bort, `@WebMvcTest`)
-- [x] Responsiv table/card-mall + `WineListResponsiveIT` - `vinkallare.html`
-      växlar mellan tabellvy och kortvy vid 640px, verifierat med Playwright
-      i två viewport-bredder
+- [x] Responsiv dubbel kortmall + `WineListResponsiveIT` - `vinkallare.html`
+      växlar mellan breda kort (desktop, `#vinlista-tabell`) och smala kort
+      med infälld Detaljer (mobil, `#vinlista-kort`) vid 960px, verifierat
+      med Playwright i flera viewport-bredder. Startade som en
+      tabell/kort-uppdelning vid 640px, men tabellvyn ersattes senare helt
+      av breda kort utan Detaljer (se "Tabellvyns designomgång" ovan)
 - [x] Bilduppladdning och -visning (`image` + `image_mime_type`,
       del av `vin-formular.html`) - se Datamodell ovan för `oid`-avvikelsen
 - [x] Excel-importskript (`tools/import-excel/`) - fristående Maven-modul,

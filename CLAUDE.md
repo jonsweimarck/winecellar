@@ -275,6 +275,74 @@ flaggade som gällande.
   (dokumenterad i README, inte bara en bugg som råkade hända) - om
   produktnummer-utan-beskrivning visar sig vara ett verkligt
   datamönster är det en enkel ändring att lägga till en fallback-rad.
+  **Tabellvyns designomgång (2026-07-19/20) - `<table>`,
+  `.detaljlista-bred`, `<tr class="detaljrad">`/`colspan` och
+  `vinbild-tabell` (allt beskrivet ovan) är alltså numera historik, inte
+  gällande kod.** Styrd av en PNG-mockup (`Vinlista.png`) och en
+  Artifact-jämförelse som itererades i flera omgångar innan bygget:
+  dämpade labels (mindre, grå, `font-weight: 400` istället för fetstil),
+  betygsraden flyttad upp bredvid bilden, fältordning, labels linjerade
+  på samma höjd, och till sist fasta betygskolumnbredder. Beslutet var
+  uttryckligen **ingen infälld Detaljer på desktop** - jämfört mot
+  kortvyns "visa lite, fäll ut resten"-modell är tabellvyn nu "visa
+  allt direkt", vilket avslöjade att `otherReference` ("Annan
+  referens") aldrig visades någonstans i listan tidigare (varken i
+  gamla tabellen eller kortvyns Detaljer) - ett dolt hål i
+  fältexponeringen som bara syntes när kravet blev "visa allt".
+  - `#vinlista-tabell` innehåller nu `.vinkort-bred`-kort, inte en
+    `<table>` - `id`:t/klassnamnet är kvar (CSS-brytpunkten och
+    `WineListResponsiveIT` pekar redan på det), men strukturen är en
+    helt annan. `vk-`-prefixet på de nya klasserna är medvetet skilt
+    från kortvyns `vinkort-`-prefix - de två vyerna har olika layout
+    (fyra kolumner mot en smal kolumn), och samma klassnamn med olika
+    betydelse i olika vyer hade varit förvirrande.
+  - **Fyra kolumner delas av `.vk-topp`/`.vk-info-rad`/`.vk-text-rad`**
+    via samma `grid-template-columns: 6rem 1fr 18rem 18rem`, så
+    Inköpsdatum hamnar under bilden, Pris under textblocket, Varför
+    köpt under Munskänkarna och Plats under Eget betyg. **Varje fält
+    har ett explicit `grid-column`** (`.vk-inkopsdatum { grid-column:
+    1 }` osv.) - utan det skulle CSS Grids auto-placering fylla nästa
+    lediga cell i dokumentordning, så om t.ex. ett vin saknar
+    `purchaseDate` (Inköpsdatum) skulle Pris hoppa in i kolumn 1
+    istället för kolumn 2 och hela kolumnjusteringen brytas för just
+    det vinet. Samma fälla som `fd-*`-klassernas `order`-lösning
+    ovan undvek på ett annat sätt (där gällde det ordning, inte
+    kolumnplacering).
+  - **Betygsraden (Vivino/Munskänkarna/Eget betyg) är en egen
+    `grid-row: 2`** i `.vk-topp`, bredvid bilden (`.vk-bildyta`, som
+    spänner `grid-row: 1 / 3` och stretchar till samma höjd som
+    text+betyg tillsammans). Alla tre labels börjar därför på exakt
+    samma höjd, oavsett hur många rader respektive värde råkar
+    radbryta till - samma princip som `fd-*`-klassernas
+    grid-row-lösning i kortvyn, fast tillämpad direkt i strukturen
+    istället för via `order`.
+  - **`.vk-munskankarna`/`.vk-egetbetyg` har fast bredd (`18rem`, inte
+    `fr`)** - de måste rymma det längsta möjliga betygsvärdet (någon av
+    de 29 Rating-etiketterna; längst är `"12,5 (12 - 14,5 Bra till
+    mycket bra vin)"` och liknande, ~41 tecken) oavsett vilket av de
+    två fälten som råkar ha ett långt värde - det kan lika gärna vara
+    Eget betyg som Munskänkarna. Verifierat lokalt med båda fälten
+    satta till den längsta etiketten samtidigt (worst-case, inte bara
+    det exempel användaren råkade visa i sin mockup).
+  - **Sidan fick höjas i bredd för att detta skulle få plats:** `body`s
+    `max-width` gick från `48rem` till `70rem`, och
+    `@media`-brytpunkten mellan bred kortvy och mobil kortvy gick från
+    `640px` till `960px`. De fasta 18rem-kolumnerna krymper aldrig, så
+    under ~960px skulle layouten svämma över (horisontell scroll) om
+    inte mobilvyn tog över istället - verifierat manuellt vid 900px
+    (faller tillbaka till kortvyn utan överflödning) och 1280px (breda
+    kort, inga betygsvärden radbryter).
+  - Redigera/Ta bort ligger direkt i `.vk-topp`-kortet
+    (`.detalj-atgarder`, samma klass som kortvyns infällda variant
+    återanvänder) - inte bakom något klick, till skillnad från kortvyn.
+  - **Testkonsekvens:** `WineListResponsiveIT`s
+    `skaDöljaRedigeraOchTaBortTillsDetaljerFällsUtPåDesktop` byttes mot
+    `skaVisaRedigeraOchTaBortDirektPåDesktop` (inget klick behövs
+    längre) plus `skaVisaAllaFältDirektPåDesktopUtanAttFällaUtNågot`;
+    readonly-testet tappade sitt `"Detaljer"`-klick av samma skäl.
+    `WineControllerTest` fick `skaRenderaBredaKortMedAllaFältSynliga`,
+    som bland annat verifierar att `<table>` och `vinbild-tabell`
+    **inte** längre förekommer i den renderade HTML:en.
 
 ## Säkerhet
 

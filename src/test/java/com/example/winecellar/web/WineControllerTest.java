@@ -253,7 +253,7 @@ class WineControllerTest {
         }
 
         @Test
-        @DisplayName("ska visa geografi- och betygsfält i översikten, resten infällt under \"Detaljer\"")
+        @DisplayName("kortvyn (mobil) ska visa geografi- och betygsfält i översikten, resten infällt under \"Detaljer\"")
         void skaVisaFältUppdeladeMellanÖversiktOchDetaljer() throws Exception {
             Wine barolo = BAROLO.toBuilder()
                     .region("Piemonte").subregion("Langhe").grapes("Nebbiolo")
@@ -337,11 +337,54 @@ class WineControllerTest {
                             containsString("class=\"fd-varfor-kopt\""),
                             containsString("class=\"fd-tasting\""),
                             // Redigera/Ta bort ligger numera inne i Detaljer, inte i
-                            // översikten - .detalj-atgarder delas mellan tabell och kort
-                            containsString("class=\"detalj-atgarder\""),
-                            // Tabellens detaljrad ska spänna exakt lika många kolumner
-                            // som huvudradens <th>-antal (13 sedan åtgärdskolumnen togs bort)
-                            containsString("colspan=\"13\"")
+                            // översikten - .detalj-atgarder delas mellan de breda korten
+                            // och kortvyn
+                            containsString("class=\"detalj-atgarder\"")
+                    )));
+        }
+
+        @Test
+        @DisplayName("de breda korten (desktop) ska visa alla fält direkt, utan någon infälld \"Detaljer\"")
+        void skaRenderaBredaKortMedAllaFältSynliga() throws Exception {
+            Wine barolo = BAROLO.toBuilder()
+                    .region("Piemonte").subregion("Langhe").grapes("Nebbiolo")
+                    .purchaseDate(LocalDate.of(2024, 3, 15)).price(new BigDecimal("450.00"))
+                    .purchaseReason("Rekommenderat").tastingNotes("Kraftfullt")
+                    .ownRating(Rating.R16)
+                    .systembolagetProductNumber("12345").systembolagetDescription("Beskrivning")
+                    .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
+                    .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
+                    .build();
+            when(wineService.listWines()).thenReturn(List.of(barolo));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            // Den gamla <table>-baserade tabellvyn är helt borttagen
+                            not(containsString("<table>")),
+                            not(containsString("class=\"vinbild-tabell\"")),
+                            // De breda kortens egna strukturklasser (se vinkallare.html)
+                            containsString("class=\"vinkort-bred\""),
+                            containsString("class=\"vk-topp\""),
+                            containsString("class=\"vk-info-rad\""),
+                            containsString("class=\"vk-text-rad\""),
+                            containsString("class=\"vk-vivino\""),
+                            containsString("class=\"vk-munskankarna\""),
+                            containsString("class=\"vk-egetbetyg\""),
+                            // Samtliga fält - inklusive Annan referens, som varken
+                            // fanns i tabellvyn eller kortvyns Detaljer tidigare
+                            containsString("Piemonte"),
+                            containsString("Langhe"),
+                            containsString("Nebbiolo"),
+                            containsString("Låda 1"),
+                            containsString("2024-03-15"),
+                            containsString("450.00 kr"),
+                            containsString("Rekommenderat"),
+                            containsString("Kraftfullt"),
+                            containsString("Systembolagets beskrivning (12345)"),
+                            containsString("Recension"),
+                            containsString("Annan referens"),
+                            containsString("https://example.com")
                     )));
         }
     }

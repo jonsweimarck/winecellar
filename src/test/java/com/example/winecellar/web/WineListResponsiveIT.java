@@ -110,17 +110,33 @@ class WineListResponsiveIT {
     }
 
     @Test
-    void skaDöljaRedigeraOchTaBortTillsDetaljerFällsUtPåDesktop() {
+    void skaVisaRedigeraOchTaBortDirektPåDesktop() {
+        // De breda korten (desktop, >960px) har ingen infälld Detaljer -
+        // allt, inklusive Redigera/Ta bort, visas direkt utan att något
+        // behöver fällas ut. Till skillnad från kortvyn (mobil) nedan,
+        // som fortfarande döljer dem tills "Detaljer" klickas.
         try (BrowserContext context = nyKontext(1280, 800, false)) {
             Page page = öppnaVinkällaren(context);
             Locator tabell = page.locator("#vinlista-tabell");
 
-            assertThat(tabell.locator("text=Redigera").isVisible()).isFalse();
-
-            tabell.locator("summary:has-text(\"Detaljer\")").click();
-
             assertThat(tabell.locator("text=Redigera").isVisible()).isTrue();
             assertThat(tabell.locator("text=Ta bort").isVisible()).isTrue();
+        }
+    }
+
+    @Test
+    void skaVisaAllaFältDirektPåDesktopUtanAttFällaUtNågot() {
+        wineService.save(Wine.builder()
+                .name("Chablis").wineType(WineType.WHITE).producer("Domaine X").country("Frankrike")
+                .vintage(2020).quantity(2).location("Låda 3")
+                .tastingNotes("Mineralisk och frisk")
+                .build());
+
+        try (BrowserContext context = nyKontext(1280, 800, false)) {
+            Page page = öppnaVinkällaren(context);
+            Locator tabell = page.locator("#vinlista-tabell");
+
+            assertThat(tabell.locator("text=Mineralisk och frisk").isVisible()).isTrue();
         }
     }
 
@@ -150,8 +166,6 @@ class WineListResponsiveIT {
             assertThat(page.locator("text=Lägg till vin").isVisible()).isFalse();
 
             Locator tabell = page.locator("#vinlista-tabell");
-            tabell.locator("summary:has-text(\"Detaljer\")").click();
-
             assertThat(tabell.locator("text=Redigera").isVisible()).isFalse();
             assertThat(tabell.locator("text=Ta bort").isVisible()).isFalse();
         }

@@ -6,18 +6,24 @@
     <title>Vinkällaren</title>
     <script src="https://unpkg.com/htmx.org@2.0.2"></script>
     <style>
-        body { font-family: sans-serif; max-width: 48rem; margin: 3rem auto; }
+        body { font-family: sans-serif; max-width: 70rem; margin: 3rem auto; }
         label { display: block; margin-top: 0.75rem; }
         input, select { width: 100%; padding: 0.4rem; box-sizing: border-box; }
         button { padding: 0.4rem 0.8rem; }
         .knapp { display: inline-block; text-decoration: none; color: inherit; border: 1px solid #999; border-radius: 0.25rem; padding: 0.6rem 1rem; }
-        table { width: 100%; border-collapse: collapse; margin-top: 2rem; }
-        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; }
 
-        /* Tabell på desktop, kort på mobil - se WineListResponsiveIT som
+        /* Breda kort på desktop, smala kort på mobil - #vinlista-tabell
+           heter fortfarande "tabell" av historiska skäl (det var en
+           riktig HTML-tabell innan tabellvyns designomgång 2026-07-19),
+           men innehåller numera samma sorts kort som mobilvyn, bara
+           bredare och utan infälld Detaljer - allt visas alltid.
+           Brytpunkten höjdes från 640px till 960px i samma omgång: de
+           breda korten har fasta minimibredder för betygskolumnerna (se
+           .vk-munskankarna/.vk-egetbetyg) och får inte plats på smalare
+           skärmar utan att svämma över. Se WineListResponsiveIT som
            verifierar att bara en av vyerna är synlig åt gången. */
         .vinlista-kort { display: none; }
-        @media (max-width: 640px) {
+        @media (max-width: 960px) {
             .vinlista-tabell { display: none; }
             .vinlista-kort { display: block; }
         }
@@ -53,11 +59,12 @@
 
         /* Ordningen på Detaljer-fälten och "etikett ovanför värde" för de
            tre sista gäller bara kortvyn (liten skärm) - satt via CSS
-           order/grid-column, inte genom att ändra fragmentets DOM-ordning,
-           så tabellvynens Detaljer (.detaljlista-bred) behåller sin egen
-           ordning opåverkad. Klasserna (fd-*) sitter på samma element i
-           båda vyerna eftersom de delar detaljfalt-fragmentet - bara denna
-           .vinkort dl-scopeade regel gör dem synliga i utseende. */
+           order/grid-column, inte genom att ändra fragmentets DOM-ordning.
+           Klasserna (fd-*) sitter bara på detaljfalt-fragmentets element,
+           som numera bara används av kortvyn (den breda vyn visar alla
+           fält direkt, utan någon infälld Detaljer) - den här
+           .vinkort dl-scopeade regeln är alltså det enda stället de
+           faktiskt syns. */
         .vinkort dl .fd-inkopsdatum { order: 10; }
         .vinkort dl .fd-pris { order: 20; }
         .vinkort dl .fd-plats { order: 40; }
@@ -87,22 +94,75 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
         }
 
-        .vinbild-tabell { width: 3rem; height: 4rem; object-fit: contain; background: #f0f0f0; border-radius: 0.25rem; display: block; }
         .vinbild-kort { width: 100%; max-height: 12rem; object-fit: contain; background: #f0f0f0; border-radius: 0.5rem; display: block; }
         .vinbild-saknas { color: #999; font-size: 0.85rem; }
 
-        /* Detaljer utöver överbliksfälten - infällda per rad/kort, se
-           detaljfalt-fragmentet nedan som delas mellan tabell- och kortvyn.
-           .vinkort dl-reglerna ovan täcker redan dt/dd-utseendet i kortvyn.
-           I tabellvyn ligger detaljraden i en egen <tr> som spänner över
-           hela tabellbredden (colspan) istället för att klämmas in i en
-           enda smal kolumn - annars hamnar alla fält i en och samma smala
-           kolumn även på en stor skärm. */
-        details summary { cursor: pointer; font-weight: bold; }
-        .detaljlista-bred { display: grid; grid-template-columns: repeat(2, auto 1fr); column-gap: 2rem; row-gap: 0.25rem; margin: 0.5rem 0; }
-        .detaljlista-bred dt { font-weight: bold; }
-        .detaljlista-bred dd { margin: 0; }
-        .vinkort details { margin-top: 0.75rem; }
+        /* Breda kort (desktop, >960px) - ersätter den tidigare
+           tabell-layouten (se WineListResponsiveIT/CLAUDE.md för historiken).
+           Ingen infälld Detaljer här: alla fält visas alltid, direkt i
+           kortet. "vk-"-prefixet skiljer de här klasserna från kortvyns
+           "vinkort-"-klasser ovan, som har en annan (enklare) layout -
+           samma klassnamn hade annars krockat med olika betydelse i de
+           två vyerna. Bygger vidare på en mockup användaren ritade upp
+           (Vinlista.png) och en Artifact-jämförelse, se README/CLAUDE.md.
+
+           Fyra kolumner delas av alla radgrupperna (topp/info/text), så
+           Inköpsdatum hamnar under bilden, Pris under textblocket,
+           Varför köpt under Munskänkarna och Plats under Eget betyg.
+           Munskänkarna/Eget betyg-kolumnerna är fasta 18rem (inte fr) -
+           de måste alltid rymma det längsta möjliga betygsvärdet (någon
+           av de 29 Rating-etiketterna, längst är t.ex. "12,5 (12 - 14,5
+           Bra till mycket bra vin)"), oavsett vilket av de två fälten
+           som råkar ha ett långt värde - därför kräver den här vyn också
+           sidans breddökning till 70rem och den höjda brytpunkten ovan.
+           Varje fält i info-/text-raderna har ett explicit grid-column
+           (inte auto-placering) - annars skulle t.ex. Pris hoppa in i
+           Inköpsdatums kolumn om Inköpsdatum råkar saknas för ett vin. */
+        .vinkort-bred {
+            position: relative;
+            border: 1px solid #ddd;
+            border-radius: 0.5rem;
+            padding: 1.25rem 1.5rem 1.5rem;
+            margin-top: 1rem;
+        }
+        .vk-topp, .vk-info-rad, .vk-text-rad {
+            display: grid;
+            grid-template-columns: 6rem 1fr 18rem 18rem;
+            column-gap: 1.5rem;
+        }
+        .vk-topp { grid-template-rows: auto auto; row-gap: 0.75rem; }
+        .vk-bildyta { grid-column: 1; grid-row: 1 / 3; align-self: stretch; }
+        .vk-bildyta img {
+            width: 100%; height: 100%; object-fit: contain;
+            border-radius: 0.25rem; background: #f0f0f0; display: block;
+        }
+        .vk-bildplatshallare {
+            width: 100%; height: 100%; border-radius: 0.25rem; background: #f0f0f0;
+            display: flex; align-items: center; justify-content: center;
+            color: #999; font-size: 0.8rem; text-align: center; padding: 0 0.25rem;
+        }
+        .vk-text { grid-column: 2; grid-row: 1; }
+        .vk-text p { margin: 0.15rem 0 0; }
+        .vk-text p:first-child { margin-top: 0; }
+        .vk-namn { font-size: 1.15rem; }
+        .vk-typ { margin-top: 0.75rem !important; }
+        .vk-vivino { grid-column: 2; grid-row: 2; }
+        .vk-munskankarna { grid-column: 3; grid-row: 2; }
+        .vk-egetbetyg { grid-column: 4; grid-row: 2; }
+
+        .vk-label { display: block; font-size: 0.78rem; color: #767676; font-weight: 400; margin-bottom: 0.15rem; }
+        .vk-value { display: block; font-size: 0.95rem; color: #1a1a1a; line-height: 1.4; }
+
+        .vk-info-rad, .vk-text-rad, .vk-referens-rad {
+            margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #eee;
+        }
+        .vk-inkopsdatum { grid-column: 1; }
+        .vk-pris { grid-column: 2; }
+        .vk-varfor-kopt { grid-column: 3; }
+        .vk-plats { grid-column: 4; }
+        .vk-sb-beskrivning { grid-column: 1 / 3; }
+        .vk-munskankarnas-bedomning { grid-column: 3; }
+        .vk-tasting { grid-column: 4; }
     </style>
 </head>
 <body>
@@ -139,74 +199,90 @@
 
     <div id="vinlista" th:fragment="lista">
         <div id="vinlista-tabell" class="vinlista-tabell">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Bild</th>
-                        <th>Namn</th>
-                        <th>Typ</th>
-                        <th>Producent</th>
-                        <th>Land</th>
-                        <th>Region</th>
-                        <th>Underregion</th>
-                        <th>Druvor</th>
-                        <th>Årgång</th>
-                        <th>Flaskor</th>
-                        <th>Eget betyg</th>
-                        <th>Munskänkarnas betyg</th>
-                        <th>Vivino-betyg</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <th:block th:each="vin : ${viner}">
-                        <tr>
-                            <td>
-                                <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
-                                    <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}"
-                                         alt="Etikett" class="vinbild-tabell">
-                                </a>
-                                <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
-                            </td>
-                            <td th:text="${vin.name}"></td>
-                            <td th:switch="${vin.wineType.name()}">
-                                <span th:case="'RED'">Rött</span>
-                                <span th:case="'WHITE'">Vitt</span>
-                                <span th:case="'ROSE'">Rosé</span>
-                                <span th:case="'SPARKLING'">Mousserande</span>
-                                <span th:case="'FORTIFIED'">Starkvin</span>
-                            </td>
-                            <td th:text="${vin.producer}"></td>
-                            <td th:text="${vin.country}"></td>
-                            <td th:text="${vin.region}"></td>
-                            <td th:text="${vin.subregion}"></td>
-                            <td th:text="${vin.grapes}"></td>
-                            <td th:text="${vin.vintage}"></td>
-                            <td th:text="${vin.quantity}"></td>
-                            <td th:text="${vin.ownRating != null ? vin.ownRating.label() : ''}"></td>
-                            <td th:text="${vin.munskankarnaRating != null ? vin.munskankarnaRating.label() : ''}"></td>
-                            <td th:text="${vin.vivinoRating}"></td>
-                        </tr>
-                        <tr class="detaljrad">
-                            <td colspan="13">
-                                <details>
-                                    <summary>Detaljer</summary>
-                                    <dl class="detaljlista-bred">
-                                        <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
-                                    </dl>
-                                    <div class="detalj-atgarder" th:if="${kanRedigera}">
-                                        <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
-                                        <button type="button"
-                                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
-                                                hx-target="#vinlista" hx-swap="outerHTML">
-                                            Ta bort
-                                        </button>
-                                    </div>
-                                </details>
-                            </td>
-                        </tr>
-                    </th:block>
-                </tbody>
-            </table>
+            <div class="vinkort-bred" th:each="vin : ${viner}">
+                <span class="flaskor-badge" th:text="${vin.quantity}" title="Antal flaskor"></span>
+                <div class="vk-topp">
+                    <div class="vk-bildyta">
+                        <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
+                            <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}" alt="Etikett">
+                        </a>
+                        <div th:unless="${vin.harBild()}" class="vk-bildplatshallare">Ingen bild</div>
+                    </div>
+                    <div class="vk-text">
+                        <p th:text="${vin.producer}"></p>
+                        <p class="vk-namn"><strong th:text="${vin.name}"></strong> <span th:text="${vin.vintage}"></span></p>
+                        <p>
+                            <span th:text="${vin.country}"></span>
+                            <span th:if="${vin.region != null}" th:text="${vin.region}"></span>
+                            <span th:if="${vin.subregion != null}" th:text="${vin.subregion}"></span>
+                        </p>
+                        <p class="vk-typ">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
+                        <p th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
+                    </div>
+                    <div class="vk-vivino" th:if="${vin.vivinoRating != null}">
+                        <span class="vk-label">Vivino</span>
+                        <span class="vk-value" th:text="${vin.vivinoRating}"></span>
+                    </div>
+                    <div class="vk-munskankarna" th:if="${vin.munskankarnaRating != null}">
+                        <span class="vk-label">Munskänkarna</span>
+                        <span class="vk-value" th:text="${vin.munskankarnaRating.label()}"></span>
+                    </div>
+                    <div class="vk-egetbetyg" th:if="${vin.ownRating != null}">
+                        <span class="vk-label">Eget betyg</span>
+                        <span class="vk-value" th:text="${vin.ownRating.label()}"></span>
+                    </div>
+                </div>
+
+                <div class="vk-info-rad">
+                    <div class="vk-inkopsdatum" th:if="${vin.purchaseDate != null}">
+                        <span class="vk-label">Inköpsdatum</span>
+                        <span class="vk-value" th:text="${vin.purchaseDate}"></span>
+                    </div>
+                    <div class="vk-pris" th:if="${vin.price != null}">
+                        <span class="vk-label">Pris</span>
+                        <span class="vk-value" th:text="|${vin.price} kr|"></span>
+                    </div>
+                    <div class="vk-varfor-kopt" th:if="${vin.purchaseReason != null}">
+                        <span class="vk-label">Varför köpt</span>
+                        <span class="vk-value" th:text="${vin.purchaseReason}"></span>
+                    </div>
+                    <div class="vk-plats">
+                        <span class="vk-label">Plats</span>
+                        <span class="vk-value" th:text="${vin.location}"></span>
+                    </div>
+                </div>
+
+                <div class="vk-text-rad"
+                     th:if="${vin.systembolagetDescription != null or vin.munskankarnaReview != null or vin.tastingNotes != null}">
+                    <div class="vk-sb-beskrivning" th:if="${vin.systembolagetDescription != null}">
+                        <span class="vk-label"
+                              th:text="${vin.systembolagetProductNumber != null} ? |Systembolagets beskrivning (${vin.systembolagetProductNumber})| : 'Systembolagets beskrivning'"></span>
+                        <span class="vk-value" th:text="${vin.systembolagetDescription}"></span>
+                    </div>
+                    <div class="vk-munskankarnas-bedomning" th:if="${vin.munskankarnaReview != null}">
+                        <span class="vk-label">Munskänkarnas bedömning</span>
+                        <span class="vk-value" th:text="${vin.munskankarnaReview}"></span>
+                    </div>
+                    <div class="vk-tasting" th:if="${vin.tastingNotes != null}">
+                        <span class="vk-label">Tasting notes</span>
+                        <span class="vk-value" th:text="${vin.tastingNotes}"></span>
+                    </div>
+                </div>
+
+                <div class="vk-referens-rad" th:if="${vin.otherReference != null}">
+                    <span class="vk-label">Annan referens</span>
+                    <span class="vk-value" th:text="${vin.otherReference}"></span>
+                </div>
+
+                <div class="detalj-atgarder" th:if="${kanRedigera}">
+                    <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
+                    <button type="button"
+                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                            hx-target="#vinlista" hx-swap="outerHTML">
+                        Ta bort
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div id="vinlista-kort" class="vinlista-kort">
