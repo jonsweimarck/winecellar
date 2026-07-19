@@ -193,6 +193,41 @@ class WineControllerTest {
                             containsString("https://example.com")
                     )));
         }
+
+        @Test
+        @DisplayName("ska rendera kortvyns badge, staplade betygs-/detaljfält och flytta åtgärderna in i Detaljer")
+        void skaRenderaKortvynsNyaStruktur() throws Exception {
+            Wine barolo = BAROLO.toBuilder()
+                    .purchaseReason("Rekommenderat")
+                    .tastingNotes("Kraftfullt")
+                    .ownRating(Rating.R16)
+                    .build();
+            when(wineService.listWines()).thenReturn(List.of(barolo));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            // Flaskbadge och kortets fältetiketslösa struktur (se vinkallare.html)
+                            containsString("class=\"flaskor-badge\""),
+                            containsString("class=\"vinkort-producent\""),
+                            containsString("class=\"vinkort-namn\""),
+                            // Betygsraderna har etikett och värde som separata element
+                            // (staplas via CSS i kortvyn) istället för en enda textrad
+                            containsString("class=\"betyg-label\""),
+                            containsString("class=\"betyg-varde\""),
+                            // Detaljfältens fd-*-klasser styr ordning/stapling i kortvyn
+                            // via CSS (se .vinkort dl-reglerna) utan att ändra
+                            // detaljfalt-fragmentets DOM-ordning
+                            containsString("class=\"fd-varfor-kopt\""),
+                            containsString("class=\"fd-tasting\""),
+                            // Redigera/Ta bort ligger numera inne i Detaljer, inte i
+                            // översikten - .detalj-atgarder delas mellan tabell och kort
+                            containsString("class=\"detalj-atgarder\""),
+                            // Tabellens detaljrad ska spänna exakt lika många kolumner
+                            // som huvudradens <th>-antal (13 sedan åtgärdskolumnen togs bort)
+                            containsString("colspan=\"13\"")
+                    )));
+        }
     }
 
     @Nested

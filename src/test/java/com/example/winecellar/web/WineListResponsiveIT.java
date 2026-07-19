@@ -5,6 +5,7 @@ import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.HttpCredentials;
@@ -104,6 +105,39 @@ class WineListResponsiveIT {
             assertThat(page.locator("#vinlista-kort").isVisible()).isTrue();
             assertThat(page.locator("#vinlista-tabell").isVisible()).isFalse();
             assertThat(page.locator("#vinlista-kort").textContent()).contains("Barolo");
+        }
+    }
+
+    @Test
+    void skaDöljaRedigeraOchTaBortTillsDetaljerFällsUtPåDesktop() {
+        try (BrowserContext context = nyKontext(1280, 800, false)) {
+            Page page = öppnaVinkällaren(context);
+            Locator tabell = page.locator("#vinlista-tabell");
+
+            assertThat(tabell.locator("text=Redigera").isVisible()).isFalse();
+
+            tabell.locator("summary:has-text(\"Detaljer\")").click();
+
+            assertThat(tabell.locator("text=Redigera").isVisible()).isTrue();
+            assertThat(tabell.locator("text=Ta bort").isVisible()).isTrue();
+        }
+    }
+
+    @Test
+    void skaVisaFlaskbadgeOchDöljaRedigeraOchTaBortTillsDetaljerFällsUtPåMobil() {
+        // isMobile(true) krävs för att CSS-brytpunkten alls ska slå till, se
+        // skaVisaKortPåMobilOchDöljaTabell ovan för bakgrunden.
+        try (BrowserContext context = nyKontext(375, 900, true)) {
+            Page page = öppnaVinkällaren(context);
+            Locator kort = page.locator("#vinlista-kort");
+
+            assertThat(kort.locator(".flaskor-badge").textContent()).isEqualTo("3");
+            assertThat(kort.locator("text=Redigera").isVisible()).isFalse();
+
+            kort.locator("summary:has-text(\"Detaljer\")").click();
+
+            assertThat(kort.locator("text=Redigera").isVisible()).isTrue();
+            assertThat(kort.locator("text=Ta bort").isVisible()).isTrue();
         }
     }
 

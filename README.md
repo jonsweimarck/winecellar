@@ -266,6 +266,23 @@ brytpunkt. Det är själva poängen med UI:t, så det har ett eget testlager:
   ```
   mvn org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.classpathScope=test -Dexec.args="install"
   ```
+- **Utökad efter kortmall-/Detaljer-omdesignen (2026-07-19)** med två nya
+  `WineListResponsiveIT`-tester: att Redigera/Ta bort är dolda tills
+  "Detaljer" fälls ut (klick på `<summary>`), i både tabell- och
+  kortvyn, samt att flaskbadgen visar rätt antal i kortvyn - inget av
+  detta kan `@WebMvcTest`/MockMvc verifiera, eftersom det är CSS
+  (`<details>` utan `open`) som gömmer innehållet, inte serverlogik.
+  `WineControllerTest` fick samtidigt ett nytt test
+  (`skaRenderaKortvynsNyaStruktur`) som verifierar att de strukturella
+  hakarna för kortets nya utseende faktiskt finns i den renderade
+  HTML:en - klassnamnen `flaskor-badge`, `vinkort-producent`,
+  `vinkort-namn`, `betyg-label`/`betyg-varde`, `fd-*` (ordnings-/
+  staplingsklasserna) och `detalj-atgarder`, samt att tabellens
+  detaljrad har `colspan="13"`. Det är medvetet bara ett strukturellt
+  test - det bekräftar att hakarna CSS:en är beroende av finns kvar i
+  HTML:en, inte att CSS:en faktiskt renderar dem rätt (det täcks av
+  Playwright-testerna ovan för de delarna som är synliga/dolda-
+  beteende, inte pixel-exakt layout).
 
 ## Köra lokalt
 
