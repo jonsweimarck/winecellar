@@ -190,6 +190,19 @@ allt skulle visas samtidigt).
   infällt bakom något klick, eftersom hela poängen med omgången var att
   slippa en Detaljer-sektion på desktop.
 
+**Bilden gjordes mindre i de breda korten (2026-07-20)**, efter att
+användaren tyckte den var onödigt stor. `.vk-bildyta`s kolumnbredd
+(`6rem`) rördes **inte** - den delas med Inköpsdatum i `.vk-info-rad`,
+som behöver bredden för att inte radbryta datumvärden. Istället fick
+själva bilden/platshållaren ett eget `max-width: 3.5rem; max-height:
+5rem` (mindre än sin kolumn, med tomrum till höger) och `.vk-bildyta`
+bytte från `grid-row: 1 / 3` (spände hela topp-blockets höjd,
+inklusive betygsraden) till bara `grid-row: 1` (samma rad som
+textblocket) - annars hade en liten bild lämnat ett konstigt stort
+tomrum under sig ändå. Verifierat manuellt vid 1280px: bilden är
+tydligt mindre och Inköpsdatum/betygsvärdena radbryter fortfarande
+inte.
+
 ## Datamodell
 
 Tabell `wines` (engelska namn, plural, genomgående):

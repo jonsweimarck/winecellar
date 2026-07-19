@@ -343,6 +343,24 @@ flaggade som gällande.
     `WineControllerTest` fick `skaRenderaBredaKortMedAllaFältSynliga`,
     som bland annat verifierar att `<table>` och `vinbild-tabell`
     **inte** längre förekommer i den renderade HTML:en.
+  **Bilden gjordes mindre (2026-07-20)**, efter att användaren tyckte
+  den var onödigt stor. Kolumnbredden (`6rem`) i
+  `grid-template-columns` rördes **inte** - den delas med Inköpsdatum i
+  `.vk-info-rad`, som behöver bredden för att `"2026-04-18"`-liknande
+  datumvärden inte ska radbryta. Istället begränsades bilden/
+  platshållaren själv: `.vk-bildyta img`/`.vk-bildplatshallare` fick
+  `max-width: 3.5rem; max-height: 5rem` (mindre än sin 6rem-kolumn,
+  lämnar tomrum till höger) istället för `width: 100%; height: 100%`.
+  Samtidigt bytte `.vk-bildyta` från `grid-row: 1 / 3` (spände hela
+  `.vk-topp`, inklusive betygsraden) till `grid-row: 1` (bara
+  textblockets rad, `align-self: start`) - med den gamla spanning-
+  regeln kvar hade en liten bild bara lämnat ett stort tomt utrymme
+  under sig ner till betygsraden istället för att faktiskt bli mindre
+  som helhet. **Fälla undviken:** att bara krympa `max-width`/
+  `max-height` utan att också ändra `grid-row` hade gjort bilden
+  mindre men lämnat kolumnen lika hög som förut - poängen med att
+  fixa båda samtidigt är att hela bildytan krymper, inte bara bilden
+  inuti den.
 
 ## Säkerhet
 
