@@ -60,7 +60,6 @@
            .vinkort dl-scopeade regel gör dem synliga i utseende. */
         .vinkort dl .fd-inkopsdatum { order: 10; }
         .vinkort dl .fd-pris { order: 20; }
-        .vinkort dl .fd-sb-nummer { order: 30; }
         .vinkort dl .fd-plats { order: 40; }
         .vinkort dl .fd-varfor-kopt { order: 50; grid-column: 1 / -1; }
         .vinkort dl .fd-tasting { order: 60; grid-column: 1 / -1; }
@@ -127,10 +126,8 @@
         <dt class="fd-tasting" th:if="${vin.tastingNotes != null}">Tasting notes</dt>
         <dd class="fd-tasting" th:if="${vin.tastingNotes != null}" th:text="${vin.tastingNotes}"></dd>
 
-        <dt class="fd-sb-nummer" th:if="${vin.systembolagetProductNumber != null}">Systembolagets produktnummer</dt>
-        <dd class="fd-sb-nummer" th:if="${vin.systembolagetProductNumber != null}" th:text="${vin.systembolagetProductNumber}"></dd>
-
-        <dt class="fd-sb-beskrivning" th:if="${vin.systembolagetDescription != null}">Systembolagets beskrivning</dt>
+        <dt class="fd-sb-beskrivning" th:if="${vin.systembolagetDescription != null}"
+            th:text="${vin.systembolagetProductNumber != null} ? |Systembolagets beskrivning (${vin.systembolagetProductNumber})| : 'Systembolagets beskrivning'"></dt>
         <dd class="fd-sb-beskrivning" th:if="${vin.systembolagetDescription != null}" th:text="${vin.systembolagetDescription}"></dd>
 
         <dt class="fd-munskankarna" th:if="${vin.munskankarnaReview != null}">Munskänkarnas bedömning</dt>

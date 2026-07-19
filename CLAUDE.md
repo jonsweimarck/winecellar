@@ -227,34 +227,54 @@ flaggade som gällande.
   eftersom det inte ger något kompilatorfel, bara ett tyst
   layoutproblem som bara syns visuellt.
   **Detaljer-fältens ordning omarbetad, scopead till bara kortvyn
-  (2026-07-19).** Ny ordning: Inköpsdatum, Pris, Systembolagets
-  produktnummer, Plats, Varför köpt, Tasting notes, Systembolagets
-  beskrivning, Munskänkarnas bedömning, Annan referens (oförändrad
-  sistplacering). De fyra sista (Varför köpt, Tasting notes,
-  Systembolagets beskrivning, Munskänkarnas bedömning) visar värdet
-  under etiketten istället för bredvid - Varför köpt fick samma
-  behandling i en uppföljande justering samma dag efter att användaren
-  påpekade att den var inkonsekvent utelämnad från de tre andra som
-  redan staplades. Medvetet **inte** löst genom att ändra
+  (2026-07-19).** Ny ordning: Inköpsdatum, Pris, Plats, Varför köpt,
+  Tasting notes, Systembolagets beskrivning, Munskänkarnas bedömning,
+  Annan referens (oförändrad sistplacering; Systembolagets
+  produktnummer försvann ur ordningslistan när det slogs ihop med
+  beskrivningsraden, se nästa punkt). De fyra sista (Varför köpt,
+  Tasting notes, Systembolagets beskrivning, Munskänkarnas bedömning)
+  visar värdet under etiketten istället för bredvid - Varför köpt fick
+  samma behandling i en uppföljande justering samma dag efter att
+  användaren påpekade att den var inkonsekvent utelämnad från de tre
+  andra som redan staplades. Medvetet **inte** löst genom att ändra
   `detaljfalt`-fragmentets DOM-ordning eller duplicera det till en
   kort-specifik variant - det hade återinfört exakt den
   dubbleringsrisk fragmentet ursprungligen skulle undvika. Istället
   fick varje `dt`/`dd`-par en `fd-*`-klass (`fd-inkopsdatum`, `fd-pris`,
-  `fd-sb-nummer`, `fd-plats`, `fd-varfor-kopt`, `fd-tasting`,
-  `fd-sb-beskrivning`, `fd-munskankarna`, `fd-annan-referens`), och CSS
-  `order` sätts på dessa klasser **scopeat under `.vinkort dl`** (inte
-  globalt) - fragmentets faktiska DOM-ordning i källkoden är alltjämt
-  den ursprungliga (Plats först). Tabellvyns `.detaljlista-bred` har
-  ingen matchande `order`-regel och behåller därför sin egen
-  dokumentordning helt opåverkad, trots att båda vyerna renderar exakt
-  samma `dt`/`dd`-element via samma `th:insert`-anrop. De fyra
-  staplade fälten kombinerar `order` med `grid-column: 1 / -1` - att
-  låta både `dt` och dess `dd` spänna hela grid-bredden tvingar
+  `fd-plats`, `fd-varfor-kopt`, `fd-tasting`, `fd-sb-beskrivning`,
+  `fd-munskankarna`, `fd-annan-referens`), och CSS `order` sätts på
+  dessa klasser **scopeat under `.vinkort dl`** (inte globalt) -
+  fragmentets faktiska DOM-ordning i källkoden är alltjämt den
+  ursprungliga (Plats först). Tabellvyns `.detaljlista-bred` har ingen
+  matchande `order`-regel och behåller därför sin egen dokumentordning
+  helt opåverkad, trots att båda vyerna renderar exakt samma
+  `dt`/`dd`-element via samma `th:insert`-anrop. De fyra staplade
+  fälten kombinerar `order` med `grid-column: 1 / -1` - att låta både
+  `dt` och dess `dd` spänna hela grid-bredden tvingar
   auto-placeringsalgoritmen att lägga dem på varsin egen rad (`dt`
   följt av `dd` direkt under), vilket ger stapling utan någon extra
   `<span>`-uppdelning av label/värde (till skillnad från
   `.betyg-label`/`.betyg-varde`-mönstret som användes för betygsraderna
   tidigare, där käll-HTML:en själv behövde två separata element).
+  **Systembolagets produktnummer slogs ihop med beskrivningsraden
+  (2026-07-19), i BÅDA vyerna - till skillnad från
+  ordningsjusteringen/staplingen ovan, som bara gäller kortvyn.**
+  `fd-sb-nummer`-raden (egen `dt`/`dd`) togs bort helt.
+  `fd-sb-beskrivning`s `dt` bygger nu sin text villkorligt: `th:text=
+  "${vin.systembolagetProductNumber != null} ? |Systembolagets
+  beskrivning (${vin.systembolagetProductNumber})| : 'Systembolagets
+  beskrivning'"`. Eftersom det här är en ändring av vad
+  `detaljfalt`-fragmentet faktiskt renderar (inte en CSS-scopead
+  layoutskillnad som ordning/stapling), slår den igenom i både
+  tabellens `.detaljlista-bred` och kortets `.vinkort dl` - det finns
+  ingen `.vinkort`-scopead regel att gömma sig bakom här. **Om
+  `systembolagetDescription` är `null` visas produktnumret inte alls**,
+  även om det är satt - `th:if="${vin.systembolagetDescription !=
+  null}"` styr hela `dt`/`dd`-paret, och utan en beskrivning finns
+  ingen etikett att fästa parentesen på. Medvetet vald avvägning
+  (dokumenterad i README, inte bara en bugg som råkade hända) - om
+  produktnummer-utan-beskrivning visar sig vara ett verkligt
+  datamönster är det en enkel ändring att lägga till en fallback-rad.
 
 ## Säkerhet
 

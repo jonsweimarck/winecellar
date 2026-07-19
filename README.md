@@ -105,13 +105,13 @@ det nya antalet översiktskolumner (håll dem i synk om en kolumn läggs
 till eller tas bort).
 
 **Detaljer-fältens ordning justerad, bara för kortvyn (2026-07-19):**
-den nya ordningen är Inköpsdatum, Pris, Systembolagets produktnummer,
-Plats, Varför köpt, Tasting notes, Systembolagets beskrivning,
-Munskänkarnas bedömning (Annan referens ligger kvar sist, oförändrad).
-De fyra sista (Varför köpt, Tasting notes, Systembolagets beskrivning,
-Munskänkarnas bedömning) visar dessutom värdet *under* etiketten
-istället för bredvid den - Varför köpt fick samma behandling i en
-uppföljande justering samma dag, av samma skäl som de tre första.
+den nya ordningen är Inköpsdatum, Pris, Plats, Varför köpt, Tasting
+notes, Systembolagets beskrivning, Munskänkarnas bedömning (Annan
+referens ligger kvar sist, oförändrad). De fyra sista (Varför köpt,
+Tasting notes, Systembolagets beskrivning, Munskänkarnas bedömning)
+visar dessutom värdet *under* etiketten istället för bredvid den -
+Varför köpt fick samma behandling i en uppföljande justering samma
+dag, av samma skäl som de tre första.
 Löst utan att duplicera `detaljfalt`-fragmentet eller ändra dess
 DOM-ordning: varje `dt`/`dd`-par har fått en `fd-*`-klass (t.ex.
 `fd-inkopsdatum`), och CSS `order` (plus `grid-column: 1 / -1` för de
@@ -119,6 +119,22 @@ fyra som ska staplas) sätts bara under `.vinkort dl`-selektorn - så
 samma fragment kan fortsätta återanvändas av tabellens
 `.detaljlista-bred`, som behåller sin egen (ursprungliga)
 dokumentordning helt opåverkad av kortvyns omordning.
+
+**Systembolagets produktnummer slogs ihop med beskrivningsraden
+(2026-07-19), i både tabell- och kortvyn:** visades tidigare som en
+egen `dt`/`dd`-rad (`fd-sb-nummer`); den klassen och raden är nu
+borttagna. Produktnumret står istället inom parentes direkt efter
+etiketten "Systembolagets beskrivning" (`Systembolagets beskrivning
+(12345)`) - till skillnad från ordningsjusteringen ovan gäller den här
+ändringen båda vyerna, eftersom det är en innehållsändring i själva
+`detaljfalt`-fragmentet, inte en CSS-scopead layoutskillnad. **Om
+beskrivningen saknas visas produktnumret inte alls** - det finns ingen
+etikett kvar att fästa parentesen på, så `dt`/`dd`-paret försvinner
+helt i det fallet (`th:if="${vin.systembolagetDescription != null}"`
+styr båda). Medvetet vald avvägning, inte ett förbiseende - om det
+visar sig vara ett problem i praktiken (produktnummer utan beskrivning
+förekommer) är det en enkel ändring att lägga till en fallback-rad för
+det fallet.
 
 ## Datamodell
 

@@ -283,10 +283,30 @@ class WineControllerTest {
                             containsString("450.00 kr"),
                             containsString("Rekommenderat"),
                             containsString("Kraftfullt"),
-                            containsString("12345"),
+                            // Systembolagets produktnummer visas inte längre som en egen
+                            // rad - värdet står inom parentes direkt efter beskrivnings-
+                            // etiketten istället
+                            containsString("Systembolagets beskrivning (12345)"),
+                            not(containsString("Systembolagets produktnummer")),
                             containsString("Beskrivning"),
                             containsString("Recension"),
                             containsString("https://example.com")
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska dölja produktnumret helt om beskrivningen saknas, eftersom det bara visas som en parentes på beskrivningsraden")
+        void skaDöljaProduktnummerOmBeskrivningSaknas() throws Exception {
+            Wine barolo = BAROLO.toBuilder()
+                    .systembolagetProductNumber("12345")
+                    .build();
+            when(wineService.listWines()).thenReturn(List.of(barolo));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            not(containsString("Systembolagets beskrivning")),
+                            not(containsString("12345"))
                     )));
         }
 
