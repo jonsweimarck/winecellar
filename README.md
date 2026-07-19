@@ -190,18 +190,24 @@ allt skulle visas samtidigt).
   infällt bakom något klick, eftersom hela poängen med omgången var att
   slippa en Detaljer-sektion på desktop.
 
-**Bilden gjordes mindre i de breda korten (2026-07-20)**, efter att
-användaren tyckte den var onödigt stor. `.vk-bildyta`s kolumnbredd
-(`6rem`) rördes **inte** - den delas med Inköpsdatum i `.vk-info-rad`,
-som behöver bredden för att inte radbryta datumvärden. Istället fick
-själva bilden/platshållaren ett eget `max-width: 3.5rem; max-height:
-5rem` (mindre än sin kolumn, med tomrum till höger) och `.vk-bildyta`
-bytte från `grid-row: 1 / 3` (spände hela topp-blockets höjd,
-inklusive betygsraden) till bara `grid-row: 1` (samma rad som
-textblocket) - annars hade en liten bild lämnat ett konstigt stort
-tomrum under sig ändå. Verifierat manuellt vid 1280px: bilden är
-tydligt mindre och Inköpsdatum/betygsvärdena radbryter fortfarande
-inte.
+**Bildens storlek i de breda korten justerad i två omgångar
+(2026-07-20)**, efter att användaren tyckte den var onödigt stor.
+`.vk-bildyta`s kolumnbredd (`6rem`) rördes **inte** i någon av
+omgångarna - den delas med Inköpsdatum i `.vk-info-rad`, som behöver
+bredden för att inte radbryta datumvärden. Istället fick själva
+bilden/platshållaren ett eget `max-width`/`max-height` (mindre än sin
+kolumn, med tomrum till höger) och `.vk-bildyta` bytte från
+`grid-row: 1 / 3` (spände hela topp-blockets höjd, inklusive
+betygsraden) till bara `grid-row: 1` (samma rad som textblocket) -
+annars hade en liten bild lämnat ett konstigt stort tomrum under sig
+ändå. Första försöket (`max-width: 3.5rem; max-height: 5rem`) visade
+sig vara för litet - användaren tyckte kortvyns bildstorlek
+(`.vinbild-kort`, `flex: 0 0 5.5rem`-kolumn, `max-height: 12rem`) såg
+bättre ut. Justerat till `max-width: 5.5rem; max-height: 8rem` - en
+medelväg som är närmare kortvyns bredd men inte lika hög (topp-blockets
+textrad är kortare på desktop än hela kortvyns kort på mobil).
+Verifierat manuellt vid 1280px efter båda justeringarna: Inköpsdatum
+och betygsvärdena radbryter fortfarande inte.
 
 ## Datamodell
 
