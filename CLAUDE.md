@@ -230,9 +230,12 @@ flaggade som gällande.
   (2026-07-19).** Ny ordning: Inköpsdatum, Pris, Systembolagets
   produktnummer, Plats, Varför köpt, Tasting notes, Systembolagets
   beskrivning, Munskänkarnas bedömning, Annan referens (oförändrad
-  sistplacering). De tre sista (Tasting notes, Systembolagets
-  beskrivning, Munskänkarnas bedömning) visar värdet under etiketten
-  istället för bredvid. Medvetet **inte** löst genom att ändra
+  sistplacering). De fyra sista (Varför köpt, Tasting notes,
+  Systembolagets beskrivning, Munskänkarnas bedömning) visar värdet
+  under etiketten istället för bredvid - Varför köpt fick samma
+  behandling i en uppföljande justering samma dag efter att användaren
+  påpekade att den var inkonsekvent utelämnad från de tre andra som
+  redan staplades. Medvetet **inte** löst genom att ändra
   `detaljfalt`-fragmentets DOM-ordning eller duplicera det till en
   kort-specifik variant - det hade återinfört exakt den
   dubbleringsrisk fragmentet ursprungligen skulle undvika. Istället
@@ -244,7 +247,7 @@ flaggade som gällande.
   den ursprungliga (Plats först). Tabellvyns `.detaljlista-bred` har
   ingen matchande `order`-regel och behåller därför sin egen
   dokumentordning helt opåverkad, trots att båda vyerna renderar exakt
-  samma `dt`/`dd`-element via samma `th:insert`-anrop. De tre
+  samma `dt`/`dd`-element via samma `th:insert`-anrop. De fyra
   staplade fälten kombinerar `order` med `grid-column: 1 / -1` - att
   låta både `dt` och dess `dd` spänna hela grid-bredden tvingar
   auto-placeringsalgoritmen att lägga dem på varsin egen rad (`dt`

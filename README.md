@@ -108,12 +108,14 @@ till eller tas bort).
 den nya ordningen är Inköpsdatum, Pris, Systembolagets produktnummer,
 Plats, Varför köpt, Tasting notes, Systembolagets beskrivning,
 Munskänkarnas bedömning (Annan referens ligger kvar sist, oförändrad).
-De tre sista (Tasting notes, Systembolagets beskrivning, Munskänkarnas
-bedömning) visar dessutom värdet *under* etiketten istället för bredvid
-den. Löst utan att duplicera `detaljfalt`-fragmentet eller ändra dess
+De fyra sista (Varför köpt, Tasting notes, Systembolagets beskrivning,
+Munskänkarnas bedömning) visar dessutom värdet *under* etiketten
+istället för bredvid den - Varför köpt fick samma behandling i en
+uppföljande justering samma dag, av samma skäl som de tre första.
+Löst utan att duplicera `detaljfalt`-fragmentet eller ändra dess
 DOM-ordning: varje `dt`/`dd`-par har fått en `fd-*`-klass (t.ex.
 `fd-inkopsdatum`), och CSS `order` (plus `grid-column: 1 / -1` för de
-tre som ska staplas) sätts bara under `.vinkort dl`-selektorn - så
+fyra som ska staplas) sätts bara under `.vinkort dl`-selektorn - så
 samma fragment kan fortsätta återanvändas av tabellens
 `.detaljlista-bred`, som behåller sin egen (ursprungliga)
 dokumentordning helt opåverkad av kortvyns omordning.
