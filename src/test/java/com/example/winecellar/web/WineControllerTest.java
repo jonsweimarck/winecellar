@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -136,6 +137,101 @@ class WineControllerTest {
         void skaFormuläretFörEttNyttVinNekas() throws Exception {
             mockMvc.perform(get("/wines/nytt"))
                     .andExpect(status().isUnauthorized());
+        }
+    }
+
+    /**
+     * readonly/readonly (se SecurityConfig) - får se listan och bilder men
+     * inte lägga till, redigera eller ta bort. Nekas både POST/DELETE-
+     * routerna och GET-routerna för formulären (/wines/nytt,
+     * /wines/{id}/redigera) - annars går det att komma åt formulärsidan
+     * genom att bara gissa på URL:en, även om länken är dold i UI:t.
+     */
+    @Nested
+    @DisplayName("readonly-kontot")
+    class ReadonlyKontot {
+
+        @Test
+        @DisplayName("ska se listan utan länkar/knappar för lägg till, redigera eller ta bort")
+        void skaSeListanUtanRedigeringslänkar() throws Exception {
+            when(wineService.listWines()).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/").with(httpBasic("readonly", "readonly")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Barolo"),
+                            not(containsString("href=\"/wines/nytt\"")),
+                            not(containsString("class=\"detalj-atgarder\""))
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska nekas formuläret för ett nytt vin")
+        void skaNekasFormuläretFörEttNyttVin() throws Exception {
+            mockMvc.perform(get("/wines/nytt").with(httpBasic("readonly", "readonly")))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("ska nekas att lägga till ett vin och aldrig nå WineService")
+        void skaNekasAttLäggaTillEttVin() throws Exception {
+            mockMvc.perform(post("/wines")
+                            .with(httpBasic("readonly", "readonly"))
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().isForbidden());
+
+            verify(wineService, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("ska nekas redigeringsformuläret")
+        void skaNekasRedigeringsformuläret() throws Exception {
+            mockMvc.perform(get("/wines/1/redigera").with(httpBasic("readonly", "readonly")))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("ska nekas att spara en redigering och aldrig nå WineService")
+        void skaNekasAttSparaEnRedigering() throws Exception {
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(httpBasic("readonly", "readonly"))
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().isForbidden());
+
+            verify(wineService, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("ska nekas att ta bort ett vin och aldrig nå WineService")
+        void skaNekasAttTaBortEttVin() throws Exception {
+            mockMvc.perform(delete("/wines/1").with(httpBasic("readonly", "readonly")))
+                    .andExpect(status().isForbidden());
+
+            verify(wineService, never()).removeWine(new WineId(1L));
+        }
+
+        @Test
+        @DisplayName("ska ändå få se en bild")
+        void skaFåSeEnBild() throws Exception {
+            byte[] bilddata = new byte[]{1, 2, 3};
+            when(wineService.findById(new WineId(1L)))
+                    .thenReturn(Optional.of(BAROLO.withImage(bilddata, "image/jpeg")));
+
+            mockMvc.perform(get("/wines/1/bild").with(httpBasic("readonly", "readonly")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentType("image/jpeg"));
         }
     }
 

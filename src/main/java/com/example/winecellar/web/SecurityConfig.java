@@ -3,6 +3,7 @@ package com.example.winecellar.web;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -17,6 +18,13 @@ import org.springframework.security.web.SecurityFilterChain;
  * (som bara skyddade `/admin/**`) finns här inget legitimt anonymt
  * användningsfall: appen har ingen separat publik läsvy, så varje route
  * låter en besökare ändra vinsamlingen.
+ *
+ * Två roller: ADMIN (fullständig åtkomst) och READONLY (bara läsning -
+ * kontot `readonly`/`readonly`, se README:s "Säkerhet"). READONLY nekas
+ * inte bara POST/DELETE utan även GET-routerna för att lägga till/redigera
+ * (`/wines/nytt`, `/wines/{id}/redigera`) - annars går det att gissa sig
+ * till formulärsidan även om länkarna är dolda i UI:t (se vinkallare.html/
+ * WineController, som döljer länkarna som ett extra lager, inte det enda).
  */
 @Configuration
 public class SecurityConfig {
@@ -25,6 +33,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(requests -> requests
+                        .requestMatchers(HttpMethod.GET, "/", "/wines/*/bild").hasAnyRole("ADMIN", "READONLY")
+                        .requestMatchers(HttpMethod.GET, "/wines/nytt", "/wines/*/redigera").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/wines", "/wines/*/redigera").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/wines/*").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
                 // htmx-formulären skickar ingen CSRF-token, och autentiseringen är
@@ -47,6 +59,13 @@ public class SecurityConfig {
                 .password(passwordEncoder.encode(adminPassword))
                 .roles("ADMIN")
                 .build();
-        return new InMemoryUserDetailsManager(admin);
+        // Medvetet hårdkodat (inte en miljövariabel som admin-lösenordet) -
+        // readonly/readonly är tänkt att vara ett känt, delbart konto för
+        // att bara titta i samlingen, inte en hemlighet.
+        var readonly = User.withUsername("readonly")
+                .password(passwordEncoder.encode("readonly"))
+                .roles("READONLY")
+                .build();
+        return new InMemoryUserDetailsManager(admin, readonly);
     }
 }

@@ -8,6 +8,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.HttpCredentials;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -141,12 +142,44 @@ class WineListResponsiveIT {
         }
     }
 
+    @Test
+    void skaDöljaLäggTillRedigeraOchTaBortFörReadonlyKontot() {
+        try (BrowserContext context = nyKontext(1280, 800, false, "readonly", "readonly")) {
+            Page page = öppnaVinkällaren(context);
+
+            assertThat(page.locator("text=Lägg till vin").isVisible()).isFalse();
+
+            Locator tabell = page.locator("#vinlista-tabell");
+            tabell.locator("summary:has-text(\"Detaljer\")").click();
+
+            assertThat(tabell.locator("text=Redigera").isVisible()).isFalse();
+            assertThat(tabell.locator("text=Ta bort").isVisible()).isFalse();
+        }
+    }
+
+    @Test
+    void skaNekaÅtkomstTillFormulärenFörReadonlyKontot() {
+        try (BrowserContext context = nyKontext(1280, 800, false, "readonly", "readonly")) {
+            Page page = context.newPage();
+
+            Response nyttVin = page.navigate("http://localhost:" + port + "/wines/nytt");
+            assertThat(nyttVin.status()).isEqualTo(403);
+
+            Response redigera = page.navigate("http://localhost:" + port + "/wines/1/redigera");
+            assertThat(redigera.status()).isEqualTo(403);
+        }
+    }
+
     private BrowserContext nyKontext(int bredd, int höjd, boolean mobil) {
+        return nyKontext(bredd, höjd, mobil, "admin", "admin");
+    }
+
+    private BrowserContext nyKontext(int bredd, int höjd, boolean mobil, String användarnamn, String lösenord) {
         return browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(bredd, höjd)
                 .setIsMobile(mobil)
                 .setHasTouch(mobil)
-                .setHttpCredentials(new HttpCredentials("admin", "admin")));
+                .setHttpCredentials(new HttpCredentials(användarnamn, lösenord)));
     }
 
     private Page öppnaVinkällaren(BrowserContext context) {

@@ -109,7 +109,7 @@
 <body>
     <h1>Vinkällaren</h1>
 
-    <a class="knapp" href="/wines/nytt">Lägg till vin</a>
+    <a class="knapp" th:if="${kanRedigera}" href="/wines/nytt">Lägg till vin</a>
 
     <th:block th:fragment="detaljfalt(vin)" th:if="${vin != null}">
         <dt class="fd-plats">Plats</dt>
@@ -196,7 +196,7 @@
                                     <dl class="detaljlista-bred">
                                         <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
                                     </dl>
-                                    <div class="detalj-atgarder">
+                                    <div class="detalj-atgarder" th:if="${kanRedigera}">
                                         <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                                         <button type="button"
                                                 th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
@@ -244,7 +244,7 @@
                     <dl>
                         <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
                     </dl>
-                    <div class="detalj-atgarder">
+                    <div class="detalj-atgarder" th:if="${kanRedigera}">
                         <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                         <button type="button"
                                 th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"

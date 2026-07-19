@@ -8,6 +8,7 @@ import com.example.winecellar.domain.WineType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -33,8 +34,9 @@ public class WineController {
     }
 
     @GetMapping("/")
-    public String vinkällare(Model model) {
+    public String vinkällare(Model model, Authentication authentication) {
         model.addAttribute("viner", wineService.listWines());
+        model.addAttribute("kanRedigera", harRollAdmin(authentication));
         return "vinkallare";
     }
 
@@ -81,9 +83,10 @@ public class WineController {
     }
 
     @DeleteMapping("/wines/{id}")
-    public String taBortVin(@PathVariable Long id, Model model) {
+    public String taBortVin(@PathVariable Long id, Model model, Authentication authentication) {
         wineService.removeWine(new WineId(id));
         model.addAttribute("viner", wineService.listWines());
+        model.addAttribute("kanRedigera", harRollAdmin(authentication));
         return "vinkallare :: lista";
     }
 
@@ -143,6 +146,17 @@ public class WineController {
         );
         wineService.save(medBildOmVald(vin, bild).build());
         return "redirect:/";
+    }
+
+    /**
+     * Styr om "Lägg till vin"/Redigera/Ta bort visas i vinkallare.html.
+     * Bara ett extra UI-lager - den faktiska åtkomstkontrollen sker i
+     * SecurityConfig, som nekar READONLY-kontot dessa routes oavsett vad
+     * som visas i gränssnittet.
+     */
+    private static boolean harRollAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(auktoritet -> auktoritet.getAuthority().equals("ROLE_ADMIN"));
     }
 
     /**

@@ -259,13 +259,32 @@ flaggade som gällande.
 ## Säkerhet
 
 - **Hela appen kräver HTTP Basic-inloggning** via `SecurityConfig`
-  (`.anyRequest().authenticated()`) - till skillnad från roombooking (som
-  bara skyddade `/admin/**`) finns här inget legitimt anonymt
-  användningsfall. Appen har ingen separat publik läsvy, så varje route
-  låter en besökare ändra vinsamlingen - och appen var redan nåbar från
-  nätet innan detta beslut togs. Ett enda konto, lösenord från
-  `winecellar.admin.password`/miljövariabeln `WINECELLAR_ADMIN_PASSWORD`
-  (default `admin` bara lokalt).
+  (`.anyRequest().authenticated()` som fallback) - till skillnad från
+  roombooking (som bara skyddade `/admin/**`) finns här inget legitimt
+  anonymt användningsfall. Appen har ingen separat publik läsvy, så
+  varje route låter i grunden en besökare ändra vinsamlingen - och
+  appen var redan nåbar från nätet innan detta beslut togs. ADMIN-
+  kontot heter `admin`, lösenord från `winecellar.admin.password`/
+  miljövariabeln `WINECELLAR_ADMIN_PASSWORD` (default `admin` bara
+  lokalt).
+- **READONLY-kontot (byggt 2026-07-19):** `readonly`/`readonly` - både
+  användarnamn och lösenord hårdkodade i `SecurityConfig` (inte en
+  miljövariabel som admin-lösenordet), eftersom kontot medvetet är
+  tänkt att vara ett känt, delbart "titta men inte ändra"-konto, inte
+  en hemlighet. Får GET `/` och GET `/wines/{id}/bild` (`hasAnyRole
+  ("ADMIN", "READONLY")`), men nekas allt annat: GET `/wines/nytt` och
+  GET `/wines/{id}/redigera` (formulärsidorna) är `hasRole("ADMIN")`,
+  liksom POST `/wines`, POST `/wines/{id}/redigera` och DELETE
+  `/wines/{id}`. Formulärsidornas GET-routes är medvetet också
+  admin-bara, inte bara POST/DELETE - annars går det att komma åt
+  "lägg till"/"redigera"-formuläret genom att gissa på URL:en även om
+  länken är dold i UI:t (se nästa punkt). `WineController.vinkällare`/
+  `taBortVin` sätter en `kanRedigera`-modellattribut
+  (`Authentication.getAuthorities()` innehåller `ROLE_ADMIN`) som
+  `vinkallare.html` använder för att dölja "Lägg till vin"-länken och
+  varje vins `.detalj-atgarder`-block (Redigera/Ta bort) för READONLY -
+  **bara ett extra UI-lager**, inte den faktiska åtkomstkontrollen; den
+  sitter i `SecurityConfig` och gäller oavsett vad UI:t visar.
 - CSRF är avstängt globalt, av samma skäl som roombooking: htmx-formulären
   skickar ingen CSRF-token, och autentiseringen är stateless Basic-auth per
   anrop - inte en inloggad session som CSRF-skyddet är till för.

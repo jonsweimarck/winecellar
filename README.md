@@ -420,3 +420,10 @@ repot är delat.
       här och appen redan var nåbar från nätet
 - [x] Deploy till Clever Cloud (se "Deploy" ovan) - appen GitHub-länkad,
       verifierad fungerande mot en riktig Postgres
+- [x] Readonly-konto (`readonly`/`readonly`, se CLAUDE.md:s "Säkerhet") -
+      får se listan och bilder men nekas lägg till/redigera/ta bort både
+      i UI:t (dolda länkar/knappar) och på serversidan
+      (`SecurityConfig`, `hasRole("ADMIN")` på formulär-/ändringsrouterna) -
+      så det inte går att komma åt funktionaliteten genom att gissa på
+      URL:en, verifierat av både `WineControllerTest` och
+      `WineListResponsiveIT`
