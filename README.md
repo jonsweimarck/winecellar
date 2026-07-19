@@ -190,24 +190,33 @@ allt skulle visas samtidigt).
   infällt bakom något klick, eftersom hela poängen med omgången var att
   slippa en Detaljer-sektion på desktop.
 
-**Bildens storlek i de breda korten justerad i två omgångar
+**Bildens storlek i de breda korten justerad i tre omgångar
 (2026-07-20)**, efter att användaren tyckte den var onödigt stor.
 `.vk-bildyta`s kolumnbredd (`6rem`) rördes **inte** i någon av
 omgångarna - den delas med Inköpsdatum i `.vk-info-rad`, som behöver
 bredden för att inte radbryta datumvärden. Istället fick själva
 bilden/platshållaren ett eget `max-width`/`max-height` (mindre än sin
-kolumn, med tomrum till höger) och `.vk-bildyta` bytte från
-`grid-row: 1 / 3` (spände hela topp-blockets höjd, inklusive
-betygsraden) till bara `grid-row: 1` (samma rad som textblocket) -
-annars hade en liten bild lämnat ett konstigt stort tomrum under sig
-ändå. Första försöket (`max-width: 3.5rem; max-height: 5rem`) visade
-sig vara för litet - användaren tyckte kortvyns bildstorlek
+kolumn, med tomrum till höger). Första försöket (`max-width: 3.5rem;
+max-height: 5rem`, `grid-row: 1` - bara textblockets rad) visade sig
+vara för litet - användaren tyckte kortvyns bildstorlek
 (`.vinbild-kort`, `flex: 0 0 5.5rem`-kolumn, `max-height: 12rem`) såg
-bättre ut. Justerat till `max-width: 5.5rem; max-height: 8rem` - en
-medelväg som är närmare kortvyns bredd men inte lika hög (topp-blockets
-textrad är kortare på desktop än hela kortvyns kort på mobil).
-Verifierat manuellt vid 1280px efter båda justeringarna: Inköpsdatum
-och betygsvärdena radbryter fortfarande inte.
+bättre ut. Justerat till `max-width: 5.5rem; max-height: 8rem` - bättre,
+men fortfarande upplevt som lite för litet, och toppjusteringen
+(`align-self: start`) gjorde att bildens underkant inte hamnade i
+linje med något särskilt. Tredje omgången: `.vk-bildyta` spänner
+återigen båda raderna (`grid-row: 1 / 3`, som i den allra första,
+"för stora" versionen) men med `align-self: end` istället för
+`stretch` - bilden bottenjusteras mot betygsradens underkant (samma
+höjd som Vivino-värdet) men **behåller sin egen begränsade storlek**
+(nu `max-width: 6rem; max-height: 9rem`) istället för att sträckas för
+att fylla hela den spända ytan. Det är skillnaden mellan `stretch`
+(vad som gjorde bilden "för stor" i original­versionen - fyller hela
+ytan oavsett hur hög den är) och `end` (positionerar en begränsad
+storlek vid nederkanten av ytan) som gör att båda kraven - liten bild
+**och** bottenjusterad mot betygsraden - kan uppfyllas samtidigt.
+Verifierat manuellt vid 1280px med både ett vin med lång text och ett
+med kort text: bildens underkant linjerar med Vivino-värdet i båda
+fallen, och Inköpsdatum/betygsvärdena radbryter fortfarande inte.
 
 ## Datamodell
 

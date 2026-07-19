@@ -343,33 +343,47 @@ flaggade som gällande.
     `WineControllerTest` fick `skaRenderaBredaKortMedAllaFältSynliga`,
     som bland annat verifierar att `<table>` och `vinbild-tabell`
     **inte** längre förekommer i den renderade HTML:en.
-  **Bildens storlek justerad i två omgångar (2026-07-20)**, efter att
-  användaren tyckte den var onödigt stor. Kolumnbredden (`6rem`) i
+  **Bildens storlek/position justerad i tre omgångar (2026-07-20)**,
+  efter att användaren tyckte den var onödigt stor och sedan ville ha
+  underkanten linjerad mot betygsraden. Kolumnbredden (`6rem`) i
   `grid-template-columns` rördes **inte** i någon av omgångarna - den
   delas med Inköpsdatum i `.vk-info-rad`, som behöver bredden för att
   `"2026-04-18"`-liknande datumvärden inte ska radbryta. Istället
   begränsades bilden/platshållaren själv: `.vk-bildyta img`/
   `.vk-bildplatshallare` fick ett `max-width`/`max-height` (mindre än
   sin 6rem-kolumn, lämnar tomrum till höger) istället för
-  `width: 100%; height: 100%`. Samtidigt bytte `.vk-bildyta` från
-  `grid-row: 1 / 3` (spände hela `.vk-topp`, inklusive betygsraden)
-  till `grid-row: 1` (bara textblockets rad, `align-self: start`) - med
-  den gamla spanning-regeln kvar hade en liten bild bara lämnat ett
-  stort tomt utrymme under sig ner till betygsraden istället för att
-  faktiskt bli mindre som helhet. **Fälla undviken:** att bara krympa
-  `max-width`/`max-height` utan att också ändra `grid-row` hade gjort
-  bilden mindre men lämnat kolumnen lika hög som förut - poängen med
-  att fixa båda samtidigt är att hela bildytan krymper, inte bara
-  bilden inuti den.
-  Första försöket (`max-width: 3.5rem; max-height: 5rem`) var för
-  litet enligt användaren, som tyckte kortvyns bildstorlek
-  (`.vinbild-kort`, `.vinkort-bildyta { flex: 0 0 5.5rem }`,
-  `max-height: 12rem`) såg bättre ut. Justerat till `max-width: 5.5rem;
-  max-height: 8rem` - matchar kortvyns kolumnbredd men med lägre
-  maxhöjd, eftersom `.vk-topp`s textrad (bara producent/namn/ursprung/
-  typ/druvor) är kortare än hela kortvyns kort (som även innehåller
-  betyg och infälld Detaljer i samma flöde). Verifierat manuellt vid
-  1280px efter båda justeringarna.
+  `width: 100%; height: 100%`.
+  1. Första försöket: `max-width: 3.5rem; max-height: 5rem`,
+     `grid-row: 1` (bara textblockets rad, `align-self: start`) - med
+     den ursprungliga `grid-row: 1 / 3`-regeln kvar hade en liten bild
+     bara lämnat ett stort tomt utrymme under sig ner till betygsraden
+     istället för att faktiskt bli mindre som helhet. **Fälla
+     undviken:** att bara krympa `max-width`/`max-height` utan att
+     också ändra `grid-row` hade gjort bilden mindre men lämnat
+     kolumnen lika hög som förut. Visade sig vara för litet - användaren
+     tyckte kortvyns bildstorlek (`.vinbild-kort`, `.vinkort-bildyta {
+     flex: 0 0 5.5rem }`, `max-height: 12rem`) såg bättre ut.
+  2. Andra omgången: `max-width: 5.5rem; max-height: 8rem` - matchar
+     kortvyns kolumnbredd men med lägre maxhöjd, eftersom `.vk-topp`s
+     textrad (bara producent/namn/ursprung/typ/druvor) är kortare än
+     hela kortvyns kort (som även innehåller betyg och infälld Detaljer
+     i samma flöde). Fortfarande upplevt som lite för litet, och
+     `align-self: start` gav ingen särskild linjering av underkanten.
+  3. Tredje omgången: `.vk-bildyta` bytte tillbaka till
+     `grid-row: 1 / 3` (som i den allra första, "för stora" versionen)
+     men med `align-self: end` istället för `stretch`, plus
+     `max-width: 6rem; max-height: 9rem`. **Skillnaden mellan `stretch`
+     och `end` är kärnan i lösningen:** `stretch` (originalversionen)
+     fyller hela den spända ytan oavsett hur hög den är - det var vad
+     som gjorde bilden "för stor" från början. `end` positionerar en
+     bild med sin egen begränsade storlek vid nederkanten av samma yta
+     - bilden förblir liten (styrd av `max-width`/`max-height`) men dess
+     underkant hamnar ändå i linje med betygsradens underkant (samma
+     höjd som Vivino-värdet), eftersom båda ligger i samma grid-area.
+  Verifierat manuellt vid 1280px efter alla tre omgångarna, sista
+  gången med både ett vin med lång text och ett med kort text (för att
+  se att bottenjusteringen ser rimlig ut oavsett hur hög textkolumnen
+  råkar bli).
 
 ## Säkerhet
 
