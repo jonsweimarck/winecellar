@@ -565,6 +565,20 @@ Excel-filen (samma bild kopplas till alla, varning skrivs ut så det
 syns). `BildmatchareTest` täcker matchning, MIME-typer per ändelse,
 okänd filändelse och båda tvetydighetsfallen.
 
+**Systembolagets produktnummer fick en egen Excel-kolumn (2026-07-20).**
+Källfilen hade tidigare produktnumret hopklistrat som första raden i
+samma cell som beskrivningen (`"12345\nBeskrivning..."`), delat på den
+första radbrytningen i `VinradParser` (`systembolagetProduktnummer`/
+`systembolagetBeskrivning`). Användaren lade till en ny kolumn
+"Systembolagets prodnummer" direkt efter "Eget betyg" i sin egen
+Excel-fil - `COL_SYSTEMBOLAGET_PRODUKTNUMMER = 15` sköt in sig där,
+vilket flyttade `COL_SYSTEMBOLAGET` (nu bara beskrivningen, ingen
+radbrytning kvar) och alla kolumner efter den ett steg åt höger
+(kolumnlayouten är nu A-V, inte A-U). De två hopklistrings-metoderna i
+`VinradParser` är borttagna - båda fälten läses nu direkt med den
+vanliga `text(row, col)`-hjälparen, som två oberoende kolumner.
+`VinradParserTest` uppdaterad med de nya kolumnindexen.
+
 **Körd mot produktionsdatabasen (2026-07-17), 30 viner sparade utan fel.**
 Klever Cloud har inget CLI/konsol att köra verktyget *på* - det behövs
 inte heller, det körs lokalt och pratar med Postgres-tillägget över

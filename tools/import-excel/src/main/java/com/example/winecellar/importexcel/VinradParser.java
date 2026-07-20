@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 
 /**
  * Mappar en rad från Vin-fliken i Vinlista.xlsx till ett Wine. Kolumn-
- * layouten (A-U) är fast - se README:s Datamodell-avsnitt för vilket
+ * layouten (A-V) är fast - se README:s Datamodell-avsnitt för vilket
  * Wine-fält varje kolumn motsvarar. Bild-kolumnen (I) hoppas medvetet
  * över: bilderna är inbäddade som Excels "bild i cell" (rich data), inte
  * vanliga cellvärden, och att extrahera dem robust är inte värt det för
@@ -45,12 +45,15 @@ final class VinradParser {
     private static final int COL_VARFOR_KOP = 12;
     private static final int COL_TASTING_NOTES = 13;
     private static final int COL_EGET_BETYG = 14;
-    private static final int COL_SYSTEMBOLAGET = 15;
-    private static final int COL_MUNSKANKARNA_BEDOMNING = 16;
-    private static final int COL_MUNSKANKARNA_BETYG = 17;
-    private static final int COL_VIVINO = 18;
-    private static final int COL_ANNAN_REFERENS = 19;
-    private static final int COL_VAR = 20;
+    // "Systembolagets prodnummer" - egen kolumn sedan 2026-07-20, tidigare
+    // ihopklistrad med beskrivningen i COL_SYSTEMBOLAGET (se git-historiken).
+    private static final int COL_SYSTEMBOLAGET_PRODUKTNUMMER = 15;
+    private static final int COL_SYSTEMBOLAGET = 16;
+    private static final int COL_MUNSKANKARNA_BEDOMNING = 17;
+    private static final int COL_MUNSKANKARNA_BETYG = 18;
+    private static final int COL_VIVINO = 19;
+    private static final int COL_ANNAN_REFERENS = 20;
+    private static final int COL_VAR = 21;
 
     private static final Map<String, WineType> VINTYPER = Map.of(
             "rött", WineType.RED,
@@ -95,8 +98,8 @@ final class VinradParser {
                 .purchaseReason(text(row, COL_VARFOR_KOP))
                 .tastingNotes(text(row, COL_TASTING_NOTES))
                 .ownRating(betyg(row, COL_EGET_BETYG, row.getRowNum() + 1, "eget betyg"))
-                .systembolagetProductNumber(systembolagetProduktnummer(row))
-                .systembolagetDescription(systembolagetBeskrivning(row))
+                .systembolagetProductNumber(text(row, COL_SYSTEMBOLAGET_PRODUKTNUMMER))
+                .systembolagetDescription(text(row, COL_SYSTEMBOLAGET))
                 .munskankarnaReview(text(row, COL_MUNSKANKARNA_BEDOMNING))
                 .munskankarnaRating(betyg(row, COL_MUNSKANKARNA_BETYG, row.getRowNum() + 1, "munskänkarna-betyg"))
                 .vivinoRating(vivino(row))
@@ -123,28 +126,6 @@ final class VinradParser {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Rad " + radnummer + ": " + fältnamn + " \"" + etikett + "\" matchar inget av de 29 kända betygen", e);
         }
-    }
-
-    private String systembolagetProduktnummer(Row row) {
-        String rått = text(row, COL_SYSTEMBOLAGET);
-        if (rått == null) {
-            return null;
-        }
-        int nyradIndex = rått.indexOf('\n');
-        return (nyradIndex == -1 ? rått : rått.substring(0, nyradIndex)).trim();
-    }
-
-    private String systembolagetBeskrivning(Row row) {
-        String rått = text(row, COL_SYSTEMBOLAGET);
-        if (rått == null) {
-            return null;
-        }
-        int nyradIndex = rått.indexOf('\n');
-        if (nyradIndex == -1) {
-            return null;
-        }
-        String beskrivning = rått.substring(nyradIndex + 1).trim();
-        return beskrivning.isEmpty() ? null : beskrivning;
     }
 
     private BigDecimal pris(Row row, int col) {

@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * inte mot den riktiga Vinlista.xlsx (som inte checkas in i repot - den
  * innehåller en riktig persons vinsamling). Fokus på de knepiga delarna:
  * rubbig indata (dubbla mellanslag i betygsetiketter, prisceller med
- * extra text) och Systembolaget-cellens sammanslagning.
+ * extra text).
  */
 class VinradParserTest {
 
@@ -45,12 +45,13 @@ class VinradParserTest {
         skrivCell(row, 12, "Prisvärt enligt munskänkarna");
         skrivCell(row, 13, "Ljusröd, doft av jordgubbe.");
         skrivCell(row, 14, "16 (15 - 17,5 Högklassigt vin)");
-        skrivCell(row, 15, "9363301\nNyanserad, kryddig smak.");
-        skrivCell(row, 16, "Mer än prisvärt\n\nNågot återhållen doft.");
-        skrivCell(row, 17, "14,5 (12 - 14,5 Bra till mycket bra vin)");
-        skrivCell(row, 18, 4.0999999999999996);
-        skrivCell(row, 19, "https://example.com/vin");
-        skrivCell(row, 20, "Låda 2");
+        skrivCell(row, 15, "9363301");
+        skrivCell(row, 16, "Nyanserad, kryddig smak.");
+        skrivCell(row, 17, "Mer än prisvärt\n\nNågot återhållen doft.");
+        skrivCell(row, 18, "14,5 (12 - 14,5 Bra till mycket bra vin)");
+        skrivCell(row, 19, 4.0999999999999996);
+        skrivCell(row, 20, "https://example.com/vin");
+        skrivCell(row, 21, "Låda 2");
 
         Wine vin = parser.parse(row);
 
@@ -112,9 +113,10 @@ class VinradParserTest {
     }
 
     @Test
-    void skaLämnaSystembolagetsBeskrivningNullOmCellenBaraHarEttProduktnummer() {
+    void skaLämnaSystembolagetsBeskrivningNullOmDenSaknasMenAnvändaProduktnummerkolumnen() {
         Row row = minimalRad();
         skrivCell(row, 15, "5020201");
+        // Kolumn 16 (beskrivningen) lämnas tom.
 
         Wine vin = parser.parse(row);
 

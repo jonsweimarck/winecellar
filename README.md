@@ -330,7 +330,7 @@ Tabell `wines` (engelska namn, plural, genomgående):
 | purchase_reason | `text`, nullable | |
 | tasting_notes | `text`, nullable | |
 | own_rating | `text` + `CHECK` | Samma enum som munskankarna_rating |
-| systembolaget_product_number | `text`, nullable | Uppdelad från Excelns hopklistrade cell |
+| systembolaget_product_number | `text`, nullable | Egen kolumn i Excel-källan sedan 2026-07-20, tidigare hopklistrad med beskrivningen |
 | systembolaget_description | `text`, nullable | |
 | munskankarna_review | `text`, nullable | Egennamn (Munskänkarna) - medvetet inte översatt |
 | munskankarna_rating | `text` + `CHECK` | |
@@ -555,13 +555,22 @@ Utan `jdbc-url`/`användare`/`lösenord` som argument används
 `POSTGRESQL_ADDON_*`-miljövariablerna, annars
 `localhost`/`winecellar`/`winecellar` (docker-compose-databasen).
 
-Kolumnlayouten (A-U på `Vin`-fliken) är hårdkodad i `VinradParser` - se
+Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `VinradParser` - se
 README:s Datamodell-avsnitt för vilket fält varje kolumn motsvarar.
 Rader som saknar vintyp, land, producent eller namn hoppas över med en
 utskriven varning (ofullständiga utkastrader förekommer i källfilen).
 Etikett-kolumnen (`Bild`) i själva Excel-filen läses **fortfarande inte**
 - Excels "bild i cell" är inbäddad rich data, inte ett vanligt cellvärde,
 och att extrahera den robust är inte värt det för ett engångsskript.
+
+**"Systembolagets prodnummer" fick en egen kolumn (2026-07-20).** Ligger
+efter "Eget betyg" (kolumn P), vilket sköt "Systembolaget"-kolumnen
+(nu bara beskrivningen, ingen radbrytning med numret först) och alla
+kolumner efter den ett steg åt höger - se `VinradParser`s
+`COL_*`-konstanter. Tidigare låg produktnumret hopklistrat som första
+raden i samma cell som beskrivningen (`"12345\nBeskrivning..."`), delat
+på den första radbrytningen - den logiken är borttagen, båda fälten
+läses nu rätt av som två oberoende kolumner.
 
 **Etiketter kan istället importeras från en vanlig bildmapp (byggt
 2026-07-19):** sätt miljövariabeln `WINECELLAR_IMPORT_IMAGE_FOLDER` till
