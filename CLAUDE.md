@@ -153,6 +153,42 @@ flaggade som gällande.
   knappen tillbaka till en riktig submit (ofarligt tack vare
   `th:open`-fixen ovan) - motiverat eftersom kryssrutornas
   auto-tillämpning också kräver JS för att fungera alls.
+- **Fritextsökning (byggd 2026-07-21/22, sista av de tre sök-/filter-/
+  sorteringstilläggen) - `search_vector` är genererad Postgres-DDL, satt
+  via `schema.sql`, inte via en manuell migrering.** Till skillnad från
+  `db/migrations/2026-07-17-image-oid-to-bytea.sql` (manuellt
+  engångsskript - se Datamodell) är `schema.sql`
+  (`ADD COLUMN IF NOT EXISTS`/`CREATE INDEX IF NOT EXISTS`, alltså
+  idempotent) kopplad till `spring.sql.init.mode: always` och körs
+  **automatiskt vid varje appstart**, inklusive i produktion. Medveten
+  avvikelse: den här migreringen är ren schema-DDL utan datamigrering
+  (Postgres beräknar kolumnvärdet automatiskt, ingen befintlig data
+  behöver flyttas/konverteras som oid→bytea-fallet krävde), så
+  automatisk/idempotent körning är säker på ett sätt en datamigrering
+  inte hade varit. **`spring.jpa.defer-datasource-initialization: true`
+  krävs** för att `schema.sql` ska köras EFTER Hibernates
+  `ddl-auto: update` skapat `wines`-tabellen, inte innan (annars
+  kraschar `ALTER TABLE` mot en tabell som inte finns än). Bekräftat
+  fungera mot en riktig, helt ny Postgres via `WineListResponsiveIT`
+  (Testcontainers, `@SpringBootTest`) - den testar migreringen indirekt
+  vid varje körning, inte bara vid en enda produktionsdeploy.
+  `WineRepository.search(String)` implementeras olika i de två
+  adaptrarna (`JpaWineRepository` mot riktig `tsvector`/`ts_rank`,
+  `InMemoryWineRepository` mot en enkel skiftlägesokänslig
+  delsträngsmatchning) - samma redan etablerade avvägning som
+  `vin-persistens.feature` representerar för annan DB-specifik
+  funktionalitet. Böjningsform-medvetenheten (stemming) verifierad
+  manuellt mot en riktig Postgres: sökning på "kraftfull" hittade ett
+  vin vars tasting notes bara innehöll "Kraftfulla".
+  **Testfälla:** sökfältets `placeholder`-text ("Systembolagets
+  beskrivning") kolliderade med en BEFINTLIG `WineControllerTest`-
+  assertion (`not(containsString("Systembolagets beskrivning"))` i
+  `skaDöljaProduktnummerOmBeskrivningSaknas`, som förutsatte att den
+  frasen bara syns när ett visst vin faktiskt har fältet satt) -
+  placeholder-texten förkortades till "Systembolaget" istället. Värt
+  att komma ihåg: ny statisk UI-text (placeholders, etiketter) kan
+  råka kollidera med `containsString`/`not(containsString(...))`-
+  assertions som antog att en fras bara förekommer villkorligt.
 - **`location`** (var flaskan förvaras) är **inte** en enum, till skillnad
   från ovanstående - det är fritext eftersom lådor/förvaringsplatser
   förväntas läggas till över tid.

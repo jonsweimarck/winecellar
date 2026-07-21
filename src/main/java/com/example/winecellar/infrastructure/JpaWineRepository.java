@@ -39,6 +39,13 @@ public class JpaWineRepository implements WineRepository {
         jpaRepository.deleteById(id.value());
     }
 
+    @Override
+    public List<Wine> search(String query) {
+        return jpaRepository.search(query).stream()
+                .map(JpaWineRepository::toDomain)
+                .toList();
+    }
+
     /** Används av acceptanstesterna för att nollställa tillstånd mellan scenarier. */
     public void deleteAll() {
         jpaRepository.deleteAll();

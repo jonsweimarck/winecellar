@@ -18,6 +18,16 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
+    # Låter schema.sql köras EFTER att Hibernate skapat/uppdaterat tabellerna,
+    # inte innan - annars kraschar schema.sql:s ALTER TABLE mot en wines-tabell
+    # som ännu inte finns (t.ex. mot en helt ny, tom databas).
+    defer-datasource-initialization: true
+  sql:
+    init:
+      # Standard är "embedded" (körs bara mot in-memory-databaser som H2) -
+      # måste sättas explicit till "always" för att köras mot vår riktiga
+      # Postgres också. Se schema.sql för vad som faktiskt körs.
+      mode: always
   servlet:
     multipart:
       # Vinetiketter, inte godtyckliga filer - 5 MB är gott och väl för ett foto.

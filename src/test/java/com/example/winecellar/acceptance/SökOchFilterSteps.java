@@ -56,13 +56,16 @@ public class SökOchFilterSteps {
             Wine.Builder vin = Wine.builder()
                     .name(rad.get("namn"))
                     .wineType(vintypEllerStandard(rad))
-                    .producer("Okänd producent")
+                    .producer(strängEllerStandard(rad, "producent", "Okänd producent"))
                     .country(strängEllerStandard(rad, "land", "Okänt land"))
                     .region(tomBlirNull(rad.get("region")))
                     .subregion(tomBlirNull(rad.get("underregion")))
                     .vintage(heltalEllerStandard(rad, "årgång", 2020))
                     .quantity(1)
-                    .location("Okänd plats");
+                    .location("Okänd plats")
+                    .tastingNotes(tomBlirNull(rad.get("tasting notes")))
+                    .systembolagetDescription(tomBlirNull(rad.get("systembolagets beskrivning")))
+                    .munskankarnaReview(tomBlirNull(rad.get("munskänkarnas bedömning")));
             String betygEtikett = rad.get("eget betyg");
             if (betygEtikett != null && !betygEtikett.isBlank()) {
                 vin.ownRating(Rating.fraEtikett(betygEtikett));
@@ -110,6 +113,23 @@ public class SökOchFilterSteps {
         }
         if (kriterierRad.containsKey("underregion")) {
             builder.underregioner(new HashSet<>(kommalista(kriterierRad.get("underregion"))));
+        }
+        resultat = wineService.sök(builder.build());
+    }
+
+    @När("jag söker efter {string}")
+    public void jagSökerEfter(String sökterm) {
+        resultat = wineService.sök(Sökkriterier.builder().sökterm(sökterm).build());
+    }
+
+    @När("jag söker efter {string} och filtrerar vinlistan på:")
+    public void jagSökerEfterOchFiltrerarPå(String sökterm, DataTable tabell) {
+        Map<String, String> kriterierRad = tabell.asMap(String.class, String.class);
+        Sökkriterier.Builder builder = Sökkriterier.builder().sökterm(sökterm);
+        if (kriterierRad.containsKey("vintyp")) {
+            builder.vintyper(kommalista(kriterierRad.get("vintyp")).stream()
+                    .map(SökOchFilterSteps::vintypFrånSvenska)
+                    .collect(Collectors.toSet()));
         }
         resultat = wineService.sök(builder.build());
     }

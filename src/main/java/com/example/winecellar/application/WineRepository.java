@@ -15,4 +15,14 @@ public interface WineRepository {
     Optional<Wine> findById(WineId id);
 
     void deleteById(WineId id);
+
+    /**
+     * Fritextsökning över namn, producent, tasting notes, Systembolagets
+     * beskrivning och Munskänkarnas bedömning. Implementationerna behöver
+     * INTE bete sig identiskt - JpaWineRepository använder Postgres
+     * tsvector (böjningsform-medveten, rankad), InMemoryWineRepository en
+     * enklare skiftlägesokänslig delsträngsmatchning för tester som inte
+     * bryr sig om just den kvaliteten. Se CLAUDE.md.
+     */
+    List<Wine> search(String query);
 }

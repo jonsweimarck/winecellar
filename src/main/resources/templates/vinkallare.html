@@ -16,6 +16,8 @@
         .falt-grupp { display: flex; flex-direction: column; gap: 0.3rem; }
         .falt-grupp label { margin: 0; font-size: 0.85rem; color: #767676; }
         .falt-grupp select { width: auto; padding: 0.4rem 0.5rem; }
+        .sok-grupp { flex: 1 1 20rem; }
+        .sok-grupp input { padding: 0.4rem 0.6rem; }
 
         .filterpanel { margin-top: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; }
         .filterpanel > summary { cursor: pointer; padding: 0.75rem 1rem; font-weight: bold; list-style: none; }
@@ -243,6 +245,11 @@
 
     <form hx-get="/" hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
         <div class="verktygsrad">
+            <div class="falt-grupp sok-grupp">
+                <label for="sok">Sök</label>
+                <input type="search" id="sok" name="sok" th:value="${sok}"
+                       placeholder="Namn, producent, tasting notes, Systembolaget, Munskänkarna …">
+            </div>
             <div class="falt-grupp">
                 <label for="sortera">Sortera efter</label>
                 <select id="sortera" name="sortera">

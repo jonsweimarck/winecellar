@@ -44,6 +44,7 @@ public class WineController {
 
     @GetMapping("/")
     public String vinkällare(
+            @RequestParam(required = false) String sok,
             @RequestParam(required = false, defaultValue = "NAMN") Sorteringsfält sortera,
             @RequestParam(required = false, defaultValue = "STIGANDE") SorteringsRiktning riktning,
             @RequestParam(required = false) Set<String> wineType,
@@ -58,6 +59,7 @@ public class WineController {
         Set<String> valdaUnderregioner = tomOmNull(subregion);
 
         Sökkriterier kriterier = Sökkriterier.builder()
+                .sökterm(sok)
                 .sortering(sortera).riktning(riktning)
                 .vintyper(valdaVintyper.stream().map(WineType::valueOf).collect(Collectors.toSet()))
                 .länder(valdaLänder)
@@ -70,6 +72,7 @@ public class WineController {
 
         model.addAttribute("viner", resultat);
         model.addAttribute("antalTotalt", wineService.listWines().size());
+        model.addAttribute("sok", sok == null ? "" : sok);
         model.addAttribute("sorteringsfält", Sorteringsfält.values());
         model.addAttribute("sortera", sortera);
         model.addAttribute("riktning", riktning);

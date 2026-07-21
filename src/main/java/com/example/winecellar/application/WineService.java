@@ -33,11 +33,19 @@ public class WineService {
     /**
      * Orkestrerar sök-/filter-/sorteringsvyn - körs i applikationslagret
      * (inte i WineController) eftersom Gherkin-scenarierna testar mot det
-     * här lagret, inte mot HTTP (se README:s arbetsprocess). Fritextsökning
-     * är planerad som ett tillägg till Sökkriterier, inte en ny metod.
+     * här lagret, inte mot HTTP (se README:s arbetsprocess). Tre steg i
+     * ordning: (1) baslista - antingen samtliga viner eller ett
+     * fritextsökresultat, (2) filtrera baslistan på facetterna, (3)
+     * sortera. Sorteringen appliceras alltid sist och skriver alltså över
+     * den rankordning en fritextsökning eventuellt gav - se README:s
+     * "Filtrering, sökning och sortering" för den medvetna avvägningen
+     * (ingen separat "Relevans"-sortering byggd ännu).
      */
     public List<Wine> sök(Sökkriterier kriterier) {
-        List<Wine> resultat = wineRepository.findAll().stream()
+        List<Wine> baslista = kriterier.sökterm() == null || kriterier.sökterm().isBlank()
+                ? wineRepository.findAll()
+                : wineRepository.search(kriterier.sökterm());
+        List<Wine> resultat = baslista.stream()
                 .filter(vin -> kriterier.vintyper().isEmpty() || kriterier.vintyper().contains(vin.wineType()))
                 .filter(vin -> kriterier.länder().isEmpty() || kriterier.länder().contains(vin.country()))
                 .filter(vin -> kriterier.regioner().isEmpty() || kriterier.regioner().contains(vin.region()))

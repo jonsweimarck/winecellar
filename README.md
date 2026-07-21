@@ -337,6 +337,7 @@ Tabell `wines` (engelska namn, plural, genomgående):
 | vivino_rating | `numeric(2,1)`, nullable | |
 | other_reference | `text`, nullable | |
 | location | `text` | Fritext (Låda 1, Öppen, etc.) - inte enum, växer troligen över tid |
+| search_vector | `tsvector`, genererad | Fritextsökning (namn/producent viktade högre än tasting notes/Systembolagets beskrivning/Munskänkarnas bedömning) - se "Filtrering, sökning och sortering". Inte en del av `WineEntity`/`Wine` - bara Postgres-intern, satt via `schema.sql`, inte Hibernate |
 | created_at, updated_at | `timestamptz` | |
 
 **Nuvarande implementationsstatus:** alla kolumner ovan finns i den körande
@@ -736,6 +737,75 @@ fixar:
   region-`<details>`-elementen (de är kusiner till knappen i DOM:et,
   inte förfäder).
 
+**Fritextsökning (byggd 2026-07-21/22) - den sista av de tre.** Sökfältet
+ligger i verktygsraden, till vänster om sorteringskontrollerna, och söker
+över namn, producent, tasting notes, Systembolagets beskrivning och
+Munskänkarnas bedömning.
+
+Postgres fulltextsökning valdes framför två alternativ som diskuterades:
+ren `ILIKE`-matchning (enkel men ingen böjningsform-medvetenhet, t.ex.
+"vin" hittar inte "viner") och en separat sök-tabell/"dubbellagring"
+("kanske kan det lösas genom dubbellagring" var frågan som ledde hit) -
+den senare avfärdades till förmån för en **genererad kolumn** på
+`wines` (`search_vector tsvector`, se `schema.sql`), eftersom det ger
+samma fördel (slippa beräkna sökbarheten vid varje fråga) utan att
+duplicera data eller behöva synk-logik; Postgres räknar om kolumnen
+automatiskt vid varje `INSERT`/`UPDATE`. Namn och producent viktas
+högre (`'A'`) än de längre fritextfälten (`'B'`) via `setweight(...)`,
+så en träff i namnet rankas högre än en träff djupt i en tasting note.
+`'swedish'`-textsökningskonfigurationen ger böjningsform-medvetenhet
+(stemming) - verifierat manuellt (`sök=kraftfull` hittar ett vin vars
+tasting notes bara innehåller "Kraftfulla", inte den exakta
+sökordsformen) och rankning (`ts_rank`, används i `ORDER BY` i den
+Postgres-specifika sökfrågan, se nedan).
+
+`schema.sql` kompletterar `ddl-auto: update`, som **inte** kan skapa en
+`GENERATED ALWAYS AS`-kolumn eller ett index - bara vanliga
+kolumner/tabeller. Till skillnad från den tidigare
+`db/migrations/2026-07-17-image-oid-to-bytea.sql` (ett manuellt
+engångsskript, se Datamodell ovan) är den här migreringen **helt
+automatisk och idempotent** (`ADD COLUMN IF NOT EXISTS`/`CREATE INDEX
+IF NOT EXISTS`), och körs av Spring Boot vid **varje** appstart
+(`spring.sql.init.mode: always` i `application.yml`) - en medveten
+avvikelse från det manuella mönstret, motiverad av att det här är ren
+schema-DDL utan datamigrering (ingen befintlig data behöver flyttas
+eller konverteras, Postgres beräknar kolumnvärdet automatiskt för både
+befintliga och nya rader), till skillnad från oid→bytea-migreringen som
+behövde flytta faktiska bytes och städa bort föräldralösa large
+objects. `spring.jpa.defer-datasource-initialization: true` säkerställer
+att `schema.sql` körs **efter** att Hibernate skapat `wines`-tabellen,
+inte innan (annars kraschar `ALTER TABLE` mot en tabell som ännu inte
+finns, t.ex. mot en helt ny databas) - detta är också varför
+`WineListResponsiveIT` (som startar en helt ny Testcontainers-Postgres
+per testkörning) fungerar som en indirekt verifiering av att
+migreringen är korrekt: om `schema.sql` vore trasig skulle den testen
+misslyckas vid varje körning, inte bara vid en enda produktionsdeploy.
+
+`WineRepository` fick en ny `search(String)`-metod. `JpaWineRepository`
+implementerar den med en native query (`WineJpaRepository.search`) mot
+`search_vector @@ plainto_tsquery('swedish', :query)`, med en explicit
+kolumnlista istället för `SELECT *` (Hibernate kan annars inte mappa
+den extra, omappade `search_vector`-kolumnen till `WineEntity`).
+`InMemoryWineRepository` implementerar samma metod med en enklare
+skiftlägesokänslig delsträngsmatchning över samma fält - **beter sig
+inte identiskt** (ingen böjningsform-medvetenhet eller rankning), men
+det är exakt samma avvägning som redan gäller för övrig DB-specifik
+funktionalitet i det här projektet (se `vin-persistens.feature`): fullt
+tillräckligt för de acceptanstester som bara bryr sig om VILKA viner
+som matchar, inte i vilken ordning.
+
+`Sökkriterier` fick ett `sökterm`-fält. `WineService.sök(...)` väljer
+baslista i tre steg: en sökterm ger `wineRepository.search(...)` som
+baslista, annars `findAll()` - facetterna filtrerar sedan den listan,
+och sorteringen appliceras sist. **Medveten avvägning:** sorteringen
+skriver därmed alltid över den relevansrankning `ts_rank` gav i
+sökfrågan (om användaren inte uttryckligen valt en annan sortering) -
+ingen separat "Relevans"-sorteringsalternativ är byggt, eftersom det
+hade krävt att rankningspoängen (som inte är ett Wine-fält) fanns
+tillgänglig även efter att `Sorteringsfält`s vanliga
+fält-comparatorer redan bestämmer ordningen. En naturlig, enkel
+utökning senare om det visar sig behövas - inte byggd nu.
+
 ## Nästa steg
 
 - [x] Skriva de första Gherkin-scenarierna tillsammans (lägg till vin, lista
@@ -776,5 +846,6 @@ fixar:
 - [x] Filtrering av vinlistan på vintyp/land/region/underregion
       (`HärkomstNod`, `Sökkriterier`) - se "Filtrering, sökning och
       sortering" ovan
-- [ ] Fritextsökning över namn/producent/tasting notes/Systembolagets
-      beskrivning/Munskänkarnas bedömning
+- [x] Fritextsökning över namn/producent/tasting notes/Systembolagets
+      beskrivning/Munskänkarnas bedömning (`search_vector`, `schema.sql`)
+      - se "Filtrering, sökning och sortering" ovan

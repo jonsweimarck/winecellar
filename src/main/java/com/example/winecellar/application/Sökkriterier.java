@@ -14,12 +14,13 @@ import java.util.Set;
  * dess land fungerar än ändå korrekt, eftersom underregionsvärdet i
  * praktiken bara förekommer på viner från just det landet.
  *
- * Sex fält nu (fyra filterfacetter + sortering), växer troligen med ett
- * sökterm-fält när fritextsökningen byggs - därför Builder redan nu
- * (samma resonemang som Wine.Builder), inte en positionell konstruktor
- * med 1-3 satta fält på de flesta anropsplatser.
+ * `sökterm` (null/blankt = ingen sökning) avgör BASLISTAN (findAll()
+ * eller ett träffresultat från WineRepository.search(...)) - facetterna
+ * och sorteringen appliceras sedan ovanpå den, i den ordningen, se
+ * WineService.sök(...).
  */
 public record Sökkriterier(
+        String sökterm,
         Set<WineType> vintyper,
         Set<String> länder,
         Set<String> regioner,
@@ -33,12 +34,18 @@ public record Sökkriterier(
     }
 
     public static final class Builder {
+        private String sökterm;
         private Set<WineType> vintyper = Set.of();
         private Set<String> länder = Set.of();
         private Set<String> regioner = Set.of();
         private Set<String> underregioner = Set.of();
         private Sorteringsfält sortering = Sorteringsfält.NAMN;
         private SorteringsRiktning riktning = SorteringsRiktning.STIGANDE;
+
+        public Builder sökterm(String sökterm) {
+            this.sökterm = sökterm;
+            return this;
+        }
 
         public Builder vintyper(Set<WineType> vintyper) {
             this.vintyper = vintyper;
@@ -71,7 +78,7 @@ public record Sökkriterier(
         }
 
         public Sökkriterier build() {
-            return new Sökkriterier(vintyper, länder, regioner, underregioner, sortering, riktning);
+            return new Sökkriterier(sökterm, vintyper, länder, regioner, underregioner, sortering, riktning);
         }
     }
 }
