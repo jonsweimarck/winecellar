@@ -64,6 +64,49 @@ flaggade som gällande.
   så två identiskt implementerade metoder vore bara två namn på samma sak.
   Om det uppstår en verklig skillnad senare (t.ex. att tillägg ska vägra
   dubbletter) är det dags att spjälka upp dem igen - inte innan.
+- **Filtrering/sökning/sortering orkestreras i `WineService`, inte i
+  `WineController`** (byggt 2026-07-21, sortering först - se README:s
+  "Filtrering, sökning och sortering" för ordningen på de tre
+  deltillägget). Beslutet togs medvetet efter en explicit avvägning:
+  Gherkin-/Cucumber-scenarierna testar redan mot applikationslagret, inte
+  mot HTTP (se `CucumberSpringConfiguration`s kommentar och README:s
+  Arbetsprocess) - hade orkestreringen legat i controllern hade
+  scenarier om sortering inte haft något naturligt ställe att anropa in
+  på utan att gå via MockMvc/riktig HTTP, vilket hade suddat ut den
+  gräns projektet redan håller isär. `WineControllerTest`
+  (`@WebMvcTest` + `@MockBean WineService`) påverkades inte av valet -
+  den mockar redan bort hela `WineService`, oavsett var logiken bor.
+  Konsekvensen: `WineController` tolkar bara råa queryparametrar till
+  typade värden (`Sorteringsfält`/`SorteringsRiktning`, bundna direkt
+  via Spring, samma mönster som `WineType` redan binds i formulären) -
+  `WineService.sök(...)` gör själva jobbet.
+- **`Sorteringsfält` (enum, `application`-paketet) håller null-hantering
+  och riktning strikt isär - en fälla som är lätt att gå i.** Varje
+  konstant bygger sin comparator via en delad `medRiktning(fältvärde,
+  stigandeOrdning, riktning)`-hjälpare som applicerar `Comparator.
+  nullsLast(...)` **efter** att riktningen (stigande/fallande) redan
+  avgjort om `stigandeOrdning` ska vara `.reversed()` eller ej - inte
+  tvärtom. Ett vin utan pris/betyg satt ska alltid hamna sist i listan,
+  oavsett om sorteringen är stigande eller fallande (verifierat av
+  Gherkin-scenariot "Viner utan värde för det sorterade fältet hamnar
+  sist, oavsett riktning"). Att i stället bygga
+  `nullsLast(stigandeOrdning).reversed()` (nullsLast **innanför**
+  reversed) hade fått null-värden att hoppa till **toppen** vid fallande
+  sortering, eftersom `.reversed()` på en redan nullsLast-inslagen
+  comparator vänder på hela jämförelsen - inklusive null-placeringen.
+- **Betygsfälten (`EGET_BETYG`/`MUNSKANKARNA_BETYG`) sorteras via
+  `Rating.ordinal()`, inte via etikettens bokstavsordning - en andra
+  fälla i samma enum.** `Rating` deklareras i **fallande** betygsordning
+  (`R20` bäst...`R6` sämst, se `Rating.java`), så `ordinal()` ger lägst
+  tal för det bästa betyget. "Stigande sortering" ska betyda stigande
+  betygsVÄRDE (sämst→bäst, dvs. `R6` före `R20`) - vilket är samma sak
+  som **fallande** ordinal, därav `Comparator.comparing(Rating::ordinal).
+  reversed()` som varje betygsfälts "stigande ordning". Verifierat av
+  Gherkin-scenariot som jämför `R9`/`R10` specifikt (inte bara `R16`/
+  `R19`) - deras etiketter ("9 (...)" och "10 (...)") sorterar **fel**
+  bokstavsvis (`"10..."` < `"9..."` alfabetiskt, eftersom `'1'` har lägre
+  teckenkod än `'9'`), så scenariot hade avslöjat en naiv
+  strängjämförelse lika väl som det avslöjar en ordinal-utan-reversed-bugg.
 - **`location`** (var flaskan förvaras) är **inte** en enum, till skillnad
   från ovanstående - det är fritext eftersom lådor/förvaringsplatser
   förväntas läggas till över tid.
@@ -592,6 +635,26 @@ dubbletter.
 
 - **Gherkin på svenska kräver `# language: sv`** som absolut första rad i
   varje `.feature`-fil.
+- **Cucumber Expressions skiljer sig från reguljära uttryck på ett sätt
+  som ger förvirrande felmeddelanden, inte bara "hittar ingen match".**
+  Upptäckt när `sortera-viner.feature`s steg byggdes (2026-07-21):
+  `@När("... i (stigande|fallande) ordning")` (regex-stil alternation med
+  `|`) matchade tyst ingenting alls - Cucumber tolkar `|` bara som en
+  vanlig bokstav i en Cucumber Expression, inte som alternation, så
+  felet såg ut som att steget helt saknade en definition (samma
+  `UndefinedStepException` som ett riktigt saknat steg hade gett).
+  Cucumber Expressions egen alternationssyntax använder `/` istället
+  (`(stigande/fallande)`) - men **den** kastade i sin tur ett tydligt
+  fel ("An alternation can not be used inside an optional") eftersom
+  parenteser i Cucumber Expressions betyder *valfri text*, inte en
+  fångstgrupp - en alternation får inte ligga direkt inuti en valfri
+  grupp. Löst genom att helt undvika alternation: två separata
+  `@När`-metoder (en för "... i stigande ordning", en för "... i
+  fallande ordning"), som båda anropar samma privata `sortera(...)`-
+  hjälpmetod - enklare och garanterat korrekt, istället för att fortsätta
+  brottas med Cucumber Expression-syntaxen. Värt att komma ihåg för
+  framtida steg med den här sortens "antingen X eller Y"-text i själva
+  Gherkin-meningen.
 - `junit-platform-suite-engine` måste vara ett explicit beroende, inte bara
   `junit-platform-suite`.
 - **Mockito + nya JDK-versioner**: lås `mockito.version` och

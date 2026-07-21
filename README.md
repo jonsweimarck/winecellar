@@ -634,6 +634,43 @@ standardlösenordet `admin`/`admin` **inte** längre fungerar, se
 CLAUDE.md:s "Säkerhet"). Appens URL är medvetet inte listad här - det här
 repot är delat.
 
+## Filtrering, sökning och sortering
+
+Tre relaterade tillägg till vinlistan, planerade tillsammans (mockup
+godkänd 2026-07-20, se `CLAUDE.md`) men byggda **var för sig** i egen takt
+- vald ordning: **sortering → filtrering → fritextsökning**, eftersom
+sortering inte kräver någon databasändring (hela listan läses redan in i
+minnet vid varje anrop, ingen paginering finns) medan fritextsökning
+kräver en riktig migrering (en `tsvector`-kolumn). Att börja med den
+enklaste av de tre lät hela mönstret - queryparametrar, htmx-verktygsrad,
+orkestrering i `WineService` - etableras innan de mer komplexa bitarna
+byggs ovanpå det.
+
+**Sortering (byggd 2026-07-21).** `Sorteringsfält` (`application`-paketet)
+är en enum med en konstant per sorterbart fält (Namn, Producent, Land,
+Årgång, Antal flaskor, Pris, Inköpsdatum, Eget betyg, Munskänkarnas
+betyg, Vivino-betyg), där varje konstant själv vet hur man jämför två
+`Wine` i given riktning (`comparator(SorteringsRiktning)`). `WineService.
+sök(Sorteringsfält, SorteringsRiktning)` är den nya orkestrerande
+metoden - se CLAUDE.md för varför den ligger i `WineService` och inte i
+`WineController`. `WineController.vinkällare` (`GET /`) tar emot
+`sortera`/`riktning` som queryparametrar (bundna direkt till enumerna,
+samma mönster som `WineType` redan binds i formulären), med Namn/Stigande
+som standard om inget valts.
+
+Sorteringskontrollerna (två `<select>`, ett för fält och ett för
+riktning) ligger i en `<form class="verktygsrad">` ovanför listan,
+skickar `hx-get="/" hx-target="#vinlista" hx-swap="outerHTML"
+hx-trigger="change" hx-push-url="true"` - samma
+target/swap-mönster som "Ta bort" redan använder. `GET /` grenar därför
+på `HX-Request`-headern: en htmx-förfrågan får bara `vinkallare ::
+lista`-fragmentet tillbaka (verktygsraden ligger utanför fragmentet och
+rör-inte-vid:s alltså inte av swappen), en vanlig sidladdning får hela
+sidan. `hx-push-url="true"` gör att den valda sorteringen hamnar i
+webbläsarens adressfält (`?sortera=EGET_BETYG&riktning=FALLANDE`) -
+bokmärkbart/delbart, och rätt alternativ är förvalt (`th:selected`) om
+sidan laddas direkt med de queryparametrarna.
+
 ## Nästa steg
 
 - [x] Skriva de första Gherkin-scenarierna tillsammans (lägg till vin, lista
@@ -669,3 +706,8 @@ repot är delat.
       så det inte går att komma åt funktionaliteten genom att gissa på
       URL:en, verifierat av både `WineControllerTest` och
       `WineListResponsiveIT`
+- [x] Sortering av vinlistan (`Sorteringsfält`, `WineService.sök`) - se
+      "Filtrering, sökning och sortering" ovan
+- [ ] Filtrering av vinlistan på vintyp/land/region/underregion
+- [ ] Fritextsökning över namn/producent/tasting notes/Systembolagets
+      beskrivning/Munskänkarnas bedömning

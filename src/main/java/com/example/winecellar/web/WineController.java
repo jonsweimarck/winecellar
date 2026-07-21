@@ -1,5 +1,7 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.SorteringsRiktning;
+import com.example.winecellar.application.Sorteringsfält;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,10 +37,17 @@ public class WineController {
     }
 
     @GetMapping("/")
-    public String vinkällare(Model model, Authentication authentication) {
-        model.addAttribute("viner", wineService.listWines());
+    public String vinkällare(
+            @RequestParam(required = false, defaultValue = "NAMN") Sorteringsfält sortera,
+            @RequestParam(required = false, defaultValue = "STIGANDE") SorteringsRiktning riktning,
+            @RequestHeader(value = "HX-Request", required = false) String hxRequest,
+            Model model, Authentication authentication) {
+        model.addAttribute("viner", wineService.sök(sortera, riktning));
+        model.addAttribute("sorteringsfält", Sorteringsfält.values());
+        model.addAttribute("sortera", sortera);
+        model.addAttribute("riktning", riktning);
         model.addAttribute("kanRedigera", harRollAdmin(authentication));
-        return "vinkallare";
+        return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
 
     @GetMapping("/wines/nytt")

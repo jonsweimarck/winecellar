@@ -12,6 +12,11 @@
         button { padding: 0.4rem 0.8rem; }
         .knapp { display: inline-block; text-decoration: none; color: inherit; border: 1px solid #999; border-radius: 0.25rem; padding: 0.6rem 1rem; }
 
+        .verktygsrad { display: flex; gap: 1.5rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1.25rem; }
+        .falt-grupp { display: flex; flex-direction: column; gap: 0.3rem; }
+        .falt-grupp label { margin: 0; font-size: 0.85rem; color: #767676; }
+        .falt-grupp select { width: auto; padding: 0.4rem 0.5rem; }
+
         /* Breda kort på desktop, smala kort på mobil - #vinlista-tabell
            heter fortfarande "tabell" av historiska skäl (det var en
            riktig HTML-tabell innan tabellvyns designomgång 2026-07-19),
@@ -210,6 +215,25 @@
     <h1>Vinkällaren</h1>
 
     <a class="knapp" th:if="${kanRedigera}" href="/wines/nytt">Lägg till vin</a>
+
+    <form class="verktygsrad" hx-get="/" hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
+        <div class="falt-grupp">
+            <label for="sortera">Sortera efter</label>
+            <select id="sortera" name="sortera">
+                <option th:each="falt : ${sorteringsfält}"
+                        th:value="${falt.name()}"
+                        th:text="${falt.etikett()}"
+                        th:selected="${falt == sortera}"></option>
+            </select>
+        </div>
+        <div class="falt-grupp">
+            <label for="riktning">Riktning</label>
+            <select id="riktning" name="riktning">
+                <option value="STIGANDE" th:selected="${riktning.name() == 'STIGANDE'}">Stigande</option>
+                <option value="FALLANDE" th:selected="${riktning.name() == 'FALLANDE'}">Fallande</option>
+            </select>
+        </div>
+    </form>
 
     <th:block th:fragment="detaljfalt(vin)" th:if="${vin != null}">
         <dt class="fd-plats">Plats</dt>
