@@ -24,12 +24,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -69,6 +72,7 @@ public class WineController {
         List<Wine> resultat = wineService.sök(kriterier);
         List<HärkomstNod> härkomstträd = wineService.härkomstträd();
         ExpanderadeNoder expanderade = beräknaExpanderadeNoder(härkomstträd, valdaRegioner, valdaUnderregioner);
+        Sökvy sökvy = new Sökvy(sok, sortera, riktning, valdaVintyper, valdaLänder, valdaRegioner, valdaUnderregioner);
 
         model.addAttribute("viner", resultat);
         model.addAttribute("antalTotalt", wineService.listWines().size());
@@ -83,12 +87,91 @@ public class WineController {
         model.addAttribute("valdaUnderregioner", valdaUnderregioner);
         model.addAttribute("expanderadeLänder", expanderade.länder());
         model.addAttribute("expanderadeRegioner", expanderade.regioner());
+        model.addAttribute("chips", byggChips(sökvy));
         model.addAttribute("kanRedigera", harRollAdmin(authentication));
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
 
     private static Set<String> tomOmNull(Set<String> värde) {
         return värde == null ? Set.of() : värde;
+    }
+
+    private static final Map<String, String> VINTYP_ETIKETT = Map.of(
+            "RED", "Rött",
+            "WHITE", "Vitt",
+            "ROSE", "Rosé",
+            "SPARKLING", "Mousserande",
+            "FORTIFIED", "Starkvin"
+    );
+
+    /**
+     * En "chip" per aktivt sök-/filtervärde (Detta är den enda extra biten
+     * utöver vad som diskuterades under mockup-godkännandet - flaggad då
+     * som ett tillägg, byggd nu på användarens begäran). Varje chip länkar
+     * till exakt samma vy MINUS det enskilda värdet - en vanlig
+     * `<a href>`, inte htmx: chippens borttagning måste uppdatera hela
+     * verktygsraden (kryssrutor, sökfält) också, inte bara listan, och de
+     * ligger utanför #vinlista-fragmentet som en htmx-swap annars hade
+     * varit begränsad till.
+     */
+    private static List<Chip> byggChips(Sökvy sökvy) {
+        List<Chip> chips = new ArrayList<>();
+        if (sökvy.sok() != null && !sökvy.sok().isBlank()) {
+            chips.add(new Chip("\"" + sökvy.sok() + "\"", sökvy.urlUtan("sok", null)));
+        }
+        for (String vintyp : sökvy.vintyper()) {
+            chips.add(new Chip(VINTYP_ETIKETT.getOrDefault(vintyp, vintyp), sökvy.urlUtan("wineType", vintyp)));
+        }
+        for (String land : sökvy.länder()) {
+            chips.add(new Chip(land, sökvy.urlUtan("country", land)));
+        }
+        for (String region : sökvy.regioner()) {
+            chips.add(new Chip(region, sökvy.urlUtan("region", region)));
+        }
+        for (String underregion : sökvy.underregioner()) {
+            chips.add(new Chip(underregion, sökvy.urlUtan("subregion", underregion)));
+        }
+        return chips;
+    }
+
+    private record Chip(String etikett, String taBortUrl) {
+    }
+
+    /**
+     * Nuvarande sök-/filter-/sorteringstillstånd, med förmågan att bygga
+     * en URL för "samma vy, men utan det här enskilda värdet" - det
+     * chipsen länkar till. facett/värde är null-säkra: facett == "sok"
+     * utelämnar sökordet oavsett värde, annars tas bara det angivna
+     * värdet bort ur just den facettens set - övriga värden i samma
+     * facett (och alla andra facetter) behålls oförändrade.
+     */
+    private record Sökvy(
+            String sok, Sorteringsfält sortera, SorteringsRiktning riktning,
+            Set<String> vintyper, Set<String> länder, Set<String> regioner, Set<String> underregioner
+    ) {
+        String urlUtan(String facett, String värde) {
+            UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/");
+            if (sok != null && !sok.isBlank() && !"sok".equals(facett)) {
+                builder.queryParam("sok", sok);
+            }
+            builder.queryParam("sortera", sortera.name());
+            builder.queryParam("riktning", riktning.name());
+            läggTillUtom(builder, "wineType", vintyper, facett, värde);
+            läggTillUtom(builder, "country", länder, facett, värde);
+            läggTillUtom(builder, "region", regioner, facett, värde);
+            läggTillUtom(builder, "subregion", underregioner, facett, värde);
+            return builder.build().encode().toUriString();
+        }
+
+        private static void läggTillUtom(
+                UriComponentsBuilder builder, String param, Set<String> värden, String facett, String taBortVärde) {
+            for (String v : värden) {
+                if (param.equals(facett) && v.equals(taBortVärde)) {
+                    continue;
+                }
+                builder.queryParam(param, v);
+            }
+        }
     }
 
     /**
@@ -168,10 +251,25 @@ public class WineController {
         return "redirect:/";
     }
 
+    /**
+     * Visar alltid den ofiltrerade/osorterade listan efter borttagning
+     * (oförändrat beteende sedan innan filter/sortering fanns) - "Ta
+     * bort" skickar inget om aktivt filter/sökning/sortering (knapparna
+     * ligger utanför verktygsradens <form>), så en eventuell aktiv vy
+     * återställs till standardläget efter en borttagning. Känd
+     * begränsning, inte löst nu - se CLAUDE.md.
+     * `antalTotalt`/`chips` måste ändå sättas (tomma/lika med antalet
+     * viner) eftersom #vinlista-fragmentet numera refererar till dem
+     * ovillkorligt - annars kraschar renderingen med en
+     * SpelEvaluationException (upptäckt av ett test, inte manuellt).
+     */
     @DeleteMapping("/wines/{id}")
     public String taBortVin(@PathVariable Long id, Model model, Authentication authentication) {
         wineService.removeWine(new WineId(id));
-        model.addAttribute("viner", wineService.listWines());
+        List<Wine> viner = wineService.listWines();
+        model.addAttribute("viner", viner);
+        model.addAttribute("antalTotalt", viner.size());
+        model.addAttribute("chips", List.of());
         model.addAttribute("kanRedigera", harRollAdmin(authentication));
         return "vinkallare :: lista";
     }

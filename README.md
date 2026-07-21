@@ -806,6 +806,50 @@ tillgänglig även efter att `Sorteringsfält`s vanliga
 fält-comparatorer redan bestämmer ordningen. En naturlig, enkel
 utökning senare om det visar sig behövas - inte byggd nu.
 
+**Druvor (`grapes`) lades till i sökuttrycket (2026-07-22), viktat
+tillsammans med namn/producent (`'A'`)** - en druvträff (t.ex. "pinot
+noir") är lika precis/stark ett signal som en namn-/producentträff,
+till skillnad från en träff i en längre fritextnot. Det här kravde att
+`schema.sql` gick från "`ADD COLUMN IF NOT EXISTS`" till att **droppa
+och återskapa** `search_vector`-kolumnen (och dess index) vid varje
+appstart - se kommentaren i filen för varför: Postgres har inget sätt
+att ändra en genererad kolumns uttryck på plats, och `IF NOT EXISTS`
+hade gjort en redan existerande kolumn i produktion permanent fastlåst
+vid sin GAMLA definition (utan druvor). Kostnaden (hela kolumnen och
+indexet räknas om vid varje omstart) är försumbar för en samlingsstorlek
+i den här klassen. `InMemoryWineRepository.search(...)` fick motsvarande
+tillägg. Verifierat manuellt mot en riktig Postgres: sökning på "pinot
+noir" hittar bara det vin vars druvor faktiskt innehåller båda orden,
+inte ett vin med bara "Chardonnay".
+
+**Chips som visar aktivt filter/sökning (byggt 2026-07-22)** - en chip
+per valt värde (vintyp, land, region, underregion, sökterm), med en
+borttagningslänk som tar bort *bara* det värdet och behåller allt
+annat oförändrat. Byggd i `WineController` (inte `WineService` - rent
+en presentationsangelägenhet, ingen Gherkin-relevant logik), som en
+`Sökvy`-hjälprecord vars `urlUtan(facett, värde)` bygger om URL:en med
+`UriComponentsBuilder`. Chip-länkarna är **vanliga `<a href>`, inte
+htmx** - medvetet: en borttagning måste uppdatera hela verktygsraden
+(kryssrutor, sökfält), inte bara listan, och de ligger utanför
+`#vinlista`-fragmentet som en htmx-swap annars hade varit begränsad
+till. Verifierat med Playwright att en borttagen chip korrekt bara
+avmarkerar sin egen kryssruta och lämnar sökfältet/övriga kryssrutor
+orörda.
+
+**Fälla som dök upp under bygget:** `#vinlista`-fragmentet fick två
+nya ovillkorliga modellattributsreferenser (`antalTotalt`, `chips`) -
+`DELETE /wines/{id}` (`taBortVin`) hade aldrig uppdaterats när
+`antalTotalt` introducerades i filtreringsomgången (osynligt då,
+eftersom `th:text` på ett null-värde bara ger tom text) men kraschade
+med en `SpelEvaluationException` när `chips.isEmpty()` anropades på
+`null`. Fixat genom att sätta båda (tomt `chips`, `antalTotalt` lika
+med antalet kvarvarande viner) i `taBortVin` också. **Känd kvarstående
+begränsning, inte löst:** "Ta bort" återställer alltid till den
+ofiltrerade/osorterade standardvyn efteråt, eftersom borttagningsknapparna
+ligger utanför verktygsradens `<form>` och inte skickar med aktivt
+sök-/filter-/sorteringstillstånd - en borttagning medan ett filter är
+aktivt tappar alltså filtreringen. Se CLAUDE.md.
+
 ## Nästa steg
 
 - [x] Skriva de första Gherkin-scenarierna tillsammans (lägg till vin, lista

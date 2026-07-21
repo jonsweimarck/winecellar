@@ -60,6 +60,7 @@ public class SökOchFilterSteps {
                     .country(strängEllerStandard(rad, "land", "Okänt land"))
                     .region(tomBlirNull(rad.get("region")))
                     .subregion(tomBlirNull(rad.get("underregion")))
+                    .grapes(tomBlirNull(rad.get("druvor")))
                     .vintage(heltalEllerStandard(rad, "årgång", 2020))
                     .quantity(1)
                     .location("Okänd plats")

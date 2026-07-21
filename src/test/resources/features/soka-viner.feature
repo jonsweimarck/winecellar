@@ -1,8 +1,9 @@
 # language: sv
 Egenskap: Fritextsök i vinlistan
-  Som vinsamlare vill jag kunna fritextsöka över namn, producent,
+  Som vinsamlare vill jag kunna fritextsöka över namn, producent, druvor,
   tasting notes, Systembolagets beskrivning och Munskänkarnas bedömning,
-  så att jag snabbt hittar ett visst vin i en stor samling
+  så att jag snabbt hittar ett visst vin i en stor samling - t.ex. alla
+  viner gjorda på en viss druva
 
   Scenario: Sökning matchar på namn
     Givet att källaren innehåller följande viner:
@@ -21,6 +22,16 @@ Egenskap: Fritextsök i vinlistan
     När jag söker efter "cesare"
     Så ska vinlistan innehålla "Barolo"
     Och vinlistan ska inte innehålla "Chablis"
+
+  Scenario: Sökning matchar på druvor
+    Givet att källaren innehåller följande viner:
+      | namn    | druvor                          |
+      | Barolo  | Nebbiolo                        |
+      | Chablis | Pinot noir, chardonnay          |
+      | Bourgogne | Chardonnay                    |
+    När jag söker efter "pinot noir"
+    Så ska vinlistan innehålla "Chablis"
+    Och vinlistan ska inte innehålla "Barolo, Bourgogne"
 
   Scenario: Sökning matchar på tasting notes
     Givet att källaren innehåller följande viner:

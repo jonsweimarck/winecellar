@@ -62,6 +62,7 @@ public class InMemoryWineRepository implements WineRepository {
     private static boolean matchar(Wine vin, String normaliseradSökterm) {
         return innehåller(vin.name(), normaliseradSökterm)
                 || innehåller(vin.producer(), normaliseradSökterm)
+                || innehåller(vin.grapes(), normaliseradSökterm)
                 || innehåller(vin.tastingNotes(), normaliseradSökterm)
                 || innehåller(vin.systembolagetDescription(), normaliseradSökterm)
                 || innehåller(vin.munskankarnaReview(), normaliseradSökterm);

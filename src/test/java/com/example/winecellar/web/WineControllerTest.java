@@ -646,6 +646,43 @@ class WineControllerTest {
                             containsString(">2<")
                     )));
         }
+
+        @Test
+        @DisplayName("ska inte visa några chips utan aktivt filter eller sökning")
+        void skaInteVisaChipsUtanAktivtFilter() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(not(containsString("class=\"chip\""))));
+        }
+
+        @Test
+        @DisplayName("ska visa en chip per aktivt filter-/sökvärde, vars borttagningslänk behåller övriga värden")
+        void skaVisaChipsMedBorttagningslänkar() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+
+            String html = mockMvc.perform(get("/")
+                            .with(httpBasic("admin", "admin"))
+                            .param("sok", "barolo")
+                            .param("wineType", "RED")
+                            .param("country", "Italien"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(html).contains("class=\"chip\"", "&quot;barolo&quot; ×", "Rött ×", "Italien ×");
+
+            // "Rött"-chippens borttagningslänk ska ta bort wineType=RED,
+            // men behålla sok och country oförändrade.
+            java.util.regex.Matcher chipLänk = java.util.regex.Pattern
+                    .compile("href=\"([^\"]+)\"[^>]*>Rött ×")
+                    .matcher(html);
+            assertThat(chipLänk.find()).isTrue();
+            String href = chipLänk.group(1);
+            assertThat(href).doesNotContain("wineType=RED")
+                    .contains("country=Italien")
+                    .contains("sok=barolo");
+        }
     }
 
     @Nested

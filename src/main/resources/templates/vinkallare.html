@@ -44,6 +44,10 @@
 
         .traffrad { color: #767676; font-size: 0.9rem; margin: 0.75rem 0.1rem 0; }
 
+        .chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0.1rem 0; }
+        .chip { display: inline-block; background: #f0f0f0; border: 1px solid #ddd; border-radius: 1rem; padding: 0.2rem 0.65rem; font-size: 0.8rem; color: #333; text-decoration: none; }
+        .chip:hover { background: #e5e5e5; }
+
         /* Breda kort på desktop, smala kort på mobil - #vinlista-tabell
            heter fortfarande "tabell" av historiska skäl (det var en
            riktig HTML-tabell innan tabellvyns designomgång 2026-07-19),
@@ -353,6 +357,10 @@
 
     <div id="vinlista" th:fragment="lista">
         <p class="traffrad">Visar <strong th:text="${viner.size()}"></strong> av <span th:text="${antalTotalt}"></span> viner</p>
+
+        <div class="chips" th:if="${!chips.isEmpty()}">
+            <a th:each="chip : ${chips}" th:href="${chip.taBortUrl()}" class="chip" th:text="|${chip.etikett()} ×|"></a>
+        </div>
 
         <div id="vinlista-tabell" class="vinlista-tabell">
             <div class="vinkort-bred" th:each="vin : ${viner}">

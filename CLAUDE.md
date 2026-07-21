@@ -157,10 +157,11 @@ flaggade som gällande.
   sorteringstilläggen) - `search_vector` är genererad Postgres-DDL, satt
   via `schema.sql`, inte via en manuell migrering.** Till skillnad från
   `db/migrations/2026-07-17-image-oid-to-bytea.sql` (manuellt
-  engångsskript - se Datamodell) är `schema.sql`
-  (`ADD COLUMN IF NOT EXISTS`/`CREATE INDEX IF NOT EXISTS`, alltså
-  idempotent) kopplad till `spring.sql.init.mode: always` och körs
-  **automatiskt vid varje appstart**, inklusive i produktion. Medveten
+  engångsskript - se Datamodell) är `schema.sql` kopplad till
+  `spring.sql.init.mode: always` och körs **automatiskt vid varje
+  appstart**, inklusive i produktion (se separat punkt nedan om att
+  filen numera droppar och återskapar kolumnen varje gång, inte bara
+  `ADD COLUMN IF NOT EXISTS` som ursprungsversionen). Medveten
   avvikelse: den här migreringen är ren schema-DDL utan datamigrering
   (Postgres beräknar kolumnvärdet automatiskt, ingen befintlig data
   behöver flyttas/konverteras som oid→bytea-fallet krävde), så
@@ -189,6 +190,46 @@ flaggade som gällande.
   att komma ihåg: ny statisk UI-text (placeholders, etiketter) kan
   råka kollidera med `containsString`/`not(containsString(...))`-
   assertions som antog att en fras bara förekommer villkorligt.
+- **Druvor (`grapes`) lades till i sökuttrycket (2026-07-22), viktat
+  med namn/producent - `schema.sql` gick från "`ADD COLUMN IF NOT
+  EXISTS`" till att DROPPA och ÅTERSKAPA `search_vector`-kolumnen (och
+  dess GIN-index) vid varje appstart.** Postgres kan inte ändra en
+  genererad kolumns uttryck på plats (inget `ALTER COLUMN ... SET
+  EXPRESSION`), och `IF NOT EXISTS` hade gjort en redan existerande
+  produktionskolumn permanent fastlåst vid sin gamla definition (utan
+  druvor) - ALTER-satsen hade aldrig körts igen. Med drop+återskapa är
+  `schema.sql` istället den enda sanningskällan för kolumnens FAKTISKA
+  definition just nu; varje appstart konvergerar databasen mot filens
+  innehåll, oavsett vad som fanns innan. Kostnaden (hela
+  `search_vector` räknas om för alla rader, indexet byggs om) är
+  försumbar för samlingsstorleken. Kom ihåg det här mönstret för
+  framtida ändringar av `search_vector`s uttryck - `ADD COLUMN IF NOT
+  EXISTS` fungerar bara för den ALLRA FÖRSTA gången kolumnen skapas.
+- **Chips (byggt 2026-07-22) - vanliga `<a href>`, inte htmx.** En chip
+  per aktivt filter-/sökvärde, med en borttagningslänk
+  (`WineController.Sökvy.urlUtan(facett, värde)`, `UriComponentsBuilder`)
+  som bygger om hela URL:en minus det enskilda värdet. Medvetet INTE
+  htmx-drivet: en borttagning måste uppdatera hela verktygsraden
+  (kryssrutor, sökfält), inte bara `#vinlista`-fragmentet en htmx-swap
+  annars hade varit begränsad till - en vanlig sidladdning garanterar
+  att båda är synkade. Byggd i `WineController`, inte `WineService` -
+  ren presentationslogik utan Gherkin-relevans.
+- **`DELETE /wines/{id}` (`taBortVin`) kraschade när `chips`/
+  `antalTotalt` blev ovillkorliga referenser i `#vinlista`-fragmentet
+  (fångat av `NärEttVinTasBort`-testsviten, inte manuellt).**
+  `antalTotalt` hade redan varit en tyst lucka sedan filtreringsomgången
+  (ett `th:text` på `null` ger bara tom text, inget fel) - men
+  `chips.isEmpty()` anropat på `null` gav en `SpelEvaluationException`
+  och kraschade hela borttagningen. Fixat genom att sätta båda i
+  `taBortVin` också (`chips` tom lista, `antalTotalt` = antalet
+  kvarvarande viner). **Kvarstående, medvetet olöst begränsning:** en
+  borttagning återställer alltid till standardvyn (ofiltrerad,
+  osorterad) efteråt - "Ta bort"-knapparna ligger utanför
+  verktygsradens `<form>` och skickar inget om aktivt filter/sökning/
+  sortering. Om det visar sig irritera i praktiken är fixen att lägga
+  till samma `@RequestParam`-uppsättning på `taBortVin` som `vinkällare`
+  har, plus att koppla `hx-include` (eller motsvarande) på
+  "Ta bort"-knapparna så de skickar med formulärets aktuella värden.
 - **`location`** (var flaskan förvaras) är **inte** en enum, till skillnad
   från ovanstående - det är fritext eftersom lådor/förvaringsplatser
   förväntas läggas till över tid.
