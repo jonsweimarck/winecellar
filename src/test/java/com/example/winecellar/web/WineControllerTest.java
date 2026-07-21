@@ -1,7 +1,9 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.HärkomstNod;
 import com.example.winecellar.application.SorteringsRiktning;
 import com.example.winecellar.application.Sorteringsfält;
+import com.example.winecellar.application.Sökkriterier;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
@@ -22,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
@@ -156,7 +159,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska se listan utan länkar/knappar för lägg till, redigera eller ta bort")
         void skaSeListanUtanRedigeringslänkar() throws Exception {
-            when(wineService.sök(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(httpBasic("readonly", "readonly")))
                     .andExpect(status().isOk())
@@ -244,7 +247,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska lista befintliga viner och länka till formuläret för ett nytt vin")
         void skaListaBefintligaVinerOchLänkaTillNyttVinFormulär() throws Exception {
-            when(wineService.sök(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
@@ -266,7 +269,7 @@ class WineControllerTest {
                     .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
                     .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
                     .build();
-            when(wineService.sök(any(), any())).thenReturn(List.of(barolo));
+            when(wineService.sök(any())).thenReturn(List.of(barolo));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
@@ -302,7 +305,7 @@ class WineControllerTest {
             Wine barolo = BAROLO.toBuilder()
                     .systembolagetProductNumber("12345")
                     .build();
-            when(wineService.sök(any(), any())).thenReturn(List.of(barolo));
+            when(wineService.sök(any())).thenReturn(List.of(barolo));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
@@ -320,7 +323,7 @@ class WineControllerTest {
                     .tastingNotes("Kraftfullt")
                     .ownRating(Rating.R16)
                     .build();
-            when(wineService.sök(any(), any())).thenReturn(List.of(barolo));
+            when(wineService.sök(any())).thenReturn(List.of(barolo));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
@@ -357,7 +360,7 @@ class WineControllerTest {
                     .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
                     .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
                     .build();
-            when(wineService.sök(any(), any())).thenReturn(List.of(barolo));
+            when(wineService.sök(any())).thenReturn(List.of(barolo));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
@@ -393,7 +396,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska rendera sorteringskontroller med alla sorterbara fält")
         void skaRenderaSorteringskontrollerMedAllaFält() throws Exception {
-            when(wineService.sök(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
@@ -418,18 +421,20 @@ class WineControllerTest {
         @Test
         @DisplayName("ska sortera på namn, stigande, som standard när inget valts")
         void skaAnvändaStandardsortering() throws Exception {
-            when(wineService.sök(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk());
 
-            verify(wineService).sök(Sorteringsfält.NAMN, SorteringsRiktning.STIGANDE);
+            verify(wineService).sök(Sökkriterier.builder()
+                    .sortering(Sorteringsfält.NAMN).riktning(SorteringsRiktning.STIGANDE)
+                    .build());
         }
 
         @Test
         @DisplayName("ska skicka valt sorteringsfält och riktning vidare till WineService")
         void skaSkickaValdSorteringTillWineService() throws Exception {
-            when(wineService.sök(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
                             .with(httpBasic("admin", "admin"))
@@ -437,13 +442,15 @@ class WineControllerTest {
                             .param("riktning", "FALLANDE"))
                     .andExpect(status().isOk());
 
-            verify(wineService).sök(Sorteringsfält.EGET_BETYG, SorteringsRiktning.FALLANDE);
+            verify(wineService).sök(Sökkriterier.builder()
+                    .sortering(Sorteringsfält.EGET_BETYG).riktning(SorteringsRiktning.FALLANDE)
+                    .build());
         }
 
         @Test
         @DisplayName("ska returnera bara listfragmentet, inte hela sidan, vid en htmx-förfrågan")
         void skaReturneraBaraListfragmentetVidHtmxFörfrågan() throws Exception {
-            when(wineService.sök(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
                             .with(httpBasic("admin", "admin"))
@@ -454,6 +461,95 @@ class WineControllerTest {
                             containsString("Barolo"),
                             not(containsString("<html")),
                             not(containsString("name=\"sortera\""))
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska rendera kryssrutor för alla vintyper")
+        void skaRenderaFilterkryssrutorMedAllaVintyper() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("name=\"wineType\" value=\"RED\""),
+                            containsString("name=\"wineType\" value=\"WHITE\""),
+                            containsString("name=\"wineType\" value=\"ROSE\""),
+                            containsString("name=\"wineType\" value=\"SPARKLING\""),
+                            containsString("name=\"wineType\" value=\"FORTIFIED\""),
+                            containsString("Rött"),
+                            containsString("Vitt"),
+                            containsString("Rosé"),
+                            containsString("Mousserande"),
+                            containsString("Starkvin")
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska rendera härkomstträdet som nästlade kryssrutor för land/region/underregion")
+        void skaRenderaHärkomstträdetSomNästladeKryssrutor() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+            when(wineService.härkomstträd()).thenReturn(List.of(
+                    new HärkomstNod("Italien", List.of(
+                            new HärkomstNod("Piemonte", List.of(
+                                    new HärkomstNod("Langhe", List.of())
+                            ))
+                    ))
+            ));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("name=\"country\" value=\"Italien\""),
+                            containsString("name=\"region\" value=\"Piemonte\""),
+                            containsString("name=\"subregion\" value=\"Langhe\"")
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska skicka valda filter vidare till WineService")
+        void skaSkickaValdaFilterTillWineService() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/")
+                            .with(httpBasic("admin", "admin"))
+                            .param("wineType", "RED", "WHITE")
+                            .param("country", "Italien"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).sök(Sökkriterier.builder()
+                    .sortering(Sorteringsfält.NAMN).riktning(SorteringsRiktning.STIGANDE)
+                    .vintyper(Set.of(WineType.RED, WineType.WHITE))
+                    .länder(Set.of("Italien"))
+                    .build());
+        }
+
+        @Test
+        @DisplayName("ska förhandskryssa redan valda filter vid sidladdning")
+        void skaFörhandskryssaRedanValdaFilter() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/")
+                            .with(httpBasic("admin", "admin"))
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(
+                            containsString("name=\"wineType\" value=\"RED\" checked")
+                    ));
+        }
+
+        @Test
+        @DisplayName("ska visa antal träffar av totalt antal viner")
+        void skaVisaAntalTräffar() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+            when(wineService.listWines()).thenReturn(List.of(BAROLO, BAROLO.toBuilder().name("Chablis").build()));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Visar"),
+                            containsString(">1<"),
+                            containsString(">2<")
                     )));
         }
     }

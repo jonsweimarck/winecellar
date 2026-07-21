@@ -107,6 +107,34 @@ flaggade som gällande.
   bokstavsvis (`"10..."` < `"9..."` alfabetiskt, eftersom `'1'` har lägre
   teckenkod än `'9'`), så scenariot hade avslöjat en naiv
   strängjämförelse lika väl som det avslöjar en ordinal-utan-reversed-bugg.
+- **Filtrering (byggd 2026-07-21) lade till `Sökkriterier`
+  (Builder-baserad record) och ersatte `WineService.sök(Sorteringsfält,
+  SorteringsRiktning)` med `sök(Sökkriterier)`.** Facetterna (vintyper,
+  länder, regioner, underregioner) kombineras med OCH sinsemellan, ELLER
+  inom en facett (tomt set = ingen begränsning för den facetten) - se
+  `Sökkriterier`s klassdoc. Land/region/underregion-trädet för
+  filterpanelens kryssrutor (`HärkomstNod`, `WineService.härkomstträd()`)
+  härleds fräscht från samtliga viner vid varje anrop, **alltid
+  obegränsat av aktivt filter** (statiska facetter, godkänt val i
+  mockupomgången) - ingen uppslagstabell, matchar samma "fri text,
+  normalisera inte i onödan"-linje som `location`/`grapes`. Ingen
+  hierarki-medveten filterlogik behövs trots att kryssrutorna visas
+  nästlat i UI:t - varje facett (land/region/underregion) filtrerar
+  fullständigt oberoende av de andra, eftersom ett underregionsvärde i
+  praktiken redan bara förekommer på viner från "rätt" land/region.
+- **`<p class="traffrad">` ("Visar X av Y viner") måste ligga innanför
+  `#vinlista`-fragmentgränsen, inte ovanför den - annars uppdateras inte
+  träffantalet vid en htmx-driven filtrering/sortering.** Upptäcktes
+  genom att faktiskt granska en Playwright-skärmdump av ett filtrerat
+  resultat (2 av 4 kort visades, men texten sa fortfarande "Visar 4 av
+  4") innan push - `WineControllerTest`s `skaVisaAntalTräffar` hade
+  **inte** fångat buggen, eftersom den bara kollar att texten finns
+  någonstans i svaret (`containsString`), inte var i DOM-trädet relativt
+  fragmentgränsen. Allmän lärdom: ett `@WebMvcTest` som bara gör
+  textmatchning mot hela svarskroppen kan missa den här sortens
+  "rätt innehåll, fel del av sidan"-bugg - bara en verklig
+  htmx-rundtur (eller ett test som specifikt kollar fragmentets
+  avgränsning) avslöjar den.
 - **`location`** (var flaskan förvaras) är **inte** en enum, till skillnad
   från ovanstående - det är fritext eftersom lådor/förvaringsplatser
   förväntas läggas till över tid.
@@ -655,6 +683,25 @@ dubbletter.
   brottas med Cucumber Expression-syntaxen. Värt att komma ihåg för
   framtida steg med den här sortens "antingen X eller Y"-text i själva
   Gherkin-meningen.
+- **Två stegklasser som delar samma Gherkin-steg (t.ex. samma "Givet
+  att källaren innehåller följande viner:") måste vara EN klass, inte
+  två - annars pratar de med olika `WineService`-instanser inom samma
+  scenario.** Cucumber-JVM skapar (utan en DI-container inkopplad, vilket
+  det här projektet inte har) en ny instans av VARJE stegklass per
+  scenario, och kör ALLA `@Before`-hooks från ALLA klasser vars steg
+  förekommer i scenariot - om `SteKlassA` och `SteKlassB` båda har sin
+  egen `@Before` som gör `wineService = new WineService(new
+  InMemoryWineRepository())`, blir det två separata repository-instanser
+  även inom samma scenario. Ett vin sparat via ett `Givet`-steg i
+  `SteKlassA` skulle då vara osynligt för ett `När`-steg i `SteKlassB`.
+  Löst genom att lägga sorterings- och filtreringsstegen i en och samma
+  klass (`SökOchFilterSteps`, se sammanslagningen 2026-07-21 av det som
+  tidigare hette `SorteraVinerSteps`) istället för en klass per
+  `.feature`-fil (mönstret `ListaVinerSteps`/`RedigeraVinSteps`/... följer
+  annars). Alternativet (konstruktorinjicerad delad "world"-klass, som
+  Cucumber-JVM:s inbyggda PicoContainer löser automatiskt) hade också
+  fungerat men introducerar ett helt nytt mönster i testkoden - inte värt
+  det för två så nära besläktade stegklasser.
 - `junit-platform-suite-engine` måste vara ett explicit beroende, inte bara
   `junit-platform-suite`.
 - **Mockito + nya JDK-versioner**: lås `mockito.version` och

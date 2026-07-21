@@ -1,7 +1,9 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.HärkomstNod;
 import com.example.winecellar.application.SorteringsRiktning;
 import com.example.winecellar.application.Sorteringsfält;
+import com.example.winecellar.application.Sökkriterier;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
@@ -26,6 +28,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Controller
 public class WineController {
@@ -40,14 +45,42 @@ public class WineController {
     public String vinkällare(
             @RequestParam(required = false, defaultValue = "NAMN") Sorteringsfält sortera,
             @RequestParam(required = false, defaultValue = "STIGANDE") SorteringsRiktning riktning,
+            @RequestParam(required = false) Set<String> wineType,
+            @RequestParam(required = false) Set<String> country,
+            @RequestParam(required = false) Set<String> region,
+            @RequestParam(required = false) Set<String> subregion,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model, Authentication authentication) {
-        model.addAttribute("viner", wineService.sök(sortera, riktning));
+        Set<String> valdaVintyper = tomOmNull(wineType);
+        Set<String> valdaLänder = tomOmNull(country);
+        Set<String> valdaRegioner = tomOmNull(region);
+        Set<String> valdaUnderregioner = tomOmNull(subregion);
+
+        Sökkriterier kriterier = Sökkriterier.builder()
+                .sortering(sortera).riktning(riktning)
+                .vintyper(valdaVintyper.stream().map(WineType::valueOf).collect(Collectors.toSet()))
+                .länder(valdaLänder)
+                .regioner(valdaRegioner)
+                .underregioner(valdaUnderregioner)
+                .build();
+        List<Wine> resultat = wineService.sök(kriterier);
+
+        model.addAttribute("viner", resultat);
+        model.addAttribute("antalTotalt", wineService.listWines().size());
         model.addAttribute("sorteringsfält", Sorteringsfält.values());
         model.addAttribute("sortera", sortera);
         model.addAttribute("riktning", riktning);
+        model.addAttribute("valdaVintyper", valdaVintyper);
+        model.addAttribute("härkomstträd", wineService.härkomstträd());
+        model.addAttribute("valdaLänder", valdaLänder);
+        model.addAttribute("valdaRegioner", valdaRegioner);
+        model.addAttribute("valdaUnderregioner", valdaUnderregioner);
         model.addAttribute("kanRedigera", harRollAdmin(authentication));
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
+    }
+
+    private static Set<String> tomOmNull(Set<String> värde) {
+        return värde == null ? Set.of() : värde;
     }
 
     @GetMapping("/wines/nytt")

@@ -17,6 +17,31 @@
         .falt-grupp label { margin: 0; font-size: 0.85rem; color: #767676; }
         .falt-grupp select { width: auto; padding: 0.4rem 0.5rem; }
 
+        .filterpanel { margin-top: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; }
+        .filterpanel > summary { cursor: pointer; padding: 0.75rem 1rem; font-weight: bold; list-style: none; }
+        .filterpanel > summary::-webkit-details-marker { display: none; }
+        .filterpanel > summary::before { content: "▸ "; }
+        .filterpanel[open] > summary::before { content: "▾ "; }
+        .antal-badge { background: #333; color: #fff; font-size: 0.75rem; border-radius: 1rem; padding: 0.1rem 0.5rem; margin-left: 0.3rem; }
+
+        .filterinnehall { padding: 0 1rem 1rem; display: flex; gap: 2.5rem; flex-wrap: wrap; }
+        .filterinnehall fieldset { border: none; padding: 0; margin: 0; min-width: 10rem; }
+        .filterinnehall legend { font-weight: bold; font-size: 0.85rem; padding: 0 0 0.5rem; }
+        .kryssrad { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.3rem; font-weight: normal; cursor: pointer; }
+        .kryssrad input { width: auto; margin: 0; }
+
+        .ursprung-tree, .ursprung-tree ul { list-style: none; margin: 0; padding: 0; }
+        .ursprung-tree ul { padding-left: 1.25rem; margin-top: 0.3rem; margin-left: 0.4rem; border-left: 1px dashed #ddd; }
+        .ursprung-tree details { margin-top: 0.2rem; }
+        .ursprung-tree details > summary { cursor: pointer; font-size: 0.8rem; color: #767676; list-style: none; }
+        .ursprung-tree details > summary::-webkit-details-marker { display: none; }
+        .ursprung-tree details > summary::before { content: "▸ "; }
+        .ursprung-tree details[open] > summary::before { content: "▾ "; }
+
+        .filter-atgarder { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid #eee; }
+
+        .traffrad { color: #767676; font-size: 0.9rem; margin: 0.75rem 0.1rem 0; }
+
         /* Breda kort på desktop, smala kort på mobil - #vinlista-tabell
            heter fortfarande "tabell" av historiska skäl (det var en
            riktig HTML-tabell innan tabellvyns designomgång 2026-07-19),
@@ -216,23 +241,80 @@
 
     <a class="knapp" th:if="${kanRedigera}" href="/wines/nytt">Lägg till vin</a>
 
-    <form class="verktygsrad" hx-get="/" hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
-        <div class="falt-grupp">
-            <label for="sortera">Sortera efter</label>
-            <select id="sortera" name="sortera">
-                <option th:each="falt : ${sorteringsfält}"
-                        th:value="${falt.name()}"
-                        th:text="${falt.etikett()}"
-                        th:selected="${falt == sortera}"></option>
-            </select>
+    <form hx-get="/" hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
+        <div class="verktygsrad">
+            <div class="falt-grupp">
+                <label for="sortera">Sortera efter</label>
+                <select id="sortera" name="sortera">
+                    <option th:each="falt : ${sorteringsfält}"
+                            th:value="${falt.name()}"
+                            th:text="${falt.etikett()}"
+                            th:selected="${falt == sortera}"></option>
+                </select>
+            </div>
+            <div class="falt-grupp">
+                <label for="riktning">Riktning</label>
+                <select id="riktning" name="riktning">
+                    <option value="STIGANDE" th:selected="${riktning.name() == 'STIGANDE'}">Stigande</option>
+                    <option value="FALLANDE" th:selected="${riktning.name() == 'FALLANDE'}">Fallande</option>
+                </select>
+            </div>
         </div>
-        <div class="falt-grupp">
-            <label for="riktning">Riktning</label>
-            <select id="riktning" name="riktning">
-                <option value="STIGANDE" th:selected="${riktning.name() == 'STIGANDE'}">Stigande</option>
-                <option value="FALLANDE" th:selected="${riktning.name() == 'FALLANDE'}">Fallande</option>
-            </select>
-        </div>
+
+        <details class="filterpanel">
+            <summary>Filter <span class="antal-badge"
+                                   th:if="${valdaVintyper.size() + valdaLänder.size() + valdaRegioner.size() + valdaUnderregioner.size() > 0}"
+                                   th:text="${valdaVintyper.size() + valdaLänder.size() + valdaRegioner.size() + valdaUnderregioner.size()}"></span></summary>
+            <div class="filterinnehall">
+                <fieldset>
+                    <legend>Vintyp</legend>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="RED" th:checked="${valdaVintyper.contains('RED')}"> Rött</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="WHITE" th:checked="${valdaVintyper.contains('WHITE')}"> Vitt</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="ROSE" th:checked="${valdaVintyper.contains('ROSE')}"> Rosé</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="SPARKLING" th:checked="${valdaVintyper.contains('SPARKLING')}"> Mousserande</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="FORTIFIED" th:checked="${valdaVintyper.contains('FORTIFIED')}"> Starkvin</label>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Ursprung</legend>
+                    <ul class="ursprung-tree">
+                        <li th:each="land : ${härkomstträd}">
+                            <label class="kryssrad">
+                                <input type="checkbox" name="country" th:value="${land.namn()}" th:checked="${valdaLänder.contains(land.namn())}">
+                                <span th:text="${land.namn()}"></span>
+                            </label>
+                            <details th:if="${!land.barn().isEmpty()}">
+                                <summary>Regioner</summary>
+                                <ul>
+                                    <li th:each="region : ${land.barn()}">
+                                        <label class="kryssrad">
+                                            <input type="checkbox" name="region" th:value="${region.namn()}" th:checked="${valdaRegioner.contains(region.namn())}">
+                                            <span th:text="${region.namn()}"></span>
+                                        </label>
+                                        <details th:if="${!region.barn().isEmpty()}">
+                                            <summary>Underregioner</summary>
+                                            <ul>
+                                                <li th:each="underregion : ${region.barn()}">
+                                                    <label class="kryssrad">
+                                                        <input type="checkbox" name="subregion" th:value="${underregion.namn()}" th:checked="${valdaUnderregioner.contains(underregion.namn())}">
+                                                        <span th:text="${underregion.namn()}"></span>
+                                                    </label>
+                                                </li>
+                                            </ul>
+                                        </details>
+                                    </li>
+                                </ul>
+                            </details>
+                        </li>
+                    </ul>
+                </fieldset>
+
+                <div class="filter-atgarder">
+                    <a href="/">Rensa filter</a>
+                    <button type="submit">Använd filter</button>
+                </div>
+            </div>
+        </details>
     </form>
 
     <th:block th:fragment="detaljfalt(vin)" th:if="${vin != null}">
@@ -263,6 +345,8 @@
     </th:block>
 
     <div id="vinlista" th:fragment="lista">
+        <p class="traffrad">Visar <strong th:text="${viner.size()}"></strong> av <span th:text="${antalTotalt}"></span> viner</p>
+
         <div id="vinlista-tabell" class="vinlista-tabell">
             <div class="vinkort-bred" th:each="vin : ${viner}">
                 <span class="flaskor-badge" th:text="${vin.quantity}" title="Antal flaskor"></span>

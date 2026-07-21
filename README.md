@@ -650,26 +650,58 @@ byggs ovanpå det.
 är en enum med en konstant per sorterbart fält (Namn, Producent, Land,
 Årgång, Antal flaskor, Pris, Inköpsdatum, Eget betyg, Munskänkarnas
 betyg, Vivino-betyg), där varje konstant själv vet hur man jämför två
-`Wine` i given riktning (`comparator(SorteringsRiktning)`). `WineService.
-sök(Sorteringsfält, SorteringsRiktning)` är den nya orkestrerande
-metoden - se CLAUDE.md för varför den ligger i `WineService` och inte i
-`WineController`. `WineController.vinkällare` (`GET /`) tar emot
-`sortera`/`riktning` som queryparametrar (bundna direkt till enumerna,
-samma mönster som `WineType` redan binds i formulären), med Namn/Stigande
-som standard om inget valts.
+`Wine` i given riktning (`comparator(SorteringsRiktning)`).
 
 Sorteringskontrollerna (två `<select>`, ett för fält och ett för
-riktning) ligger i en `<form class="verktygsrad">` ovanför listan,
-skickar `hx-get="/" hx-target="#vinlista" hx-swap="outerHTML"
-hx-trigger="change" hx-push-url="true"` - samma
-target/swap-mönster som "Ta bort" redan använder. `GET /` grenar därför
-på `HX-Request`-headern: en htmx-förfrågan får bara `vinkallare ::
-lista`-fragmentet tillbaka (verktygsraden ligger utanför fragmentet och
-rör-inte-vid:s alltså inte av swappen), en vanlig sidladdning får hela
-sidan. `hx-push-url="true"` gör att den valda sorteringen hamnar i
-webbläsarens adressfält (`?sortera=EGET_BETYG&riktning=FALLANDE`) -
-bokmärkbart/delbart, och rätt alternativ är förvalt (`th:selected`) om
-sidan laddas direkt med de queryparametrarna.
+riktning) ligger i en `<form>` ovanför listan, skickar `hx-get="/"
+hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change"
+hx-push-url="true"` - samma target/swap-mönster som "Ta bort" redan
+använder. `GET /` grenar därför på `HX-Request`-headern: en
+htmx-förfrågan får bara `vinkallare :: lista`-fragmentet tillbaka
+(verktygsraden och filterpanelen ligger utanför fragmentet och rörs
+alltså inte av swappen), en vanlig sidladdning får hela sidan.
+`hx-push-url="true"` gör att den valda sorteringen/filtreringen hamnar i
+webbläsarens adressfält (`?sortera=EGET_BETYG&riktning=FALLANDE&
+wineType=RED`) - bokmärkbart/delbart, och rätt alternativ är förvalt
+(`th:selected`/`th:checked`) om sidan laddas direkt med de
+queryparametrarna.
+
+**Filtrering (byggd 2026-07-21).** Vintyp (5 fasta kryssrutor) och
+ursprung (land→region→underregion, nästlade kryssrutor - Alternativ A
+från mockupen, statiska facetter) i en hopfällbar `<details
+class="filterpanel">` under sorteringskontrollerna. Land/region/
+underregion är fri text på `Wine` (ingen uppslagstabell, se
+Datamodell), så trädet för kryssrutorna härleds fräscht vid varje
+anrop av `WineService.härkomstträd()` från **samtliga** viner (statiska
+facetter - oavsett aktivt filter), inte lagrat. `HärkomstNod(namn,
+barn)` är samma rekursiva form på alla tre nivåer (en underregion är
+bara en nod utan barn); mallen renderar trädet med två nästlade
+`th:each` (inte en generisk rekursiv fragment - djupet är fast på tre
+nivåer, en rekursiv lösning hade varit onödig generalitet).
+
+Facetterna kombineras med OCH (vintyp OCH land OCH region OCH
+underregion måste alla matcha, om satta), inom en facett är flera
+valda värden ELLER (t.ex. Rött eller Vitt). Ingen explicit
+hierarki-logik behövs för land/region/underregion trots att de visas
+nästlat - varje facett filtrerar oberoende av de andra, och en kryssad
+underregion (t.ex. "Rías Baixas") råkar redan bara matcha viner från
+rätt land eftersom det är vad datan faktiskt innehåller.
+`WineService.sök(Sökkriterier)` ersatte den tvåparametrar-varianten
+(`sortering, riktning`) från sorteringsomgången - `Sökkriterier` är en
+`Builder`-baserad record (samma mönster som `Wine.Builder`, motiverat
+av samma skäl: för många fält för en positionell konstruktor så fort
+filter+sortering kombineras) med defaultvärden (inga filter, Namn
+stigande) så anropsplatser bara sätter det de faktiskt bryr sig om.
+
+En `<p class="traffrad">` ("Visar X av Y viner") ligger **inuti**
+`#vinlista`-fragmentet, inte ovanför det som ett första försök gjorde -
+annars uppdaterades inte träffantalet vid en htmx-filtrering (bara
+kortlistan bytte ut sig, texten blev kvar med det gamla antalet).
+Upptäckt via en Playwright-skärmdump av ett filtrerat resultat innan
+push, inte av något automatiskt test - `WineControllerTest`s
+`skaVisaAntalTräffar` verifierar bara att texten *finns* i svaret, inte
+var i DOM-trädet den ligger relativt fragmentgränsen, så den hade inte
+fångat buggen.
 
 ## Nästa steg
 
@@ -708,6 +740,8 @@ sidan laddas direkt med de queryparametrarna.
       `WineListResponsiveIT`
 - [x] Sortering av vinlistan (`Sorteringsfält`, `WineService.sök`) - se
       "Filtrering, sökning och sortering" ovan
-- [ ] Filtrering av vinlistan på vintyp/land/region/underregion
+- [x] Filtrering av vinlistan på vintyp/land/region/underregion
+      (`HärkomstNod`, `Sökkriterier`) - se "Filtrering, sökning och
+      sortering" ovan
 - [ ] Fritextsökning över namn/producent/tasting notes/Systembolagets
       beskrivning/Munskänkarnas bedömning
