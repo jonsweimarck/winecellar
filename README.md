@@ -843,12 +843,20 @@ nya ovillkorliga modellattributsreferenser (`antalTotalt`, `chips`) -
 eftersom `th:text` på ett null-värde bara ger tom text) men kraschade
 med en `SpelEvaluationException` när `chips.isEmpty()` anropades på
 `null`. Fixat genom att sätta båda (tomt `chips`, `antalTotalt` lika
-med antalet kvarvarande viner) i `taBortVin` också. **Känd kvarstående
-begränsning, inte löst:** "Ta bort" återställer alltid till den
-ofiltrerade/osorterade standardvyn efteråt, eftersom borttagningsknapparna
-ligger utanför verktygsradens `<form>` och inte skickar med aktivt
-sök-/filter-/sorteringstillstånd - en borttagning medan ett filter är
-aktivt tappar alltså filtreringen. Se CLAUDE.md.
+med antalet kvarvarande viner) i `taBortVin` också.
+
+**"Ta bort" behåller nu aktivt filter/sökning/sortering (fixat
+2026-07-22).** Tidigare återställdes vyn alltid till standardläget
+efter en borttagning, eftersom borttagningsknapparna ligger utanför
+verktygsradens `<form>` och inte skickade med något sök-/filter-/
+sorteringstillstånd. Löst genom att dela orkestreringslogiken
+(`WineController.fyllIVinlistaModell(...)`) mellan `GET /` och
+`DELETE /wines/{id}`, och genom att bygga varje "Ta bort"-knapps
+`hx-delete`-URL med samma sju queryparametrar som verktygsraden -
+Thymeleafs `@{...}`-länkuttryck expanderar `Set`-värden (vintyp,
+land, region, underregion) till upprepade queryparametrar automatiskt,
+så knappen behöver inte läsa av formuläret vid klicktillfället. Se
+CLAUDE.md.
 
 ## Nästa steg
 

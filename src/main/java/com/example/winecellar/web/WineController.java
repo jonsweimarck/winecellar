@@ -56,6 +56,21 @@ public class WineController {
             @RequestParam(required = false) Set<String> subregion,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model, Authentication authentication) {
+        fyllIVinlistaModell(model, sok, sortera, riktning, wineType, country, region, subregion, authentication);
+        return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
+    }
+
+    /**
+     * Delas av GET / och DELETE /wines/{id} - båda renderar samma
+     * #vinlista-fragment utifrån samma sök-/filter-/sorteringstillstånd.
+     * "Ta bort" skickade tidigare inget om aktivt tillstånd alls (fixat
+     * 2026-07-22, se CLAUDE.md) - borttagningsknapparna postar nu med
+     * exakt samma queryparametrar som verktygsraden, se vinkallare.html.
+     */
+    private void fyllIVinlistaModell(
+            Model model, String sok, Sorteringsfält sortera, SorteringsRiktning riktning,
+            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion,
+            Authentication authentication) {
         Set<String> valdaVintyper = tomOmNull(wineType);
         Set<String> valdaLänder = tomOmNull(country);
         Set<String> valdaRegioner = tomOmNull(region);
@@ -89,7 +104,6 @@ public class WineController {
         model.addAttribute("expanderadeRegioner", expanderade.regioner());
         model.addAttribute("chips", byggChips(sökvy));
         model.addAttribute("kanRedigera", harRollAdmin(authentication));
-        return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
 
     private static Set<String> tomOmNull(Set<String> värde) {
@@ -252,25 +266,26 @@ public class WineController {
     }
 
     /**
-     * Visar alltid den ofiltrerade/osorterade listan efter borttagning
-     * (oförändrat beteende sedan innan filter/sortering fanns) - "Ta
-     * bort" skickar inget om aktivt filter/sökning/sortering (knapparna
-     * ligger utanför verktygsradens <form>), så en eventuell aktiv vy
-     * återställs till standardläget efter en borttagning. Känd
-     * begränsning, inte löst nu - se CLAUDE.md.
-     * `antalTotalt`/`chips` måste ändå sättas (tomma/lika med antalet
-     * viner) eftersom #vinlista-fragmentet numera refererar till dem
-     * ovillkorligt - annars kraschar renderingen med en
-     * SpelEvaluationException (upptäckt av ett test, inte manuellt).
+     * Behåller aktivt filter/sökning/sortering efter en borttagning
+     * (fixat 2026-07-22 - tidigare återställdes vyn alltid till
+     * standardläget, se CLAUDE.md). Borttagningsknapparna postar nu med
+     * samma queryparametrar som verktygsraden (se vinkallare.html:s
+     * hx-delete), så samma @RequestParam-uppsättning som GET / tas emot
+     * här också.
      */
     @DeleteMapping("/wines/{id}")
-    public String taBortVin(@PathVariable Long id, Model model, Authentication authentication) {
+    public String taBortVin(
+            @PathVariable Long id,
+            @RequestParam(required = false) String sok,
+            @RequestParam(required = false, defaultValue = "NAMN") Sorteringsfält sortera,
+            @RequestParam(required = false, defaultValue = "STIGANDE") SorteringsRiktning riktning,
+            @RequestParam(required = false) Set<String> wineType,
+            @RequestParam(required = false) Set<String> country,
+            @RequestParam(required = false) Set<String> region,
+            @RequestParam(required = false) Set<String> subregion,
+            Model model, Authentication authentication) {
         wineService.removeWine(new WineId(id));
-        List<Wine> viner = wineService.listWines();
-        model.addAttribute("viner", viner);
-        model.addAttribute("antalTotalt", viner.size());
-        model.addAttribute("chips", List.of());
-        model.addAttribute("kanRedigera", harRollAdmin(authentication));
+        fyllIVinlistaModell(model, sok, sortera, riktning, wineType, country, region, subregion, authentication);
         return "vinkallare :: lista";
     }
 

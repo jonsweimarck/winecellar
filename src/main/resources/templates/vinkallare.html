@@ -441,7 +441,7 @@
                 <div class="detalj-atgarder" th:if="${kanRedigera}">
                     <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                     <button type="button"
-                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, sok=${sok}, sortera=${sortera}, riktning=${riktning}, wineType=${valdaVintyper}, country=${valdaLänder}, region=${valdaRegioner}, subregion=${valdaUnderregioner})}"
                             hx-target="#vinlista" hx-swap="outerHTML">
                         Ta bort
                     </button>
@@ -484,7 +484,7 @@
                     <div class="detalj-atgarder" th:if="${kanRedigera}">
                         <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                         <button type="button"
-                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value})}"
+                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, sok=${sok}, sortera=${sortera}, riktning=${riktning}, wineType=${valdaVintyper}, country=${valdaLänder}, region=${valdaRegioner}, subregion=${valdaUnderregioner})}"
                                 hx-target="#vinlista" hx-swap="outerHTML">
                             Ta bort
                         </button>

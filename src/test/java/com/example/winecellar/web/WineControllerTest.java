@@ -683,6 +683,31 @@ class WineControllerTest {
                     .contains("country=Italien")
                     .contains("sok=barolo");
         }
+
+        @Test
+        @DisplayName("\"Ta bort\"-länken ska skicka med aktivt filter, sökning och sortering")
+        void skaSkickaMedAktivtTillståndITaBortLänken() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+
+            String html = mockMvc.perform(get("/")
+                            .with(httpBasic("admin", "admin"))
+                            .param("sok", "barolo")
+                            .param("wineType", "RED")
+                            .param("sortera", "ARGANG")
+                            .param("riktning", "FALLANDE"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            java.util.regex.Matcher taBortLänk = java.util.regex.Pattern
+                    .compile("hx-delete=\"([^\"]+)\"")
+                    .matcher(html);
+            assertThat(taBortLänk.find()).isTrue();
+            String hxDelete = taBortLänk.group(1);
+            assertThat(hxDelete).contains("sok=barolo")
+                    .contains("wineType=RED")
+                    .contains("sortera=ARGANG")
+                    .contains("riktning=FALLANDE");
+        }
     }
 
     @Nested
@@ -769,6 +794,27 @@ class WineControllerTest {
                     .andExpect(status().isOk());
 
             verify(wineService).removeWine(new WineId(1L));
+        }
+
+        @Test
+        @DisplayName("ska behålla aktivt filter, sökning och sortering efter en borttagning")
+        void skaBehållaAktivtFilterEfterBorttagning() throws Exception {
+            when(wineService.listWines()).thenReturn(List.of());
+            when(wineService.sök(any())).thenReturn(List.of());
+
+            mockMvc.perform(delete("/wines/1")
+                            .with(httpBasic("admin", "admin"))
+                            .param("sok", "barolo")
+                            .param("wineType", "RED")
+                            .param("sortera", "ARGANG")
+                            .param("riktning", "FALLANDE"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).sök(Sökkriterier.builder()
+                    .sökterm("barolo")
+                    .sortering(Sorteringsfält.ARGANG).riktning(SorteringsRiktning.FALLANDE)
+                    .vintyper(Set.of(WineType.RED))
+                    .build());
         }
     }
 

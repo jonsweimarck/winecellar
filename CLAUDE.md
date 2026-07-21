@@ -222,14 +222,27 @@ flaggade som gällande.
   `chips.isEmpty()` anropat på `null` gav en `SpelEvaluationException`
   och kraschade hela borttagningen. Fixat genom att sätta båda i
   `taBortVin` också (`chips` tom lista, `antalTotalt` = antalet
-  kvarvarande viner). **Kvarstående, medvetet olöst begränsning:** en
-  borttagning återställer alltid till standardvyn (ofiltrerad,
-  osorterad) efteråt - "Ta bort"-knapparna ligger utanför
-  verktygsradens `<form>` och skickar inget om aktivt filter/sökning/
-  sortering. Om det visar sig irritera i praktiken är fixen att lägga
-  till samma `@RequestParam`-uppsättning på `taBortVin` som `vinkällare`
-  har, plus att koppla `hx-include` (eller motsvarande) på
-  "Ta bort"-knapparna så de skickar med formulärets aktuella värden.
+  kvarvarande viner).
+  **Begränsningen (borttagning återställde till standardvyn) fixad
+  2026-07-22, på användarens begäran.** `WineController.
+  fyllIVinlistaModell(...)` (samma `@RequestParam`-uppsättning som
+  `vinkällare`, samma sök-/filter-/sorteringspipeline) delas nu av
+  både `GET /` och `DELETE /wines/{id}`, så `taBortVin` gick från att
+  bara anropa `wineService.listWines()` till att anropa
+  `wineService.sök(kriterier)` precis som `vinkällare`. Löst utan
+  `hx-include`: "Ta bort"-knapparnas `hx-delete`-URL byggs nu med
+  `@{...}`-länkuttrycket och alla sju queryparametrarna
+  (`sok`/`sortera`/`riktning`/`wineType`/`country`/`region`/
+  `subregion`) direkt i `vinkallare.html`, istället för att förlita sig
+  på att läsa in värden från formuläret vid klicktillfället - enklare
+  och fungerar oavsett var knappen ligger i DOM:et relativt formuläret.
+  Thymeleafs `@{...}` expanderar `Set`-värden till upprepade
+  queryparametrar automatiskt (`wineType=RED&wineType=WHITE`), samma
+  mekanism som redan användes för `GET /`. Verifierat med Playwright
+  mot en riktig körande app: ta bort ett rött vin medan "Rött"-filtret
+  är aktivt lämnar filtret aktivt och det kvarvarande röda vinet synligt
+  efteråt, det borttagna vinet försvinner, ett vitt vin förblir
+  exkluderat.
 - **`location`** (var flaskan förvaras) är **inte** en enum, till skillnad
   från ovanstående - det är fritext eftersom lådor/förvaringsplatser
   förväntas läggas till över tid.
