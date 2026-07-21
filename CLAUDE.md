@@ -135,6 +135,24 @@ flaggade som gällande.
   "rätt innehåll, fel del av sidan"-bugg - bara en verklig
   htmx-rundtur (eller ett test som specifikt kollar fragmentets
   avgränsning) avslöjar den.
+- **Filterpanelens träd fälls nu ut automatiskt runt redan valda
+  filter, och "Använd filter" döptes om till "Dölj filter" (fixat
+  2026-07-21, båda felen rapporterade av användaren mot produktionen).**
+  Grundorsaken till båda: `<form hx-trigger="change">` gör att en
+  `<button type="submit">` i formuläret **inte** går via htmx alls -
+  htmx lyssnar bara på "change" på det formuläret, så en
+  knapptryckning utlöste en riktig sidladdning, vilken i sin tur
+  fällde ihop alla `<details>`-noder i land/region/underregion-trädet
+  (även de som täckte ett redan valt filter). `WineController.
+  beräknaExpanderadeNoder(...)` löser det ena (räknar ut
+  `expanderadeLänder`/`expanderadeRegioner`, mallen sätter `th:open`
+  utifrån dem). Knappen fick dessutom `onclick="event.preventDefault();
+  this.closest('details').removeAttribute('open')"` - projektets enda
+  bit egenskriven JS utöver htmx, eftersom det inte finns något rent
+  HTML/CSS-sätt att stänga ett `<details>`-element. Utan JS faller
+  knappen tillbaka till en riktig submit (ofarligt tack vare
+  `th:open`-fixen ovan) - motiverat eftersom kryssrutornas
+  auto-tillämpning också kräver JS för att fungera alls.
 - **`location`** (var flaskan förvaras) är **inte** en enum, till skillnad
   från ovanstående - det är fritext eftersom lådor/förvaringsplatser
   förväntas läggas till över tid.

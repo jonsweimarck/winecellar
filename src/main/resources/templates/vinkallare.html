@@ -283,7 +283,7 @@
                                 <input type="checkbox" name="country" th:value="${land.namn()}" th:checked="${valdaLänder.contains(land.namn())}">
                                 <span th:text="${land.namn()}"></span>
                             </label>
-                            <details th:if="${!land.barn().isEmpty()}">
+                            <details th:if="${!land.barn().isEmpty()}" th:open="${expanderadeLänder.contains(land.namn())}">
                                 <summary>Regioner</summary>
                                 <ul>
                                     <li th:each="region : ${land.barn()}">
@@ -291,7 +291,7 @@
                                             <input type="checkbox" name="region" th:value="${region.namn()}" th:checked="${valdaRegioner.contains(region.namn())}">
                                             <span th:text="${region.namn()}"></span>
                                         </label>
-                                        <details th:if="${!region.barn().isEmpty()}">
+                                        <details th:if="${!region.barn().isEmpty()}" th:open="${expanderadeRegioner.contains(region.namn())}">
                                             <summary>Underregioner</summary>
                                             <ul>
                                                 <li th:each="underregion : ${region.barn()}">
@@ -311,7 +311,7 @@
 
                 <div class="filter-atgarder">
                     <a href="/">Rensa filter</a>
-                    <button type="submit">Använd filter</button>
+                    <button type="submit" onclick="event.preventDefault(); this.closest('details').removeAttribute('open')">Dölj filter</button>
                 </div>
             </div>
         </details>

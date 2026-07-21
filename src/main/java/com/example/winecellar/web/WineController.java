@@ -28,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -64,6 +65,8 @@ public class WineController {
                 .underregioner(valdaUnderregioner)
                 .build();
         List<Wine> resultat = wineService.sök(kriterier);
+        List<HärkomstNod> härkomstträd = wineService.härkomstträd();
+        ExpanderadeNoder expanderade = beräknaExpanderadeNoder(härkomstträd, valdaRegioner, valdaUnderregioner);
 
         model.addAttribute("viner", resultat);
         model.addAttribute("antalTotalt", wineService.listWines().size());
@@ -71,16 +74,53 @@ public class WineController {
         model.addAttribute("sortera", sortera);
         model.addAttribute("riktning", riktning);
         model.addAttribute("valdaVintyper", valdaVintyper);
-        model.addAttribute("härkomstträd", wineService.härkomstträd());
+        model.addAttribute("härkomstträd", härkomstträd);
         model.addAttribute("valdaLänder", valdaLänder);
         model.addAttribute("valdaRegioner", valdaRegioner);
         model.addAttribute("valdaUnderregioner", valdaUnderregioner);
+        model.addAttribute("expanderadeLänder", expanderade.länder());
+        model.addAttribute("expanderadeRegioner", expanderade.regioner());
         model.addAttribute("kanRedigera", harRollAdmin(authentication));
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
 
     private static Set<String> tomOmNull(Set<String> värde) {
         return värde == null ? Set.of() : värde;
+    }
+
+    /**
+     * Vilka land-/regionnivåer i filterträdet som ska visas uppfällda vid
+     * rendering - ett land fälls upp om någon av dess regioner (eller
+     * någon underregion i någon av dess regioner) är vald, en region
+     * fälls upp om någon av dess underregioner är vald. Annars är valda
+     * region-/underregionsfilter osynliga bakom en hopfälld gren nästa
+     * gång filterpanelen öppnas (upptäckt av användaren mot produktionen
+     * 2026-07-21).
+     */
+    private static ExpanderadeNoder beräknaExpanderadeNoder(
+            List<HärkomstNod> träd, Set<String> valdaRegioner, Set<String> valdaUnderregioner) {
+        Set<String> länder = new HashSet<>();
+        Set<String> regioner = new HashSet<>();
+        for (HärkomstNod land : träd) {
+            boolean landHarValtBarn = false;
+            for (HärkomstNod region : land.barn()) {
+                boolean harValdUnderregion = region.barn().stream()
+                        .anyMatch(underregion -> valdaUnderregioner.contains(underregion.namn()));
+                if (harValdUnderregion) {
+                    regioner.add(region.namn());
+                }
+                if (valdaRegioner.contains(region.namn()) || harValdUnderregion) {
+                    landHarValtBarn = true;
+                }
+            }
+            if (landHarValtBarn) {
+                länder.add(land.namn());
+            }
+        }
+        return new ExpanderadeNoder(länder, regioner);
+    }
+
+    private record ExpanderadeNoder(Set<String> länder, Set<String> regioner) {
     }
 
     @GetMapping("/wines/nytt")

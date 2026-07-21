@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -486,6 +487,19 @@ class WineControllerTest {
         }
 
         @Test
+        @DisplayName("filterpanelens knapp ska heta \"Dölj filter\", inte \"Använd filter\" - checkrutorna applicerar redan filtret vid ändring")
+        void skaHaKnappenDöljFilter() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Dölj filter"),
+                            not(containsString("Använd filter"))
+                    )));
+        }
+
+        @Test
         @DisplayName("ska rendera härkomstträdet som nästlade kryssrutor för land/region/underregion")
         void skaRenderaHärkomstträdetSomNästladeKryssrutor() throws Exception {
             when(wineService.sök(any())).thenReturn(List.of(BAROLO));
@@ -504,6 +518,53 @@ class WineControllerTest {
                             containsString("name=\"region\" value=\"Piemonte\""),
                             containsString("name=\"subregion\" value=\"Langhe\"")
                     )));
+        }
+
+        @Test
+        @DisplayName("ska fälla ut land- och regionnivån automatiskt runt en vald underregion")
+        void skaFällaUtTrädetAutomatisktRuntEnValdUnderregion() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+            when(wineService.härkomstträd()).thenReturn(List.of(
+                    new HärkomstNod("Italien", List.of(
+                            new HärkomstNod("Piemonte", List.of(
+                                    new HärkomstNod("Langhe", List.of())
+                            ))
+                    )),
+                    new HärkomstNod("Frankrike", List.of(
+                            new HärkomstNod("Bourgogne", List.of())
+                    ))
+            ));
+
+            String html = mockMvc.perform(get("/")
+                            .with(httpBasic("admin", "admin"))
+                            .param("subregion", "Langhe"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            // Bara Italien- och Piemonte-nivån (som leder till den valda
+            // underregionen Langhe) ska vara uppfällda - inte Frankrike/
+            // Bourgogne, som inte har något valt under sig.
+            int uppfällda = html.split("<details open=\"open\">", -1).length - 1;
+            assertThat(uppfällda).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("ska hålla trädet hopfällt när inget filter är valt")
+        void skaHållaTrädetHopfälltUtanValtFilter() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+            when(wineService.härkomstträd()).thenReturn(List.of(
+                    new HärkomstNod("Italien", List.of(
+                            new HärkomstNod("Piemonte", List.of(
+                                    new HärkomstNod("Langhe", List.of())
+                            ))
+                    ))
+            ));
+
+            String html = mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(html).doesNotContain("<details open=\"open\">");
         }
 
         @Test

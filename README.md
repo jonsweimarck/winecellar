@@ -703,6 +703,39 @@ push, inte av något automatiskt test - `WineControllerTest`s
 var i DOM-trädet den ligger relativt fragmentgränsen, så den hade inte
 fångat buggen.
 
+**Filterpanelens träd fälls ut automatiskt runt redan valda filter, och
+knappen döljer panelen istället för att "använda" ett redan applicerat
+filter (fixat 2026-07-21, upptäckt av användaren mot produktionen).**
+Två separata problem, en gemensam orsak: den gamla `<button
+type="submit">Använd filter</button>` gjorde en riktig sidladdning
+(`hx-trigger="change"` är satt på hela formuläret, inte "submit", så en
+knapptryckning gick inte via htmx alls) - varje sådan omladdning
+återställde alla `<details>`-element i trädet till hopfällt, även de
+som täckte en redan vald region/underregion. Löst med två oberoende
+fixar:
+- `WineController.beräknaExpanderadeNoder(...)` räknar ut vilka
+  land-/regionnivåer i `härkomstträd()` som innehåller ett valt filter
+  (`expanderadeLänder`/`expanderadeRegioner`-modellattribut), och
+  mallen sätter `th:open` på respektive `<details>` utifrån det. Löser
+  problemet för varje *riktig* sidladdning (bokmärkt/delad URL,
+  webbläsarrefresh, eller knappen om JS är avstängt).
+- Knappen döptes om till "Dölj filter" och fick `onclick="event.
+  preventDefault(); this.closest('details').removeAttribute('open')"` -
+  en liten, väl avgränsad JS-rad (appen är i övrigt JS-fri förutom
+  htmx) eftersom det inte finns något rent HTML/CSS-sätt att stänga ett
+  `<details>`-element programmatiskt. `event.preventDefault()` stoppar
+  den gamla sidladdningen helt när JS är tillgängligt - kryssrutorna har
+  redan applicerat filtret live via `hx-trigger="change"`, så knappen
+  behöver inte skicka något själv. Utan JS faller den tillbaka till en
+  riktig formulärsubmit (nödvändigt eftersom kryssrutornas
+  auto-tillämpning också kräver JS/htmx för att fungera över huvud
+  taget) - vilket sidan `expanderadeLänder`/`expanderadeRegioner`-fixen
+  ovan gör ofarligt, eftersom den efterföljande sidladdningen ändå
+  fäller ut rätt grenar. `this.closest('details')` hittar den
+  omslutande `.filterpanel`, inte något av de nästlade land-/
+  region-`<details>`-elementen (de är kusiner till knappen i DOM:et,
+  inte förfäder).
+
 ## Nästa steg
 
 - [x] Skriva de första Gherkin-scenarierna tillsammans (lägg till vin, lista
