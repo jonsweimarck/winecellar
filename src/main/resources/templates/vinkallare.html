@@ -62,6 +62,17 @@
         @media (max-width: 960px) {
             .vinlista-tabell { display: none; }
             .vinlista-kort { display: block; }
+            /* Utan detta ligger verktygsraden/filterpanelen (och allt
+               annat) an mot skärmkanterna på mobil - body har annars
+               ingen horisontell padding alls (bara margin: 3rem auto,
+               som inte gör något när body redan är lika bred som
+               viewporten). Scoped till mobilbrytpunkten, inte satt
+               globalt, för att inte rubba den breda vyns noggrant
+               avstämda 70rem-bredd (se "Tabellvyns designomgång" i
+               README) - en global padding hade krympt innehållsytan
+               innanför max-width och riskerat att de fasta
+               18rem-betygskolumnerna inte längre får plats. */
+            body { padding: 0 1rem; }
         }
         .vinkort {
             position: relative;

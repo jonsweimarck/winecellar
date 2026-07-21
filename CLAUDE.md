@@ -101,6 +101,25 @@ flaggade som gällande.
     be found on null` på `${vin.id.value}` - ett riktigt sparat vin har
     alltid ett id, så testvin utan `.id(new WineId(1L))` är orealistiskt
     och inte samma sak som att testa "fält som saknas".
+- **Mobil saknade horisontell padding helt (fixat 2026-07-22, upptäckt
+  av användaren mot produktionen) - `body` ligger an mot skärmkanterna
+  utan den.** `body`s enda layoutregel var `max-width: 70rem; margin:
+  3rem auto;` - `margin: ... auto` centrerar bara när `body` är SMALARE
+  än sin förälder, vilket aldrig händer på mobil (`body` fyller alltid
+  hela viewporten där). Upptäcktes inte i den breda vyn eftersom
+  `.vinkort-bred` aldrig visas under 960px, och kortvyns egna kort redan
+  hade `border`/`padding` som gav dem ett visst visuellt "andrum" även
+  utan yttre marginal - men verktygsraden/filterpanelens fullbredds
+  `<input>`/`<select>`-fält och flaskbadgens `position: absolute; right:
+  -0.6rem` (som faktiskt klipptes bort utanför viewporten) gjorde
+  problemet tydligt. Fixat med `body { padding: 0 1rem; }`, men
+  **scopeat till `@media (max-width: 960px)`, inte satt globalt** - en
+  global padding hade krympt innehållsytan innanför den breda vynens
+  noggrant avstämda `max-width: 70rem` och riskerat att de fasta
+  18rem-betygskolumnerna inte längre får plats (se "Tabellvyns
+  designomgång" i README). Verifierat med Playwright-skärmdumpar i båda
+  breddlägena: mobil får ett litet, jämnt andrum utan att desktop-vyn
+  påverkas alls.
 - **Filtrering/sökning/sortering orkestreras i `WineService`, inte i
   `WineController`** (byggt 2026-07-21, sortering först - se README:s
   "Filtrering, sökning och sortering" för ordningen på de tre
