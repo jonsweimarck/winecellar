@@ -33,6 +33,7 @@
             </label>
             <label>Typ
                 <select name="wineType">
+                    <option value="" th:selected="${vin.wineType == null}">Ej valt</option>
                     <option value="RED" th:selected="${vin.wineType != null and vin.wineType.name() == 'RED'}">Rött</option>
                     <option value="WHITE" th:selected="${vin.wineType != null and vin.wineType.name() == 'WHITE'}">Vitt</option>
                     <option value="ROSE" th:selected="${vin.wineType != null and vin.wineType.name() == 'ROSE'}">Rosé</option>
@@ -41,10 +42,10 @@
                 </select>
             </label>
             <label>Producent
-                <input type="text" name="producer" th:value="${vin.producer}" required>
+                <input type="text" name="producer" th:value="${vin.producer}">
             </label>
             <label>Land
-                <input type="text" name="country" th:value="${vin.country}" required>
+                <input type="text" name="country" th:value="${vin.country}">
             </label>
             <label>Region
                 <input type="text" name="region" th:value="${vin.region}">
@@ -56,13 +57,13 @@
                 <input type="text" name="grapes" th:value="${vin.grapes}">
             </label>
             <label>Årgång
-                <input type="number" name="vintage" th:value="${vin.vintage == 0 ? '' : vin.vintage}" required>
+                <input type="number" name="vintage" th:value="${vin.vintage}">
             </label>
             <label>Plats
-                <input type="text" name="location" th:value="${vin.location}" required>
+                <input type="text" name="location" th:value="${vin.location}">
             </label>
             <label>Antal flaskor
-                <input type="number" name="quantity" min="0" th:value="${vin.quantity == 0 ? '' : vin.quantity}" required>
+                <input type="number" name="quantity" min="0" th:value="${vin.quantity}">
             </label>
         </fieldset>
 

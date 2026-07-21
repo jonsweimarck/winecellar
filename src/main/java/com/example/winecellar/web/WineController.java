@@ -233,16 +233,16 @@ public class WineController {
     @PostMapping("/wines")
     public String läggTillVin(
             @RequestParam String name,
-            @RequestParam WineType wineType,
-            @RequestParam String producer,
-            @RequestParam String country,
+            @RequestParam(required = false) String wineType,
+            @RequestParam(required = false) String producer,
+            @RequestParam(required = false) String country,
             @RequestParam(required = false) String region,
             @RequestParam(required = false) String subregion,
             @RequestParam(required = false) String grapes,
-            @RequestParam int vintage,
+            @RequestParam(required = false) String vintage,
             @RequestParam(required = false) String purchaseDate,
             @RequestParam(required = false) String price,
-            @RequestParam int quantity,
+            @RequestParam(required = false) String quantity,
             @RequestParam(required = false) String purchaseReason,
             @RequestParam(required = false) String tastingNotes,
             @RequestParam(required = false) String ownRating,
@@ -252,7 +252,7 @@ public class WineController {
             @RequestParam(required = false) String munskankarnaRating,
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
-            @RequestParam String location,
+            @RequestParam(required = false) String location,
             @RequestParam(value = "bild", required = false) MultipartFile bild
     ) throws IOException {
         Wine.Builder vin = tillämpaFormulärfält(Wine.builder(),
@@ -313,16 +313,16 @@ public class WineController {
     public String sparaRedigering(
             @PathVariable Long id,
             @RequestParam String name,
-            @RequestParam WineType wineType,
-            @RequestParam String producer,
-            @RequestParam String country,
+            @RequestParam(required = false) String wineType,
+            @RequestParam(required = false) String producer,
+            @RequestParam(required = false) String country,
             @RequestParam(required = false) String region,
             @RequestParam(required = false) String subregion,
             @RequestParam(required = false) String grapes,
-            @RequestParam int vintage,
+            @RequestParam(required = false) String vintage,
             @RequestParam(required = false) String purchaseDate,
             @RequestParam(required = false) String price,
-            @RequestParam int quantity,
+            @RequestParam(required = false) String quantity,
             @RequestParam(required = false) String purchaseReason,
             @RequestParam(required = false) String tastingNotes,
             @RequestParam(required = false) String ownRating,
@@ -332,7 +332,7 @@ public class WineController {
             @RequestParam(required = false) String munskankarnaRating,
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
-            @RequestParam String location,
+            @RequestParam(required = false) String location,
             @RequestParam(value = "bild", required = false) MultipartFile bild
     ) throws IOException {
         Wine befintligt = wineService.findById(new WineId(id))
@@ -376,28 +376,32 @@ public class WineController {
     /**
      * Delad av läggTillVin och sparaRedigering - båda formulären har samma
      * fält, skillnaden är bara vilken Builder de startar från (tom vid
-     * tillägg, befintligt.toBuilder() vid redigering). Tar emot valfria
-     * fält som rå String och tolkar dem själv istället för att låta Spring
-     * binda direkt till Rating/LocalDate/BigDecimal - ett tomt formulärfält
-     * (inget betyg valt, inget pris ifyllt) blir annars en tom sträng som
-     * Spring försöker binda rakt av och kraschar på, inte null. Samma sorts
-     * hantering som VinradParser gör för Excel-celler.
+     * tillägg, befintligt.toBuilder() vid redigering). Tar emot ALLA fält
+     * som rå String och tolkar dem själv istället för att låta Spring
+     * binda direkt till WineType/Integer/Rating/LocalDate/BigDecimal - ett
+     * tomt formulärfält blir annars en tom sträng som Spring försöker
+     * binda rakt av och kraschar på, inte null. Samma sorts hantering som
+     * VinradParser gör för Excel-celler. Namn är sedan 2026-07-22 det enda
+     * obligatoriska fältet (se CLAUDE.md) - övriga tolkas alla till null
+     * om blanka, inklusive wineType/vintage/quantity/producer/country/
+     * location som tidigare krävdes ifyllda.
      */
     private static Wine.Builder tillämpaFormulärfält(
             Wine.Builder builder,
-            String name, WineType wineType, String producer, String country,
+            String name, String wineType, String producer, String country,
             String region, String subregion, String grapes,
-            int vintage, String purchaseDate, String price, int quantity,
+            String vintage, String purchaseDate, String price, String quantity,
             String purchaseReason, String tastingNotes, String ownRating,
             String systembolagetProductNumber, String systembolagetDescription,
             String munskankarnaReview, String munskankarnaRating, String vivinoRating,
             String otherReference, String location
     ) {
         return builder
-                .name(name).wineType(wineType).producer(producer).country(country)
+                .name(name).wineType(tolkaVinTyp(wineType))
+                .producer(tomBlirNull(producer)).country(tomBlirNull(country))
                 .region(tomBlirNull(region)).subregion(tomBlirNull(subregion)).grapes(tomBlirNull(grapes))
-                .vintage(vintage).purchaseDate(tolkaDatum(purchaseDate)).price(tolkaDecimal(price))
-                .quantity(quantity)
+                .vintage(tolkaHeltal(vintage)).purchaseDate(tolkaDatum(purchaseDate)).price(tolkaDecimal(price))
+                .quantity(tolkaHeltal(quantity))
                 .purchaseReason(tomBlirNull(purchaseReason)).tastingNotes(tomBlirNull(tastingNotes))
                 .ownRating(tolkaBetyg(ownRating))
                 .systembolagetProductNumber(tomBlirNull(systembolagetProductNumber))
@@ -406,11 +410,19 @@ public class WineController {
                 .munskankarnaRating(tolkaBetyg(munskankarnaRating))
                 .vivinoRating(tolkaDecimal(vivinoRating))
                 .otherReference(tomBlirNull(otherReference))
-                .location(location);
+                .location(tomBlirNull(location));
     }
 
     private static String tomBlirNull(String värde) {
         return (värde == null || värde.isBlank()) ? null : värde;
+    }
+
+    private static WineType tolkaVinTyp(String värde) {
+        return tomBlirNull(värde) == null ? null : WineType.valueOf(värde);
+    }
+
+    private static Integer tolkaHeltal(String värde) {
+        return tomBlirNull(värde) == null ? null : Integer.valueOf(värde.trim());
     }
 
     private static Rating tolkaBetyg(String värde) {

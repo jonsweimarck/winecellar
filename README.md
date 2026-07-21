@@ -314,19 +314,19 @@ Tabell `wines` (engelska namn, plural, genomgående):
 | Kolumn | Typ | Kommentar |
 |---|---|---|
 | id | `bigserial` PK | |
-| wine_type | `text` + `CHECK` | Enum i Java: RED, WHITE, ROSE, SPARKLING, FORTIFIED |
-| country | `text` | |
-| region | `text` | |
+| wine_type | `text` + `CHECK`, nullable | Enum i Java: RED, WHITE, ROSE, SPARKLING, FORTIFIED |
+| country | `text`, nullable | |
+| region | `text`, nullable | |
 | subregion | `text`, nullable | |
 | grapes | `text`, nullable | Fritext, ingen normalisering till egen tabell |
-| producer | `text` | |
-| name | `text` | |
-| vintage | `smallint` | |
+| producer | `text`, nullable | |
+| name | `text` | **Enda obligatoriska fältet** (sedan 2026-07-22, se "Bara namnet obligatoriskt" nedan) |
+| vintage | `smallint`, nullable | `Integer` i Java (inte primitiv `int`) - se "Bara namnet obligatoriskt" |
 | image | `bytea`, nullable | Vinetikett, lagras direkt i databasen (se nedan) |
 | image_mime_type | `text`, nullable | T.ex. `image/jpeg` - krävs för att kunna servera bilden med rätt `Content-Type` |
 | purchase_date | `date` | |
 | price | `numeric(10,2)` | |
-| quantity | `integer` | Enkel räknare, ändras direkt vid redigering - ingen förbrukningslogg (kan utökas senare om det behövs) |
+| quantity | `integer`, nullable | Enkel räknare, ändras direkt vid redigering - ingen förbrukningslogg (kan utökas senare om det behövs). `Integer` i Java sedan 2026-07-22, se nedan |
 | purchase_reason | `text`, nullable | |
 | tasting_notes | `text`, nullable | |
 | own_rating | `text` + `CHECK` | Samma enum som munskankarna_rating |
@@ -336,7 +336,7 @@ Tabell `wines` (engelska namn, plural, genomgående):
 | munskankarna_rating | `text` + `CHECK` | |
 | vivino_rating | `numeric(2,1)`, nullable | |
 | other_reference | `text`, nullable | |
-| location | `text` | Fritext (Låda 1, Öppen, etc.) - inte enum, växer troligen över tid |
+| location | `text`, nullable | Fritext (Låda 1, Öppen, etc.) - inte enum, växer troligen över tid |
 | search_vector | `tsvector`, genererad | Fritextsökning (namn/producent viktade högre än tasting notes/Systembolagets beskrivning/Munskänkarnas bedömning) - se "Filtrering, sökning och sortering". Inte en del av `WineEntity`/`Wine` - bara Postgres-intern, satt via `schema.sql`, inte Hibernate |
 | created_at, updated_at | `timestamptz` | |
 
@@ -350,6 +350,38 @@ i en enda stor migrering - se `tools/import-excel/`.
 egennamn som faktiskt syftar på svenska institutioner
 (`munskankarna_review`, `systembolaget_*`) behåller sitt svenska namn -
 samma princip som att man inte skulle döpa om "IKEA" i en möbelapp.
+
+**Bara namnet obligatoriskt (byggt 2026-07-22).** Tidigare krävde
+`vin-formular.html` (och `WineController`) att typ, producent, land,
+årgång, plats och antal flaskor alla var ifyllda för att spara ett vin -
+upptäckt av användaren som ett irritationsmoment ("jag vill kunna fylla
+i ett vin snabbt och fylla i resten senare"). Namn är nu det enda
+obligatoriska fältet; alla övriga sparas som `null` om de lämnas tomma,
+precis som de fält som redan var valfria (region, pris, tasting notes
+osv). `Wine.vintage`/`Wine.quantity` gick från primitiv `int` (kan inte
+representera "inget värde") till `Integer` - `WineController.
+tillämpaFormulärfält` tar nu emot **alla** fält som rå `String` och
+tolkar dem själv (`tolkaHeltal`/`tolkaVinTyp`, samma mönster som redan
+fanns för betyg/datum/decimaltal), istället för att låta Spring binda
+direkt till `int`/`WineType` - annars kraschar bindningen på ett tomt
+formulärfält istället för att ge `null`.
+
+`vintage`/`quantity`-kolumnerna fick automatiskt en `NOT NULL`-
+begränsning av Hibernate när de var Java-primitiver - `ddl-auto: update`
+lättar aldrig på en befintlig begränsning även när Java-typen ändras
+till en nullable `Integer`, så `schema.sql` fick två kompletterande
+`ALTER TABLE ... DROP NOT NULL`-satser (idempotenta, säkra att köra om
+- se filen). Land (`WineService.härkomstträd()`) hoppar nu över viner
+utan land helt när filterträdet byggs, eftersom `TreeMap` inte tillåter
+en `null`-nyckel - ett vin utan land kan ändå inte placeras i något
+land-/regiongren. Mallarna (`vinkallare.html`) fick `th:if`-vakter
+tillagda överallt där ett fält tidigare antogs alltid vara satt (typ,
+årgång, antal/flaskbadge, producent, land, plats) - särskilt `.vk-plats`
+i de breda korten, som visade en tom "Plats"-etikett innan den fick sin
+vakt (upptäckt via en Playwright-skärmdump av ett minimalt vin, inte av
+något automatiskt test). Verifierat manuellt: ett vin med bara namnet
+ifyllt sparas och visas felfritt i både breda och smala kort, med
+filterpanelen öppen, och med Detaljer/redigeringsläge uppfällt.
 
 **Betyg som enum (byggt):** `own_rating` och `munskankarna_rating` är
 begränsade till exakt de 29 värdena från Excelns `Listor`-flik. `Rating`
@@ -901,3 +933,5 @@ CLAUDE.md.
 - [x] Fritextsökning över namn/producent/tasting notes/Systembolagets
       beskrivning/Munskänkarnas bedömning (`search_vector`, `schema.sql`)
       - se "Filtrering, sökning och sortering" ovan
+- [x] Bara namnet obligatoriskt vid tillägg/redigering - se Datamodell-
+      avsnittets "Bara namnet obligatoriskt" ovan

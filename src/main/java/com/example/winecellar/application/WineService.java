@@ -62,11 +62,17 @@ public class WineService {
      * Ingen uppslagstabell - land/region/underregion är fri text på Wine
      * (se CLAUDE.md), så trädet byggs om vid varje anrop istället för att
      * lagras. TreeMap/TreeSet ger alfabetisk ordning på alla tre nivåer
-     * utan extra sorteringssteg.
+     * utan extra sorteringssteg. Viner utan land (tillåtet sedan namn
+     * blev det enda obligatoriska fältet, se CLAUDE.md) hoppas över helt
+     * - TreeMap tillåter inte en null-nyckel, och ett vin utan land kan
+     * ändå inte placeras i något land-/regiongren i trädet.
      */
     public List<HärkomstNod> härkomstträd() {
         Map<String, Map<String, Set<String>>> perLandOchRegion = new TreeMap<>();
         for (Wine vin : wineRepository.findAll()) {
+            if (vin.country() == null) {
+                continue;
+            }
             Map<String, Set<String>> perRegion =
                     perLandOchRegion.computeIfAbsent(vin.country(), k -> new TreeMap<>());
             if (vin.region() != null) {

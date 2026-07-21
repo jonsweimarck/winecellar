@@ -53,6 +53,11 @@ public class LaggTillVinSteps {
         wineService.save(nyttVin);
     }
 
+    @När("jag lägger till ett vin med bara namnet {string}")
+    public void jagLäggerTillEttVinMedBaraNamnet(String namn) {
+        wineService.save(Wine.builder().name(namn).build());
+    }
+
     @Så("ska källaren innehålla {int} vin")
     public void skaKällarenInnehålla(int antal) {
         assertThat(wineService.listWines()).hasSize(antal);
@@ -63,6 +68,17 @@ public class LaggTillVinSteps {
         Wine vin = Stegstöd.hittaVin(wineService, namn);
         assertThat(vin.quantity()).isEqualTo(flaskor);
         assertThat(vin.location()).isEqualTo(plats);
+    }
+
+    @Och("vinet {string} ska sakna övriga uppgifter")
+    public void vinetSkaSaknaÖvrigaUppgifter(String namn) {
+        Wine vin = Stegstöd.hittaVin(wineService, namn);
+        assertThat(vin.wineType()).isNull();
+        assertThat(vin.producer()).isNull();
+        assertThat(vin.country()).isNull();
+        assertThat(vin.vintage()).isNull();
+        assertThat(vin.quantity()).isNull();
+        assertThat(vin.location()).isNull();
     }
 
     private WineType vinTypFrån(String svenskTyp) {

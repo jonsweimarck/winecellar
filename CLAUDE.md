@@ -64,6 +64,43 @@ flaggade som gällande.
   så två identiskt implementerade metoder vore bara två namn på samma sak.
   Om det uppstår en verklig skillnad senare (t.ex. att tillägg ska vägra
   dubbletter) är det dags att spjälka upp dem igen - inte innan.
+- **Bara `name` är obligatoriskt (byggt 2026-07-22, på användarens
+  begäran - "årgång" var tvingande, irriterande för att snabbt kunna
+  logga ett vin och fylla i resten senare).** `Wine.vintage`/
+  `Wine.quantity` gick från primitiv `int` till `Integer` - motiverat
+  rakt av (en primitiv kan inte representera "inget värde ännu", till
+  skillnad från de redan nullable String-fälten). `WineController.
+  tillämpaFormulärfält` tar nu emot ALLA fält (inklusive `wineType`/
+  `producer`/`country`/`location`, som tidigare var direkt bundna,
+  icke-nullable `@RequestParam`) som rå `String` och tolkar dem själv
+  (`tolkaHeltal`, `tolkaVinTyp`) - samma mönster som redan fanns för
+  betyg/datum/decimaltal, nu utökat till alla fält.
+  **Följdeffekter som krävde separata fixar, inte bara typändringen:**
+  - `schema.sql` fick två `ALTER TABLE ... DROP NOT NULL`-satser
+    (vintage, quantity) - Hibernate satte NOT NULL automatiskt när
+    fälten var primitiver, och `ddl-auto: update` lättar aldrig på en
+    befintlig begränsning bara för att Java-typen ändras.
+  - `WineService.härkomstträd()` måste hoppa över viner med `null`
+    land explicit (`if (vin.country() == null) continue;`) - `TreeMap`
+    kastar på en `null`-nyckel, och ett vin utan land kan ändå inte
+    placeras i något land-/regiongren i filterträdet.
+  - `vinkallare.html` fick `th:if`-vakter på flera ställen som tidigare
+    antog fältet alltid var satt (vintyp-`th:switch` hade kraschat rakt
+    av på `null`, flaskbadge, producent-rad, land-span, årgångs-span).
+    **Testfälla:** `.vk-plats` (de breda kortens Plats-fält) visade en
+    tom etikett utan vakt - missades av den första manuella
+    verifieringsrundan (som bara kollade att sidan inte kraschade) och
+    upptäcktes först via en Playwright-skärmdump som visade en synlig
+    men tom "Plats"-rad. Lärdom: att en sida inte kraschar bevisar inte
+    att alla fält renderas snyggt - en skärmdump av det FAKTISKA
+    minimala fallet (inte bara ett test som kollar HTTP 200) behövs för
+    den sortens bugg.
+  - `WineControllerTest` fick en ny testfälla att undvika: ett minimalt
+    testvin (`Wine.builder().name(...).build()`, utan `.id(...)`)
+    kraschade rendering med `EL1007E: Property or field 'value' cannot
+    be found on null` på `${vin.id.value}` - ett riktigt sparat vin har
+    alltid ett id, så testvin utan `.id(new WineId(1L))` är orealistiskt
+    och inte samma sak som att testa "fält som saknas".
 - **Filtrering/sökning/sortering orkestreras i `WineService`, inte i
   `WineController`** (byggt 2026-07-21, sortering först - se README:s
   "Filtrering, sökning och sortering" för ordningen på de tre

@@ -38,3 +38,14 @@ ALTER TABLE wines ADD COLUMN search_vector tsvector
     ) STORED;
 
 CREATE INDEX IF NOT EXISTS wines_search_vector_idx ON wines USING GIN (search_vector);
+
+-- Namn är sedan 2026-07-22 det enda obligatoriska fältet (se CLAUDE.md) -
+-- vintage/quantity var tidigare Java-primitiver (int) och fick därför
+-- automatiskt en NOT NULL-kolumn av Hibernate när tabellen skapades.
+-- ddl-auto: update lägger bara till nya kolumner/tabeller, det lättar
+-- aldrig på en befintlig NOT NULL-begränsning även om Java-typen ändras
+-- till en nullable Integer - därav den här kompletterande satsen.
+-- DROP NOT NULL är själv idempotent i Postgres (ingen "IF EXISTS" behövs
+-- - att köra den mot en redan nullable kolumn är ett ofarligt no-op).
+ALTER TABLE wines ALTER COLUMN vintage DROP NOT NULL;
+ALTER TABLE wines ALTER COLUMN quantity DROP NOT NULL;

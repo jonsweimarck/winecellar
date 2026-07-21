@@ -259,6 +259,17 @@ class WineControllerTest {
         }
 
         @Test
+        @DisplayName("ska rendera ett vin som bara har namnet ifyllt utan att krascha (typ/årgång/antal/land/producent/plats null)")
+        void skaRenderaEttVinMedBaraNamnetIfylltUtanAttKrascha() throws Exception {
+            Wine minimaltVin = Wine.builder().id(new WineId(1L)).name("Anteckning om ett vin").build();
+            when(wineService.sök(any())).thenReturn(List.of(minimaltVin));
+
+            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Anteckning om ett vin")));
+        }
+
+        @Test
         @DisplayName("kortvyn (mobil) ska visa geografi- och betygsfält i översikten, resten infällt under \"Detaljer\"")
         void skaVisaFältUppdeladeMellanÖversiktOchDetaljer() throws Exception {
             Wine barolo = BAROLO.toBuilder()
@@ -753,6 +764,20 @@ class WineControllerTest {
             verify(wineService).save(Wine.builder()
                     .name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
                     .vintage(2018).quantity(3).location("Låda 1")
+                    .build());
+        }
+
+        @Test
+        @DisplayName("ska gå att lägga till ett vin med bara namnet ifyllt - övriga fält blir null, inte tomma strängar/0")
+        void skaGåAttLäggaTillMedBaraNamnet() throws Exception {
+            mockMvc.perform(post("/wines")
+                            .with(httpBasic("admin", "admin"))
+                            .param("name", "Anteckning om ett vin"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+
+            verify(wineService).save(Wine.builder()
+                    .name("Anteckning om ett vin")
                     .build());
         }
 

@@ -48,14 +48,14 @@ public class WineEntity {
     @Column(columnDefinition = "text")
     private String grapes;
 
-    private int vintage;
+    private Integer vintage;
 
     private LocalDate purchaseDate;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal price;
 
-    private int quantity;
+    private Integer quantity;
 
     @Column(columnDefinition = "text")
     private String purchaseReason;
@@ -164,11 +164,11 @@ public class WineEntity {
         this.grapes = grapes;
     }
 
-    int getVintage() {
+    Integer getVintage() {
         return vintage;
     }
 
-    void setVintage(int vintage) {
+    void setVintage(Integer vintage) {
         this.vintage = vintage;
     }
 
@@ -188,11 +188,11 @@ public class WineEntity {
         this.price = price;
     }
 
-    int getQuantity() {
+    Integer getQuantity() {
         return quantity;
     }
 
-    void setQuantity(int quantity) {
+    void setQuantity(Integer quantity) {
         this.quantity = quantity;
     }
 

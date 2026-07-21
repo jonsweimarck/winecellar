@@ -329,8 +329,8 @@
     </form>
 
     <th:block th:fragment="detaljfalt(vin)" th:if="${vin != null}">
-        <dt class="fd-plats">Plats</dt>
-        <dd class="fd-plats" th:text="${vin.location}"></dd>
+        <dt class="fd-plats" th:if="${vin.location != null}">Plats</dt>
+        <dd class="fd-plats" th:if="${vin.location != null}" th:text="${vin.location}"></dd>
 
         <dt class="fd-inkopsdatum" th:if="${vin.purchaseDate != null}">Inköpsdatum</dt>
         <dd class="fd-inkopsdatum" th:if="${vin.purchaseDate != null}" th:text="${vin.purchaseDate}"></dd>
@@ -364,7 +364,7 @@
 
         <div id="vinlista-tabell" class="vinlista-tabell">
             <div class="vinkort-bred" th:each="vin : ${viner}">
-                <span class="flaskor-badge" th:text="${vin.quantity}" title="Antal flaskor"></span>
+                <span class="flaskor-badge" th:if="${vin.quantity != null}" th:text="${vin.quantity}" title="Antal flaskor"></span>
                 <div class="vk-topp">
                     <div class="vk-bildyta">
                         <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
@@ -373,14 +373,14 @@
                         <div th:unless="${vin.harBild()}" class="vk-bildplatshallare">Ingen bild</div>
                     </div>
                     <div class="vk-text">
-                        <p th:text="${vin.producer}"></p>
-                        <p class="vk-namn"><strong th:text="${vin.name}"></strong> <span th:text="${vin.vintage}"></span></p>
+                        <p th:if="${vin.producer != null}" th:text="${vin.producer}"></p>
+                        <p class="vk-namn"><strong th:text="${vin.name}"></strong> <span th:if="${vin.vintage != null}" th:text="${vin.vintage}"></span></p>
                         <p>
-                            <span th:text="${vin.country}"></span>
+                            <span th:if="${vin.country != null}" th:text="${vin.country}"></span>
                             <span th:if="${vin.region != null}" th:text="${vin.region}"></span>
                             <span th:if="${vin.subregion != null}" th:text="${vin.subregion}"></span>
                         </p>
-                        <p class="vk-typ">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
+                        <p class="vk-typ" th:if="${vin.wineType != null}">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
                         <p th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
                     </div>
                     <div class="vk-vivino" th:if="${vin.vivinoRating != null}">
@@ -397,7 +397,8 @@
                     </div>
                 </div>
 
-                <div class="vk-info-rad">
+                <div class="vk-info-rad"
+                     th:if="${vin.purchaseDate != null or vin.price != null or vin.purchaseReason != null or vin.location != null}">
                     <div class="vk-inkopsdatum" th:if="${vin.purchaseDate != null}">
                         <span class="vk-label">Inköpsdatum</span>
                         <span class="vk-value" th:text="${vin.purchaseDate}"></span>
@@ -410,7 +411,7 @@
                         <span class="vk-label">Varför köpt</span>
                         <span class="vk-value" th:text="${vin.purchaseReason}"></span>
                     </div>
-                    <div class="vk-plats">
+                    <div class="vk-plats" th:if="${vin.location != null}">
                         <span class="vk-label">Plats</span>
                         <span class="vk-value" th:text="${vin.location}"></span>
                     </div>
@@ -451,7 +452,7 @@
 
         <div id="vinlista-kort" class="vinlista-kort">
             <div class="vinkort" th:each="vin : ${viner}">
-                <span class="flaskor-badge" th:text="${vin.quantity}" title="Antal flaskor"></span>
+                <span class="flaskor-badge" th:if="${vin.quantity != null}" th:text="${vin.quantity}" title="Antal flaskor"></span>
                 <div class="vinkort-topp">
                     <div class="vinkort-bildyta">
                         <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
@@ -460,14 +461,14 @@
                         <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
                     </div>
                     <div class="vinkort-text">
-                        <p class="vinkort-producent" th:text="${vin.producer}"></p>
-                        <p class="vinkort-namn"><strong th:text="${vin.name}"></strong> <span th:text="${vin.vintage}"></span></p>
+                        <p class="vinkort-producent" th:if="${vin.producer != null}" th:text="${vin.producer}"></p>
+                        <p class="vinkort-namn"><strong th:text="${vin.name}"></strong> <span th:if="${vin.vintage != null}" th:text="${vin.vintage}"></span></p>
                         <p class="vinkort-ursprung">
-                            <span th:text="${vin.country}"></span>
+                            <span th:if="${vin.country != null}" th:text="${vin.country}"></span>
                             <span th:if="${vin.region != null}" th:text="${vin.region}"></span>
                             <span th:if="${vin.subregion != null}" th:text="${vin.subregion}"></span>
                         </p>
-                        <p class="vinkort-typ">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
+                        <p class="vinkort-typ" th:if="${vin.wineType != null}">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
                         <p class="vinkort-druvor" th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
                     </div>
                 </div>
