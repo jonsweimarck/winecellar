@@ -131,7 +131,7 @@ public class WineController {
     private static List<Chip> byggChips(Sökvy sökvy) {
         List<Chip> chips = new ArrayList<>();
         if (sökvy.sok() != null && !sökvy.sok().isBlank()) {
-            chips.add(new Chip("\"" + sökvy.sok() + "\"", sökvy.urlUtan("sok", null)));
+            chips.add(new Chip(sökordsEtikett(sökvy.sok()), sökvy.urlUtan("sok", null)));
         }
         for (String vintyp : sökvy.vintyper()) {
             chips.add(new Chip(VINTYP_ETIKETT.getOrDefault(vintyp, vintyp), sökvy.urlUtan("wineType", vintyp)));
@@ -146,6 +146,17 @@ public class WineController {
             chips.add(new Chip(underregion, sökvy.urlUtan("subregion", underregion)));
         }
         return chips;
+    }
+
+    /**
+     * Sökningen (`plainto_tsquery`) kräver OCH mellan flera ord, inte en
+     * sammanhängande fras - citationstecken runt hela frasen (tidigare
+     * variant) antydde därför något striktare än vad som faktiskt sker.
+     * "+" mellan orden signalerar OCH utan att kräva förklarande text i
+     * det trånga chip-utrymmet.
+     */
+    private static String sökordsEtikett(String sok) {
+        return "Sök: " + String.join(" + ", sok.trim().split("\\s+"));
     }
 
     private record Chip(String etikett, String taBortUrl) {
