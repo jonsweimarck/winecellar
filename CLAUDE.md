@@ -1089,4 +1089,7 @@ dubbletter.
   `@Lob byte[]`-fält, inte bara lita på att applikationsbeteendet ser
   rätt ut.
 
-Se README.md:s "Nästa steg"-sektion - hålls bara på ett ställe.
+**Kommande arbete spåras i YouTrack (WINE-projektet), inte som en
+checklista i README.md (ändrat 2026-07-22, WINE-1)** - README.md:s
+tidigare "Nästa steg"-sektion är borttagen. Backlog/Develop/Review-delen
+av flödet drivs av `.claude/skills/plocka-nasta/SKILL.md`.

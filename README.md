@@ -285,19 +285,6 @@ Kända fällor (HikariCP-poolstorlek, tillägget måste länkas om appen
 skapas om) finns dokumenterade i `CLAUDE.md`. Appens URL är medvetet
 inte listad här - det här repot är delat.
 
-## Nästa steg
-
-- [x] Gherkin-scenarier, domänmodell, grundläggande CRUD
-- [x] Responsiv dubbel layout + `WineListResponsiveIT`
-- [x] Bilduppladdning och -visning
-- [x] Excel-import (`tools/import-excel/`), inklusive etikettimport
-      från en bildmapp
-- [x] Autentisering (HTTP Basic, admin + readonly)
-- [x] Deploy till Clever Cloud
-- [x] Sortering, filtrering och fritextsökning
-- [x] Bara namnet obligatoriskt vid tillägg/redigering
-- [x] Excel-export, inklusive fullständig bildrundtripp
-
 ## Mer information
 
 - `docs/adr/` - arkitektur- och designbeslut med motivering
