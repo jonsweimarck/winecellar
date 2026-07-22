@@ -681,7 +681,7 @@ class WineControllerTest {
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
 
-            assertThat(html).contains("class=\"chip\"", "&quot;barolo&quot; ×", "Rött ×", "Italien ×");
+            assertThat(html).contains("class=\"chip\"", "Sök: barolo ×", "Rött ×", "Italien ×");
 
             // "Rött"-chippens borttagningslänk ska ta bort wineType=RED,
             // men behålla sok och country oförändrade.
@@ -693,6 +693,22 @@ class WineControllerTest {
             assertThat(href).doesNotContain("wineType=RED")
                     .contains("country=Italien")
                     .contains("sok=barolo");
+        }
+
+        @Test
+        @DisplayName("sökchippet ska visa flera sökord ihopfogade med + istället för som en citerad fras, eftersom sökningen faktiskt är OCH mellan orden")
+        void skaVisaFleraSökordMedPlusIChippet() throws Exception {
+            when(wineService.sök(any())).thenReturn(List.of(BAROLO));
+
+            String html = mockMvc.perform(get("/")
+                            .with(httpBasic("admin", "admin"))
+                            .param("sok", "kraftfullt spanskt"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(html)
+                    .contains("Sök: kraftfullt + spanskt ×")
+                    .doesNotContain("&quot;");
         }
 
         @Test
