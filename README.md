@@ -1,18 +1,17 @@
 # winecellar
 
-Lärprojekt nummer två i samma serie som `roombooking`: samma process
-(Claude Code, Specification by Example, CI/CD), men ett annat fokus. Här är
-domänlogiken medvetet enkel (i praktiken CRUD) - det som är den intressanta
-utmaningen är istället ett gränssnitt som fungerar lika bra på en
-datorskärm som på en mobil.
+Webbapp för att hålla reda på en vinsamling - ersätter en Excel-fil
+(`Vinlista.xlsx`, en rad per vin). Läs- och skrivbar från både dator och
+mobil, deployad på Clever Cloud.
 
-Ersätter en tidigare Excel-fil (`Vinlista.xlsx`, en rad per vin) med en
-webbapp, tillgänglig från nätet, läs- och skrivbar från både dator och
-mobil.
+Lärprojekt i samma serie som `roombooking` (samma process: Claude Code,
+Specification by Example, CI/CD). Se `docs/adr/` för arkitektur- och
+designbesluten och varför de togs - den här filen beskriver bara
+nuläget.
 
 ## Arkitektur
 
-Samma hexagonala lagerindelning som `roombooking`:
+Hexagonal lagerindelning:
 
 ```
 domain/          Rena domänobjekt (Wine, WineType, Rating), inga ramverksberoenden
@@ -21,512 +20,131 @@ infrastructure/  In-memory-testdubblett + JPA/Postgres-adapter (JpaWineRepositor
 web/             Controller + Thymeleaf/htmx
 ```
 
-Till skillnad från `roombooking` finns här inga affärsregler att tala om -
-domänlagret är tunt. Det som gör UI-lagret svårare är istället
-responsiviteten, se "UI-test" nedan - `vinkallare.html` renderar två
-kortlayouter i samma HTML-fragment och växlar mellan dem med en CSS media
-query vid 960px, verifierat av `WineListResponsiveIT`: breda kort på
-desktop (`#vinlista-tabell` - namnet är kvar av historiska skäl, se
-"Tabellvyns designomgång" nedan) och smala kort med en infälld
-"Detaljer"-sektion på mobil (`#vinlista-kort`).
+Domänlagret är tunt - inga affärsregler att skydda, se
+[ADR 0001](docs/adr/0001-thin-domain-layer.md). `WineService` har en
+enda `save`-metod för både tillägg och redigering.
 
-`Wine` har vuxit till 23 fält i takt med att Excel-importen (se nedan)
-krävde dem - för många för en läsbar positionell record-konstruktor, så
-`Wine.builder()...build()` används på alla anropsplatser istället för
-`new Wine(...)`. Alla fält är redigerbara i webb-UI:t via en separat
-sida (`vin-formular.html`) - för mycket för en radform i listan, så det
-är en egen sida istället för ett htmx-fragment som resten av appen.
-Startsidan (`/`) är bara vinlistan; att lägga till och redigera ett vin
-sker på **samma** sida/mall (`GET /wines/nytt` respektive
-`GET /wines/{id}/redigera`) - fälten är identiska, det enda som skiljer
-är rubrik, submit-knapp och vart formuläret postar (`POST /wines` vid
-tillägg, `POST /wines/{id}/redigera` vid redigering), så två nästan
-identiska mallar hade bara varit dubblettunderhåll. Formuläret postar
-`multipart/form-data` och tar emot en valfri bildfil (`bild`) tillsammans
-med alla andra fält i samma spar-anrop - ett tomt filfält skriver inte
-över en redan sparad bild. Ändra antal och ladda upp bild är alltså inte
-längre separata snabbåtgärder i listan; bara "Ta bort" är kvar som
-htmx-fragment där.
+`Wine` har 23 fält och byggs alltid via `Wine.builder()...build()`
+(eller `vin.toBuilder()...build()` för ändringar), aldrig via en
+positionell konstruktor - se [ADR 0003](docs/adr/0003-wine-builder-pattern.md).
 
-Vinlistan visar en överblick per vin i grundläget: bild, namn, typ,
-producent, land, region, underregion, druvor, årgång, flaskor, eget
-betyg, Munskänkarnas betyg och Vivino-betyg (`plats` flyttades härifrån
-till detaljvyn 2026-07-19, se nedan). Övriga fält (plats, inköpsdatum,
-pris, inköpsanledning, tasting notes, Systembolagets
-produktnummer/beskrivning, Munskänkarnas bedömning, annan referens -
-alltså allt utom `id`, `image`/`image_mime_type` och de ännu obyggda
-`created_at`/`updated_at`) visas infällt under en "Detaljer"-knapp per
-rad/kort med `<details>`, ingen JS. Fälten delas mellan tabell- och
-kortvyn via ett gemensamt Thymeleaf-fragment (`detaljfalt(vin)`) istället
-för att dupliceras, och de flesta av dem visas bara om de faktiskt är
-satta (`th:if="${vin.X != null}"`) - plats är alltid satt (obligatoriskt
-fält) och visas därför ovillkorligt, som resten av översiktsfälten.
-I tabellvyn ligger den infällda detaljraden i en egen `<tr>` med
-`colspan` som spänner hela tabellbredden, inte i en av översiktens
-smala kolumner - annars klämdes de uppfällda fälten in i en enda smal
-kolumn även på en stor skärm (upptäckt av användaren mot den riktiga
-deployen, fixat 2026-07-19).
-
-**Kortmallen fick en egen designomgång (2026-07-19)**, styrd av en PNG-
-mockup användaren ritade upp (bild vänster, text höger, inga fältetiketter
-för de flesta fälten). `.vinkort-topp` är en flex-rad med en smal
-bildkolumn (`.vinkort-bildyta`, `flex: 0 0 5.5rem`) och en textkolumn
-till höger - producent visas utan egen etikett, namn och årgång på samma
-rad (`<strong>Namn</strong> Årgång`), ursprung (land/region/underregion)
-som en löpande rad utan fältetiketter, vintyp inom parentes på egen rad
-med extra luft ovanför, druvor på egen rad. Betygen (eget, Munskänkarnas,
-Vivino), "Detaljer" och knapparna (Redigera/Ta bort) ligger däremot
-**utanför** `.vinkort-topp`, som egna block direkt under `.vinkort` -
-de spänner alltså hela kortets bredd istället för att trängas i den
-smala textkolumnen. Ändringen kom efter att användaren påpekade att
-bilden (t.ex. en flaskfoto) ofta slutar ungefär vid druvor-raden, så
-utrymmet under bilden stod oanvänt när resten av kortet klämdes in i
-textkolumnen bredvid. Betygen grupperas under en egen rubrikfri sektion
-med etiketten *ovanför* sitt värde (inte på samma rad) - annars radbröts
-långa betygstexter (t.ex. Munskänkarnas fulla etikett) mitt i på ett
-sätt som såg trasigt ut. Antal flaskor är inte med i mockupen men
-löstes som en rund badge i kortets övre högra hörn (`.flaskor-badge`,
-`position: absolute`) efter en avstämning med användaren - central
-information för en vinkällarapp som annars hade krävt en utfällning
-för att se. "Detaljer" är en vanlig `<summary>` men styld som en
-understruken länk (`text-decoration: underline; font-weight: normal`)
-istället för tabellvyns fetstilta knapputseende, för att matcha
-mockupens länkkänsla. Tabellvyn var vid det här laget fortfarande
-oförändrad - designomgången var avgränsad till kortmallen. Tabellvyn
-fick sin egen omgång strax efter, se "Tabellvyns designomgång" längre
-ner - och ersattes då helt av samma sorts kort, fast bredare.
-
-**Redigera/Ta bort flyttade till Detaljer, högerjusterade (2026-07-19,
-gäller både tabell- och kortvyn):** låg tidigare alltid synliga i
-översikten (en egen kolumn i tabellen, `.vinkort-fot` under kortet).
-Ligger nu istället längst ner i den infällda "Detaljer"-sektionen, i en
-delad `.detalj-atgarder`-`<div>` (`display: flex; justify-content:
-flex-end`) - samma klass återanvänds i både tabellens `<td colspan>`
-och kortets `<details>` istället för att duplicera layouten. I
-tabellvyn försvann därmed hela åtgärdskolumnen ur `<thead>`/huvudraden,
-så `colspan` på detaljraden sänktes från `14` till `13` för att matcha
-det nya antalet översiktskolumner (håll dem i synk om en kolumn läggs
-till eller tas bort).
-
-**Detaljer-fältens ordning justerad, bara för kortvyn (2026-07-19):**
-den nya ordningen är Inköpsdatum, Pris, Plats, Varför köpt, Tasting
-notes, Systembolagets beskrivning, Munskänkarnas bedömning (Annan
-referens ligger kvar sist, oförändrad). De fyra sista (Varför köpt,
-Tasting notes, Systembolagets beskrivning, Munskänkarnas bedömning)
-visar dessutom värdet *under* etiketten istället för bredvid den -
-Varför köpt fick samma behandling i en uppföljande justering samma
-dag, av samma skäl som de tre första.
-Löst utan att duplicera `detaljfalt`-fragmentet eller ändra dess
-DOM-ordning: varje `dt`/`dd`-par har fått en `fd-*`-klass (t.ex.
-`fd-inkopsdatum`), och CSS `order` (plus `grid-column: 1 / -1` för de
-fyra som ska staplas) sätts bara under `.vinkort dl`-selektorn - så
-samma fragment kan fortsätta återanvändas av tabellens
-`.detaljlista-bred`, som behåller sin egen (ursprungliga)
-dokumentordning helt opåverkad av kortvyns omordning.
-
-**Annan referens fick samma stapling (2026-07-20):** låg kvar i
-sida-vid-sida-läget efter föregående omgång, vilket visade sig vara
-lika inkonsekvent som Varför köpt hade varit - samma fix (`grid-column:
-1 / -1` på `fd-annan-referens`, scopeat under `.vinkort dl`).
-
-**Systembolagets produktnummer slogs ihop med beskrivningsraden
-(2026-07-19), i både tabell- och kortvyn:** visades tidigare som en
-egen `dt`/`dd`-rad (`fd-sb-nummer`); den klassen och raden är nu
-borttagna. Produktnumret står istället inom parentes direkt efter
-etiketten "Systembolagets beskrivning" (`Systembolagets beskrivning
-(12345)`) - till skillnad från ordningsjusteringen ovan gäller den här
-ändringen båda vyerna, eftersom det är en innehållsändring i själva
-`detaljfalt`-fragmentet, inte en CSS-scopead layoutskillnad. **Om
-beskrivningen saknas visas produktnumret inte alls** - det finns ingen
-etikett kvar att fästa parentesen på, så `dt`/`dd`-paret försvinner
-helt i det fallet (`th:if="${vin.systembolagetDescription != null}"`
-styr båda). Medvetet vald avvägning, inte ett förbiseende - om det
-visar sig vara ett problem i praktiken (produktnummer utan beskrivning
-förekommer) är det en enkel ändring att lägga till en fallback-rad för
-det fallet.
-
-**Tabellvyns designomgång (2026-07-19/20) - den gamla `<table>` är helt
-borttagen.** Styrd av en PNG-mockup användaren ritade upp
-(`Vinlista.png`) och en Artifact-jämförelse som itererades i flera
-omgångar (dämpade labels, betygsraden flyttad upp bredvid bilden,
-omordning, labels linjerade på samma höjd, fasta betygskolumnbredder)
-innan den byggdes på riktigt. Beslutet var uttryckligen att **inte**
-ha någon infälld Detaljer på desktop - alla fält visas alltid,
-inklusive `otherReference` ("Annan referens"), som varken den gamla
-tabellen eller kortvyns Detaljer råkade visa förut (ett fält som fanns
-i datamodellen men aldrig syntes någonstans i listan - upptäcktes när
-allt skulle visas samtidigt).
-
-- **`#vinlista-tabell` innehåller nu breda kort (`.vinkort-bred`),
-  inte en `<table>`** - namnet på `id`:t/klassen är kvar av historiska
-  skäl (CSS-brytpunkten och `WineListResponsiveIT` pekar redan på det),
-  men det är samma sorts kort som `#vinlista-kort` (mobil), bara
-  bredare och utan `<details>`. `vinbild-tabell`, `.detaljlista-bred`
-  och `<tr class="detaljrad"> / colspan` (dokumenterat ovan) är alla
-  borttagna tillsammans med `<table>`:n.
-- **Fyra kolumner delas av tre radgrupper** (`.vk-topp`, `.vk-info-rad`,
-  `.vk-text-rad`) via samma `grid-template-columns`, så Inköpsdatum
-  hamnar under bilden, Pris under textblocket, Varför köpt under
-  Munskänkarna och Plats under Eget betyg. Varje fält har ett
-  **explicit `grid-column`** (inte auto-placering) - annars skulle t.ex.
-  Pris hoppa in i Inköpsdatums kolumn för ett vin som saknar
-  inköpsdatum, eftersom CSS Grids auto-placering fyller nästa lediga
-  cell i dokumentordning oavsett vilket fält som faktiskt saknas.
-- **Betygsraden (Vivino/Munskänkarna/Eget betyg) är en egen grid-rad**
-  (`grid-row: 2`) bredvid bilden, som spänner båda raderna
-  (`grid-row: 1 / 3`) och stretchar till samma höjd. Alla tre labels
-  börjar därför på exakt samma höjd oavsett hur långt respektive värde
-  råkar vara.
-- **Munskänkarna/Eget betyg-kolumnerna har fast bredd (`18rem`), inte
-  `fr`** - de måste rymma det längsta möjliga betygsvärdet (någon av
-  de 29 Rating-etiketterna, t.ex. `"12,5 (12 - 14,5 Bra till mycket
-  bra vin)"`) oavsett vilket av de två fälten som råkar ha ett långt
-  värde. Verifierat med båda fälten satta till den längsta etiketten
-  samtidigt.
-- **Sidan blev bredare för att detta skulle få plats:** `body`s
-  `max-width` höjdes från `48rem` till `70rem`, och CSS-brytpunkten
-  mellan bred kortvy och mobil kortvy höjdes från `640px` till `960px`
-  - de fasta 18rem-kolumnerna kan inte krympa, så under ~960px svämmar
-  layouten över om inte mobilvyn tar över istället. Verifierat manuellt
-  vid 900px (mobilkort, ingen överflödning) och 1280px (breda kort,
-  inga betygsvärden radbryter).
-- Redigera/Ta bort ligger direkt i kortet (`.detalj-atgarder`, samma
-  klass som kortvyn återanvänder för sin infällda variant) - inte
-  infällt bakom något klick, eftersom hela poängen med omgången var att
-  slippa en Detaljer-sektion på desktop.
-
-**Bildens storlek i de breda korten justerad i tre omgångar
-(2026-07-20)**, efter att användaren tyckte den var onödigt stor.
-`.vk-bildyta`s kolumnbredd (`6rem`) rördes **inte** i någon av
-omgångarna - den delas med Inköpsdatum i `.vk-info-rad`, som behöver
-bredden för att inte radbryta datumvärden. Istället fick själva
-bilden/platshållaren ett eget `max-width`/`max-height` (mindre än sin
-kolumn, med tomrum till höger). Första försöket (`max-width: 3.5rem;
-max-height: 5rem`, `grid-row: 1` - bara textblockets rad) visade sig
-vara för litet - användaren tyckte kortvyns bildstorlek
-(`.vinbild-kort`, `flex: 0 0 5.5rem`-kolumn, `max-height: 12rem`) såg
-bättre ut. Justerat till `max-width: 5.5rem; max-height: 8rem` - bättre,
-men fortfarande upplevt som lite för litet, och toppjusteringen
-(`align-self: start`) gjorde att bildens underkant inte hamnade i
-linje med något särskilt. Tredje omgången: `.vk-bildyta` spänner
-återigen båda raderna (`grid-row: 1 / 3`, som i den allra första,
-"för stora" versionen) men med `align-self: end` istället för
-`stretch` - bilden bottenjusteras mot betygsradens underkant (samma
-höjd som Vivino-värdet) men **behåller sin egen begränsade storlek**
-(nu `max-width: 6rem; max-height: 9rem`) istället för att sträckas för
-att fylla hela den spända ytan. Det är skillnaden mellan `stretch`
-(vad som gjorde bilden "för stor" i original­versionen - fyller hela
-ytan oavsett hur hög den är) och `end` (positionerar en begränsad
-storlek vid nederkanten av ytan) som gör att båda kraven - liten bild
-**och** bottenjusterad mot betygsraden - kan uppfyllas samtidigt.
-Verifierat manuellt vid 1280px med både ett vin med lång text och ett
-med kort text: bildens underkant linjerar med Vivino-värdet i båda
-fallen, och Inköpsdatum/betygsvärdena radbryter fortfarande inte.
-
-**Fjärde omgången: både överkant och underkant, tillbaka till
-`stretch`** - användaren ville att bilden även skulle linjera mot
-producentnamnets överkant, inte bara mot Vivino-värdets underkant.
-Att vara alignad i **båda** ändarna samtidigt går bara med `align-self:
-stretch` (bilden fyller hela den spända ytan, `grid-row: 1 / 3`) -
-`end` (föregående omgång) och `start` (omgången innan dess) kan bara
-träffa en kant i taget, eftersom en begränsad storlek som inte fyller
-hela ytan alltid lämnar tomrum någonstans. `.vk-bildyta img`/
-`.vk-bildplatshallare` gick från `max-height` till `height: 100%`
-(fortfarande `max-width: 6rem` för bredden) - `object-fit: contain`
-skalar innehållet proportionerligt utan distorsion, men själva ytan
-(och därmed hur hög bilden faktiskt blir) växer nu med hur mycket text
-vinet har, en medveten avvägning för att kunna alignas mot båda
-kanterna. `<a>`-taggen som omsluter `<img>` fick också
-`display: block; height: 100%` - annars bryts `height: 100%`-kedjan
-eftersom en vanlig inline `<a>` inte har någon egen resolverbar höjd.
-Verifierat manuellt vid 1280px med både lång och kort text: bilden
-linjerar mot båda kanterna i båda fallen, och ingenting annat radbryter.
-
-**Femte omgången: `object-position: bottom` - en riktig flaskbild följde
-inte underkanten trots `height: 100%`.** Upptäckt av användaren mot den
-riktiga deployen (skärmdump bifogad): en riktig bild (till skillnad
-från "Ingen bild"-platshållaren) centrerades istället inom sin box
-(standard `object-position: 50% 50%`) när bildens eget höjd/bredd-
-förhållande inte fyllde hela den spända ytan - det lämnade tomrum både
-ovanför **och** under bilden, inte bara ovanför. Platshållarrutan har
-inget eget bildförhållande och fyller alltid hela sin box trivialt, så
-den lokala testningen (som bara använt "Ingen bild"-vinet) missade
-buggen helt - fixat genom att faktiskt ladda upp en riktig (genererad)
-flaskbild lokalt och verifiera mot den, inte bara platshållaren.
-Fixat med `object-position: center bottom` på `.vk-bildyta img` - tvingar
-`object-fit: contain` att alltid lägga eventuellt överskottsutrymme
-högst upp istället för att dela det mellan topp och botten.
-**Kvarstående avvägning, inte en bugg:** eftersom en riktig bild har
-ett fast bildförhållande som inte alltid matchar boxens (som växer med
-textmängden), kan bilden bara garanterat nå **en** kant fullständigt -
-underkanten (mot Vivino-värdet, det uttryckliga kravet) prioriterades.
-Överkanten kan fortfarande ha ett litet tomrum ovanför för viner med
-mycket text, där boxen blir högre än vad bildens eget
-bredd/höjd-förhållande kräver.
-
-**Sjätte omgången: `position: absolute` - den verkliga boven, inte bara
-ett litet tomrum ovanför.** Femte omgångens "kvarstående avvägning"
-ovan visade sig vara feldiagnostiserad. Användaren rapporterade
-(med ny skärmdump) att underkanten fortfarande inte alignade efter
-`object-position`-fixen ovan - och efter en hård refresh och test i en
-annan webbläsare (uteslöt cache/deploy-fördröjning) gick det att
-återskapa lokalt: en riktig, smal/hög flaskbild kunde tvinga upp **hela
-rad 1+2:s höjd** till bildens egen bildförhållande-höjd, inte bara
-lämna ett litet tomrum. Tydligast för viner med **lite text** (kort
-producent/namn/ursprung, inga druvor) - då är textens/betygets egna
-naturliga höjd liten, så bildens naturliga höjd blir lättare den
-dominerande faktorn. Grid-/flex-item har `min-height: auto` som
-standard, vilket låter deras eget innehålls naturliga storlek räknas
-in i hur höga "auto"-raderna blir, **även med `height: 100%`** på
-`<img>` - ett första försök att nollställa detta med `min-height: 0`
-på `.vk-bildyta` räckte **inte** (verifierat med samma smala/höga
-testbild som avslöjade buggen - den kvarstod). Den robusta lösningen:
-ta bilden helt ur det normala dokumentflödet med `position: absolute`
-(`inset: 0` fyller hela `.vk-bildyta`s yta, som i sin tur får
-`position: relative` som positioneringskontext). Absolutpositionerade
-element kan aldrig bidra till sin förälders storleksberäkning, oavsett
-bildens eget bildförhållande - till skillnad från `min-height: 0`, som
-bara justerar en tröskel men inte helt kopplar bort bidraget.
-**Lärdom om testmetodik:** det första verifieringspasset (omgång
-fyra) använde bara en bild med aspect ratio 300×900 (1:3) på ett vin
-med mycket text - inte tillräckligt extremt för att avslöja buggen.
-Omgång sex verifierades med både en smalare/högre testbild (200×1000)
-**och** ett vin med minimal text samtidigt - den kombinationen som
-faktiskt triggar problemet.
-
-**Kortvyn (mobil) fick samma dämpade label-stil som de breda korten
-(2026-07-20).** Betygsraderna (`.betyg-label`) och Detaljer-fälten
-(`.vinkort dt`) i mobilvyn använde tidigare två olika äldre stilar -
-plain/odämpad text för betyg respektive fetstil för Detaljer-fälten -
-kvar sedan innan den dämpade label-stilen (`.vk-label`: liten, grå
-`#767676`, `font-weight: 400`) togs fram för de breda korten. Justerat
-så `.vinkort-betyg .betyg-label` och `.vinkort dt`/`.vinkort dd` har
-exakt samma deklarationer som `.vk-label`/`.vk-value` - separata
-CSS-regler (inte samma klassnamn återanvänt) eftersom kortvyn
-fortfarande har sina egna `betyg-label`/`dt`/`dd`-element, bara med
-matchande utseende nu. Verifierat manuellt vid 375px med Detaljer
-uppfälld: samma dämpade stil på både betygsraderna och Detaljer-fälten.
+Alla fält är redigerbara via en egen sida (`vin-formular.html`), delad
+mellan tillägg (`GET/POST /wines/nytt`) och redigering (`GET/POST
+/wines/{id}/redigera`) - samma mall, formuläret postar `multipart/
+form-data` med en valfri bildfil. Startsidan (`/`) visar bara listan.
 
 ## Datamodell
 
-Tabell `wines` (engelska namn, plural, genomgående):
+Tabell `wines`:
 
 | Kolumn | Typ | Kommentar |
 |---|---|---|
 | id | `bigserial` PK | |
-| wine_type | `text` + `CHECK`, nullable | Enum i Java: RED, WHITE, ROSE, SPARKLING, FORTIFIED |
+| wine_type | `text` + `CHECK`, nullable | Enum: RED, WHITE, ROSE, SPARKLING, FORTIFIED |
 | country | `text`, nullable | |
 | region | `text`, nullable | |
 | subregion | `text`, nullable | |
-| grapes | `text`, nullable | Fritext, ingen normalisering till egen tabell |
+| grapes | `text`, nullable | Fritext |
 | producer | `text`, nullable | |
-| name | `text` | **Enda obligatoriska fältet** (sedan 2026-07-22, se "Bara namnet obligatoriskt" nedan) |
-| vintage | `smallint`, nullable | `Integer` i Java (inte primitiv `int`) - se "Bara namnet obligatoriskt" |
-| image | `bytea`, nullable | Vinetikett, lagras direkt i databasen (se nedan) |
-| image_mime_type | `text`, nullable | T.ex. `image/jpeg` - krävs för att kunna servera bilden med rätt `Content-Type` |
-| purchase_date | `date` | |
-| price | `numeric(10,2)` | |
-| quantity | `integer`, nullable | Enkel räknare, ändras direkt vid redigering - ingen förbrukningslogg (kan utökas senare om det behövs). `Integer` i Java sedan 2026-07-22, se nedan |
+| name | `text`, **NOT NULL** | Enda obligatoriska fältet |
+| vintage | `smallint`, nullable | `Integer` i Java |
+| image | `bytea`, nullable | Vinetikett |
+| image_mime_type | `text`, nullable | T.ex. `image/jpeg` |
+| purchase_date | `date`, nullable | |
+| price | `numeric(10,2)`, nullable | |
+| quantity | `integer`, nullable | `Integer` i Java |
 | purchase_reason | `text`, nullable | |
 | tasting_notes | `text`, nullable | |
-| own_rating | `text` + `CHECK` | Samma enum som munskankarna_rating |
-| systembolaget_product_number | `text`, nullable | Egen kolumn i Excel-källan sedan 2026-07-20, tidigare hopklistrad med beskrivningen |
+| own_rating | `text` + `CHECK`, nullable | 29 fasta värden, se `Rating` |
+| systembolaget_product_number | `text`, nullable | |
 | systembolaget_description | `text`, nullable | |
-| munskankarna_review | `text`, nullable | Egennamn (Munskänkarna) - medvetet inte översatt |
-| munskankarna_rating | `text` + `CHECK` | |
+| munskankarna_review | `text`, nullable | Egennamn (Munskänkarna) |
+| munskankarna_rating | `text` + `CHECK`, nullable | Samma 29 värden som `own_rating` |
 | vivino_rating | `numeric(2,1)`, nullable | |
 | other_reference | `text`, nullable | |
-| location | `text`, nullable | Fritext (Låda 1, Öppen, etc.) - inte enum, växer troligen över tid |
-| search_vector | `tsvector`, genererad | Fritextsökning (namn/producent viktade högre än tasting notes/Systembolagets beskrivning/Munskänkarnas bedömning) - se "Filtrering, sökning och sortering". Inte en del av `WineEntity`/`Wine` - bara Postgres-intern, satt via `schema.sql`, inte Hibernate |
-| created_at, updated_at | `timestamptz` | |
+| location | `text`, nullable | Fritext (Låda 1, Öppen, etc.) |
+| search_vector | `tsvector`, genererad | Se "Filtrering, sökning och sortering" |
+| created_at, updated_at | `timestamptz` | Inte byggda ännu |
 
-**Nuvarande implementationsstatus:** alla kolumner ovan finns i den körande
-databasen (`WineEntity`) **utom** `created_at`/`updated_at` - de är inte
-byggda, ingen skriven Gherkin-scenario har krävt dem än. Resten kom i
-omgångar (CRUD-fälten, sedan bild, sedan resten via Excel-importen), inte
-i en enda stor migrering - se `tools/import-excel/`.
+Namngivningsprincip: engelska för kolumner/tabeller, men svenska
+egennamn som syftar på svenska institutioner behåller sitt svenska namn
+(`munskankarna_review`, `systembolaget_*`).
 
-**Namngivningsprincip:** engelska för kolumner/tabeller, men svenska
-egennamn som faktiskt syftar på svenska institutioner
-(`munskankarna_review`, `systembolaget_*`) behåller sitt svenska namn -
-samma princip som att man inte skulle döpa om "IKEA" i en möbelapp.
+`own_rating`/`munskankarna_rating` är begränsade till exakt de 29
+värdena från källfilens `Listor`-flik. `Rating` (`domain/Rating.java`)
+har korta konstantnamn (`R16`, `R14_5`) med den fulla svenska etiketten
+som ett separat fält; `Rating.fraEtikett(text)` normaliserar mellanslag
+innan matchning.
 
-**Bara namnet obligatoriskt (byggt 2026-07-22).** Tidigare krävde
-`vin-formular.html` (och `WineController`) att typ, producent, land,
-årgång, plats och antal flaskor alla var ifyllda för att spara ett vin -
-upptäckt av användaren som ett irritationsmoment ("jag vill kunna fylla
-i ett vin snabbt och fylla i resten senare"). Namn är nu det enda
-obligatoriska fältet; alla övriga sparas som `null` om de lämnas tomma,
-precis som de fält som redan var valfria (region, pris, tasting notes
-osv). `Wine.vintage`/`Wine.quantity` gick från primitiv `int` (kan inte
-representera "inget värde") till `Integer` - `WineController.
-tillämpaFormulärfält` tar nu emot **alla** fält som rå `String` och
-tolkar dem själv (`tolkaHeltal`/`tolkaVinTyp`, samma mönster som redan
-fanns för betyg/datum/decimaltal), istället för att låta Spring binda
-direkt till `int`/`WineType` - annars kraschar bindningen på ett tomt
-formulärfält istället för att ge `null`.
+Se [ADR 0004](docs/adr/0004-images-in-bytea.md) för varför bilder
+lagras i `bytea` och [ADR 0005](docs/adr/0005-only-name-required.md)
+för varför bara `name` är obligatoriskt.
 
-`vintage`/`quantity`-kolumnerna fick automatiskt en `NOT NULL`-
-begränsning av Hibernate när de var Java-primitiver - `ddl-auto: update`
-lättar aldrig på en befintlig begränsning även när Java-typen ändras
-till en nullable `Integer`, så `schema.sql` fick två kompletterande
-`ALTER TABLE ... DROP NOT NULL`-satser (idempotenta, säkra att köra om
-- se filen). Land (`WineService.härkomstträd()`) hoppar nu över viner
-utan land helt när filterträdet byggs, eftersom `TreeMap` inte tillåter
-en `null`-nyckel - ett vin utan land kan ändå inte placeras i något
-land-/regiongren. Mallarna (`vinkallare.html`) fick `th:if`-vakter
-tillagda överallt där ett fält tidigare antogs alltid vara satt (typ,
-årgång, antal/flaskbadge, producent, land, plats) - särskilt `.vk-plats`
-i de breda korten, som visade en tom "Plats"-etikett innan den fick sin
-vakt (upptäckt via en Playwright-skärmdump av ett minimalt vin, inte av
-något automatiskt test). Verifierat manuellt: ett vin med bara namnet
-ifyllt sparas och visas felfritt i både breda och smala kort, med
-filterpanelen öppen, och med Detaljer/redigeringsläge uppfällt.
+## Vinlistan
 
-**Betyg som enum (byggt):** `own_rating` och `munskankarna_rating` är
-begränsade till exakt de 29 värdena från Excelns `Listor`-flik. `Rating`
-(`domain/Rating.java`) har korta konstantnamn (`R16`, `R14_5` osv. - samma
-mönster som `WineType`s `RED`/`WHITE`) med den fullständiga svenska
-etiketten (t.ex. `"16 (15 - 17,5 Högklassigt vin)"`) som ett fält;
-`Rating.fraEtikett(text)` normaliserar bort inkonsekvent mellanslag i
-källfilen (några av "Enkel vin"-raderna har dubbla mellanslag) innan den
-matchar. `@Enumerated(EnumType.STRING)` gör att Hibernate genererar
-`CHECK`-constrainten automatiskt, precis som för `WineType`. Ingen separat
-uppslagstabell - 29 fasta strängar är overengineering att normalisera bort.
+Startsidan visar en överblick per vin: bild, namn, typ, producent,
+land, region, underregion, druvor, årgång, flaskor, eget betyg,
+Munskänkarnas betyg och Vivino-betyg. Övriga fält (plats, inköpsdatum,
+pris, inköpsanledning, tasting notes, Systembolagets
+produktnummer/beskrivning, Munskänkarnas bedömning, annan referens)
+visas infällt under en "Detaljer"-sektion på mobil - på desktop visas
+alla fält direkt utan infällning.
 
-**Bilder i `bytea`, inte objektlagring:** medvetet val för en samling i
-den här storleksordningen (se diskussion i chatten) - en datakälla,
-enklare backup, ingen extra molntjänst. Om samlingen och bildmängden växer
-kraftigt är det en isolerad migrering senare (flytta bara bilddatan), inte
-något vi bygger beredskap för nu.
+Layouten växlar mellan en bred fyrkolumnslayout (desktop, >960px) och
+en smal kortlayout med infälld Detaljer (mobil, ≤960px) via en CSS
+media query, verifierat av `WineListResponsiveIT` (Playwright) - se
+[ADR 0002](docs/adr/0002-responsive-list-dual-layout.md).
 
-**`oid`-avvikelsen är fixad (2026-07-17):** `image`-kolumnen blev i
-praktiken `oid` (Postgres large object) istället för `bytea` -
-`@Lob private byte[] image` mappar till `oid` med Hibernates
-standardinställningar mot Postgres, upptäckt via `\d wines` (syntes inte
-i den ursprungliga end-to-end-verifieringen, som bara testade
-HTTP-beteendet). `WineEntity.image` har bytt från `@Lob` till
-`@JdbcTypeCode(SqlTypes.VARBINARY)`, som ger en riktig `bytea`-kolumn.
-`ddl-auto: update` kan bara lägga till kolumner/tabeller, inte ändra en
-kolumns typ, så en engångsmigrering krävdes: `db/migrations/2026-07-17-image-oid-to-bytea.sql`
-kopierar bilddata från de gamla large objects till en ny `bytea`-kolumn,
-städar bort large objects med `lo_unlink` (annars läcker de) och byter
-namn på kolumnen. Verifierat lokalt mot en simulerad "gammal" databas -
-bytes bevarade, `pg_largeobject` tomt efteråt.
+### Filtrering, sökning och sortering
 
-Körs en gång, manuellt, mot en riktig databas (samma mönster som
-Excel-importen ovan):
+Verktygsraden ovanför listan har:
 
-```powershell
-$env:POSTGRESQL_ADDON_HOST = "<host>"
-$env:POSTGRESQL_ADDON_PORT = "<port>"
-$env:POSTGRESQL_ADDON_DB = "<databasnamn>"
-$env:POSTGRESQL_ADDON_USER = "<användare>"
-$env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
+- Ett sökfält (fritextsökning över namn, producent, druvor, tasting
+  notes, Systembolagets beskrivning och Munskänkarnas bedömning),
+  Postgres-driven med böjningsform-medvetenhet - se
+  [ADR 0007](docs/adr/0007-fulltext-search-tsvector.md).
+- Sorteringskontroller (fält + riktning) för Namn, Producent, Land,
+  Årgång, Antal flaskor, Pris, Inköpsdatum, Eget betyg, Munskänkarnas
+  betyg och Vivino-betyg. Viner utan värde för det sorterade fältet
+  hamnar alltid sist, oavsett riktning.
+- En hopfällbar filterpanel med vintyp (fem kryssrutor) och ursprung
+  (land→region→underregion, nästlade kryssrutor). Facetter kombineras
+  med OCH sinsemellan, ELLER inom en facett. Panelen fälls automatiskt
+  ut runt redan valda filter.
+- Chips som visar varje aktivt filter-/sökvärde, med en
+  borttagningslänk per chip - se
+  [ADR 0008](docs/adr/0008-filter-chips-plain-links.md).
 
-Get-Content db\migrations\2026-07-17-image-oid-to-bytea.sql -Raw |
-  docker run --rm -i -e PGPASSWORD=$env:POSTGRESQL_ADDON_PASSWORD postgres:16 `
-    psql -h $env:POSTGRESQL_ADDON_HOST -p $env:POSTGRESQL_ADDON_PORT `
-         -U $env:POSTGRESQL_ADDON_USER -d $env:POSTGRESQL_ADDON_DB
-```
+Vald sortering/filtrering/sökning hamnar i URL:en
+(`?sok=...&sortera=...&riktning=...&wineType=...`) - bokmärkbart och
+delbart. Orkestreringen ligger i `WineService.sök(Sökkriterier)`, inte
+i controllern - se
+[ADR 0006](docs/adr/0006-search-orchestration-in-application-layer.md).
 
-**Körd mot produktionsdatabasen (2026-07-17):** `UPDATE 0` och `lo_unlink`
-gav 0 rader - inga bilder hade laddats upp i produktion än, så
-migreringen var en ren typkonvertering utan data att flytta. `image` är
-nu `bytea` i produktion.
+## Säkerhet
 
-**Uppladdning och visning (byggt):** bilden är sedan sist ett vanligt fält
-i `vin-formular.html` (fältnamn `bild`, `enctype="multipart/form-data"`)
-och sparas i samma `WineService.save`-anrop som resten av vinet - ett tomt
-filfält skriver inte över en redan sparad bild. `GET /wines/{id}/bild`
-serverar bytes tillbaka med `Content-Type` satt från `image_mime_type`
-(404 om vinet saknar bild). `vinkallare.html` visar en `<img>`-tagg mot
-den GET-routen när `vin.harBild()` är sant, annars en textplatshållare -
-bilddatan skickas alltså aldrig inbäddad i själva listfragmentet, bara via
-webbläsarens egna bildförfrågningar. Miniatyrerna i listan (tabell och
-kort) skalas med `object-fit: contain` - beskär alltså aldrig bort delar
-av etiketten - och är länkade till samma GET-route, så ett klick öppnar
-bilden i sin fulla storlek via webbläsarens egen bildvisning (ingen
-egenbyggd lightbox/JS).
-`spring.servlet.multipart.max-file-size`/`max-request-size` är satta till
-5 MB i `application.yml` som en enkel gräns mot orimligt stora
-uppladdningar.
+Hela appen kräver HTTP Basic-inloggning - se
+[ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md). Två konton:
 
-## Arbetsprocess
+- `admin` - full åtkomst, lösenord via `WINECELLAR_ADMIN_PASSWORD`
+  (miljövariabel i produktion, `admin` som lokal default).
+- `readonly`/`readonly` - får se listan och bilder, nekas allt annat.
 
-Samma ordning som `roombooking`:
-
-1. Gherkin-scenario tillsammans, innan kod skrivs
-2. Acceptanstest (Cucumber, `*IT.java`) mot applikationslagret
-3. Enhetstest i domänlagret
-4. UI-test (`@WebMvcTest` + `MockMvc`) mot stubbat servicelager - verifierar
-   faktiskt renderad HTML
-
-### UI-test, utökat med Playwright
-
-Till skillnad från `roombooking` (där vi medvetet avstod från
-Playwright, eftersom htmx-fragmentet var det enda som behövde verifieras)
-behövs det här: `@WebMvcTest`/MockMvc kör ingen CSS och kan inte se att
-listan faktiskt växlar mellan tabell (desktop) och kort (mobil) vid en viss
-brytpunkt. Det är själva poängen med UI:t, så det har ett eget testlager:
-
-- **`WineListResponsiveIT`** (Failsafe, `*IT.java`): startar appen
-  (`@SpringBootTest(webEnvironment = RANDOM_PORT)`), öppnar sidan med
-  Playwright i två viewport-bredder (1280×800 för desktop, 375×667 för
-  mobil) och verifierar vilket element (`#vinlista-tabell` respektive
-  `#vinlista-kort`) som faktiskt är synligt vid respektive bredd. Egen
-  Testcontainers-Postgres, oberoende av Cucumber-suitens. Mobilkontexten
-  sätter `isMobile(true)`, inte bara en smal `setViewportSize` - se
-  CLAUDE.md för varför det gör skillnad (en riktig telefon visade
-  tabellvyn trots grönt test, innan `<meta name="viewport">` och
-  `isMobile(true)` fanns).
-- Kräver `com.microsoft.playwright:playwright` som testberoende, samt att
-  webbläsarbinärerna installeras en gång lokalt (och som ett steg i CI
-  innan `mvn verify`):
-  ```
-  mvn org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.classpathScope=test -Dexec.args="install"
-  ```
-- **Utökad efter kortmall-/Detaljer-omdesignen (2026-07-19)** med
-  `WineListResponsiveIT`-tester för att Redigera/Ta bort är dolda tills
-  "Detaljer" fälls ut, och att flaskbadgen visar rätt antal - inget av
-  detta kan `@WebMvcTest`/MockMvc verifiera, eftersom det är CSS
-  (`<details>` utan `open`) som gömmer innehållet, inte serverlogik.
-  `WineControllerTest` fick samtidigt ett strukturellt test
-  (`skaRenderaKortvynsNyaStruktur`) som verifierar att klassnamnen
-  kortets utseende är beroende av faktiskt finns i den renderade
-  HTML:en (`flaskor-badge`, `vinkort-producent`, `vinkort-namn`,
-  `betyg-label`/`betyg-varde`, `fd-*`, `detalj-atgarder`) - ett rent
-  strukturellt test, inte ett bevis på att CSS:en renderar rätt (det
-  täcks av Playwright-testerna för synlig/dold-beteende, inte
-  pixel-exakt layout).
-- **Uppdaterad efter tabellvyns designomgång (2026-07-19/20):** de
-  breda korten (`#vinlista-tabell`) har ingen Detaljer längre, så
-  `skaDöljaRedigeraOchTaBortTillsDetaljerFällsUtPåDesktop` byttes mot
-  `skaVisaRedigeraOchTaBortDirektPåDesktop` (inget klick behövs -
-  åtgärderna är synliga direkt) plus
-  `skaVisaAllaFältDirektPåDesktopUtanAttFällaUtNågot` (ett fält som
-  `tastingNotes` är synligt utan interaktion). Readonly-kontots test
-  (`skaDöljaLäggTillRedigeraOchTaBortFörReadonlyKontot`) tappade sitt
-  klick på `"Detaljer"` av samma skäl. `WineControllerTest` fick ett
-  nytt strukturellt test (`skaRenderaBredaKortMedAllaFältSynliga`) som
-  verifierar att `<table>` och `vinbild-tabell` är helt borta, att de
-  nya `vk-*`-klasserna finns, och att alla fält - inklusive `Annan
-  referens`, som aldrig syntes i den gamla tabellen eller kortvyns
-  Detaljer - renderas.
+CSRF är avstängt globalt (htmx-formulären skickar ingen CSRF-token,
+autentiseringen är stateless Basic-auth per anrop).
 
 ## Köra lokalt
 
-Produktionskonfigurationen kräver en riktig Postgres (se `application.yml`).
-Starta den med docker-compose innan appen startas:
+Kräver en riktig Postgres (se `application.yml`):
 
 ```
 docker compose up -d
 mvn spring-boot:run
 ```
 
-Öppna http://localhost:8080 - formuläret postar via htmx utan sidladdning.
-Databasen är tom från början; lägg till det första vinet via formuläret på
-sidan.
+Öppna http://localhost:8080 - formuläret postar via htmx utan
+sidladdning. Databasen är tom från början; lägg till det första vinet
+via formuläret.
 
 ## Köra tester
 
@@ -534,50 +152,81 @@ sidan.
 mvn verify
 ```
 
-Kör både enhetstester/webblagertester (JUnit 5 + AssertJ + MockMvc, via
+Kör enhetstester/webblagertester (JUnit 5 + AssertJ + MockMvc, via
 Surefire) och acceptanstester (Cucumber, via `CucumberIT`, Failsafe).
-Persistensscenariot (`vin-persistens.feature`) startar en egen Postgres via
-Testcontainers - kräver en körande Docker-daemon, oavsett om
-docker-compose-databasen ovan är igång eller inte.
+Persistensscenariot (`vin-persistens.feature`) och
+`WineListResponsiveIT` (Playwright) startar egna Postgres-instanser via
+Testcontainers - kräver en körande Docker-daemon oavsett om
+docker-compose-databasen ovan är igång.
 
-## Import av befintlig Excel-data
+Playwright kräver att webbläsarbinärerna är installerade lokalt (och
+som ett steg i CI innan `mvn verify`):
 
-`Vinlista.xlsx` importeras **en gång**, inte som en del av den vanliga
-CRUD-cykeln. `tools/import-excel/` är en helt fristående Maven-modul
-(egen `pom.xml`, inte ett `<module>` av rot-pom.xml) - POI och en
-JDBC-drivrutin är beroenden av *den*, inte av den deployade appen.
+```
+mvn org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.classpathScope=test -Dexec.args="install"
+```
 
-Den beror på huvudprojektets egna `com.example:winecellar`-artefakt för
-att återanvända `Wine`/`WineType`/`Rating` (rena domänobjekt) istället för
-att duplicera betygslistan och mappningslogiken. Roten måste därför vara
-`mvn install`-ad lokalt innan importmodulen byggs - se
-`spring-boot-maven-plugin`s `<classifier>exec</classifier>`-konfiguration
-i rot-`pom.xml`: utan den skriver `repackage` över den vanliga jaren med
-en Boot-fatjar som inte går att bero på som vanligt bibliotek.
+### Arbetsprocess
 
-Kör en gång, manuellt, mot en riktig databas. **I PowerShell** - sätt
-anslutningen som miljövariabler (samma namn som `application.yml` läser)
-och skicka bara filsökvägen som argument, annars trasslar PowerShells
-citattecken-hantering till ett `-Dexec.args` med flera mellanslagsskilda
-värden (Maven kan då tolka delar av strängen som ett plugin-koordinat och
-misslyckas med ett förvirrande "could not be resolved"-fel som inte har
-med själva filen eller databasen att göra):
+1. Gherkin-scenario tillsammans, innan kod skrivs
+2. Acceptanstest (Cucumber, `*IT.java`) mot applikationslagret
+3. Enhetstest i domänlagret
+4. UI-test (`@WebMvcTest` + `MockMvc`) mot stubbat servicelager -
+   verifierar faktiskt renderad HTML
+5. `WineListResponsiveIT` (Playwright) för CSS-/responsivitetsbeteende
+   som `@WebMvcTest`/MockMvc inte kan verifiera
+
+## Import och export av Excel-data
+
+`tools/import-excel/` är en fristående Maven-modul (egen `pom.xml`,
+inte en del av den deployade appen) - se
+[ADR 0010](docs/adr/0010-excel-tool-standalone-module.md). Bygg roten
+lokalt först:
 
 ```powershell
 cd C:\projects\winecellar
-mvn install -DskipTests                      # från repo-roten, en gång
+mvn install -DskipTests
+```
 
+Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `VinradParser`:
+
+| Kolumn | Fält | Kolumn | Fält |
+|---|---|---|---|
+| A | Vintyp | L | Antal |
+| B | Land | M | Varför köpt |
+| C | Region | N | Tasting notes |
+| D | Underregion | O | Eget betyg |
+| E | Druvor | P | Systembolagets prodnummer |
+| F | Producent | Q | Systembolagets beskrivning |
+| G | Namn | R | Munskänkarnas bedömning |
+| H | Årgång | S | Munskänkarnas betyg |
+| I | Bild (läses ej vid import) | T | Vivino |
+| J | Inköpsdatum | U | Annan referens |
+| K | Pris | V | Plats |
+
+Bara namnet är obligatoriskt vid import (samma regel som webb-UI:t, se
+[ADR 0005](docs/adr/0005-only-name-required.md)) - en rad utan namn
+hoppas över med en utskriven varning.
+
+### Import
+
+**I PowerShell** - sätt anslutningen som miljövariabler och skicka bara
+filsökvägen som argument (annars trasslar PowerShells
+citattecken-hantering med `-Dexec.args`):
+
+```powershell
 $env:POSTGRESQL_ADDON_HOST = "<host>"
 $env:POSTGRESQL_ADDON_PORT = "<port>"
 $env:POSTGRESQL_ADDON_DB = "<databasnamn>"
 $env:POSTGRESQL_ADDON_USER = "<användare>"
 $env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
+$env:WINECELLAR_LOCAL_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"  # valfri, se nedan
 
 cd tools\import-excel
 mvn exec:java "-Dexec.args=C:\Users\jonsw\Documents\Vin\Vinlista.xlsx"
 ```
 
-**I Bash** funkar det multi-värdesargumentet som tidigare stod här:
+**I Bash** går flervärdesargumentet att skicka direkt:
 
 ```bash
 cd tools/import-excel
@@ -587,127 +236,24 @@ mvn exec:java -Dexec.args="<sökväg-till-Vinlista.xlsx> <jdbc-url> <användare>
 Utan `jdbc-url`/`användare`/`lösenord` som argument används
 `POSTGRESQL_ADDON_*`-miljövariablerna, annars
 `localhost`/`winecellar`/`winecellar` (docker-compose-databasen).
+Verktyget har ingen dedupliceringslogik - kör inte importen två gånger
+mot samma databas.
 
-Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `VinradParser` - se
-README:s Datamodell-avsnitt för vilket fält varje kolumn motsvarar.
-**Bara namnet är obligatoriskt (ändrat 2026-07-22, samma regel som
-webb-UI:t** - se Datamodell-avsnittets "Bara namnet obligatoriskt"):
-en rad utan namn hoppas över med en utskriven varning, men alla andra
-fält (inklusive vintyp/land/producent, som tidigare krävdes) tolkas nu
-som valfria och blir `null` om cellen är tom. Etikett-kolumnen (`Bild`)
-i själva Excel-filen läses **fortfarande inte** - Excels "bild i cell"
-är inbäddad rich data, inte ett vanligt cellvärde, och att extrahera den
-robust är inte värt det för ett engångsskript. Etiketter importeras
-istället från en vanlig bildmapp, se nedan.
+`WINECELLAR_LOCAL_IMAGE_FOLDER` (valfri) pekar ut en mapp med bildfiler
+döpta exakt som respektive vins namn (t.ex. `Barolo.jpg`) -
+`jpg`/`jpeg`/`png`/`gif`/`webp` känns igen. Matchning är exakt
+(filnamnsstam mot `name`, ingen normalisering). Två tvetydighetsfall
+hoppas över med en utskriven varning: flera bildfiler med samma stam
+men olika ändelse, och flera viner med exakt samma namn (samma bildfil
+kopplas då till alla).
 
-**"Systembolagets prodnummer" fick en egen kolumn (2026-07-20).** Ligger
-efter "Eget betyg" (kolumn P), vilket sköt "Systembolaget"-kolumnen
-(nu bara beskrivningen, ingen radbrytning med numret först) och alla
-kolumner efter den ett steg åt höger - se `VinradParser`s
-`COL_*`-konstanter. Tidigare låg produktnumret hopklistrat som första
-raden i samma cell som beskrivningen (`"12345\nBeskrivning..."`), delat
-på den första radbrytningen - den logiken är borttagen, båda fälten
-läses nu rätt av som två oberoende kolumner.
+### Export
 
-**Etiketter kan istället importeras från en vanlig bildmapp (byggt
-2026-07-19, miljövariabeln döpt om till `WINECELLAR_LOCAL_IMAGE_FOLDER`
-2026-07-22 - se "Export av databasen till Excel" nedan för varför):**
-sätt miljövariabeln till sökvägen till en mapp där varje bildfil är
-döpt exakt som vinets `name`-fält (t.ex. `Barolo.jpg` för ett vin med
-namnet "Barolo") - `jpg`/`jpeg`/`png`/`gif`/`webp` känns igen, MIME-typen
-sätts utifrån filändelsen. `Bildmatchare` (`tools/import-excel/`) matchar
-filnamnets stam (utan ändelse) mot varje vins namn **exakt**, ingen
-normalisering av mellanslag/skiftläge. Två fällor hanteras explicit, med
-utskrivna varningar istället för att gissa:
-- Flera bildfiler med samma stam men olika ändelse (t.ex. både
-  `Barolo.jpg` och `Barolo.png`) - tvetydigt vilken som ska användas,
-  den stammen hoppas över helt.
-- Flera viner med exakt samma namn i Excel-filen (t.ex. samma vin köpt i
-  flera årgångar) - samma bildfil kopplas då till alla, med en varning
-  utskriven så det inte sker i tysthet. Om det är fel för ett enskilt
-  vin går det att rätta i efterhand via webb-UI:ts redigeringsformulär.
-
-Miljövariabel istället för ett nytt positionellt argument, av samma skäl
-som `jdbc-url`/`användare`/`lösenord` redan är miljövariabler ovan -
-undviker PowerShells trassel med flervärdesargument i `-Dexec.args`.
-Variabeln är helt valfri - utan den beter sig importen precis som förut,
-ingen bild kopplas till något vin.
-
-```powershell
-$env:WINECELLAR_LOCAL_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"
-```
-
-Om ingen fil matchar ett visst vin kopplas helt enkelt ingen bild till
-det vinet (precis som innan denna funktion fanns) - det går fint att
-ladda upp den etiketten manuellt via webb-UI:t efteråt istället.
-
-Verifierat lokalt (2026-07-17) mot en tom docker-compose-databas: 28 av
-30 rader importerade (2 dåvarande ofullständiga utkastrader korrekt
-överhoppade), alla fält - inklusive betyg, Systembolagets hopklistrade
-cell och prisceller med extra anteckningstext - stämde vid stickprov mot
-källfilen, och appen renderade listan felfritt efteråt.
-
-**Körd mot produktionsdatabasen (2026-07-17):** kördes lokalt (PowerShell,
-se kommandot ovan - Clever Cloud har inget CLI att köra verktyget *på*,
-och behövs inte heller, Postgres-tillägget är nåbart utifrån) mot
-produktionens `POSTGRESQL_ADDON_*`-uppgifter från Clever Cloud-konsolen.
-Sparade 30 viner utan fel - samtliga rader i källfilen hade alltså hunnit
-fyllas i komplett sedan den lokala testkörningen ovan. Verktyget har ingen
-dedupliceringslogik - kör inte importen igen mot samma databas, det skulle
-skapa dubbletter.
-
-## Export av databasen till Excel
-
-`ExportExcel` (byggt 2026-07-22, samma modul: `tools/import-excel/`) är den
-omvända operationen av `ImportExcel` ovan: läser hela `wines`-tabellen och
-skriver en `.xlsx`-fil i exakt samma kolumnlayout (A-V) som
-`VinradParser`/`ImportExcel` förväntar sig, så filen kan redigeras och
-importeras tillbaka - och fungerar samtidigt som en enkel backup av
-databasens textdata. `VinradSkrivare` gör själva radskrivningen och delar
-`VinradParser`s `COL_*`-konstanter (paketsynliga, inte private, sedan
-export tillkom) istället för att duplicera kolumnindexen i en andra
-klass - samma kolumnlayout måste annars hållas i synk manuellt på två
-ställen, ett tidigare dokumenterat felmönster i det här projektet
-(Systembolagets prodnummer-kolumnen). `Databaskoppling` (extraherad ur
-`ImportExcel` när export tillkom) delar
-jdbc-url/användare/lösenord-uppslagningen mellan de två verktygen.
-
-**Etiketter exporteras på två oberoende sätt (byggt 2026-07-22, på
-användarens begäran - fullständig rundtripp för både text och bilder).**
-
-1. Som en vanlig ankrad POI-`Picture` i xlsx-filens "Bild"-kolumn (samma
-   kolumn som källfilens ursprungliga, men fylld på ett helt annat sätt
-   - se nedan). Bara en visuell bekvämlighet för att kunna bläddra
-   bilderna direkt i Excel. Stödda MIME-typer: JPEG, PNG, GIF - **inte**
-   WEBP, eftersom OOXML/`.xlsx` inte har något bildformat för webp och
-   POI ingen `PICTURE_TYPE`-konstant för det. En webp-bild hoppas över
-   här med en utskriven varning istället för att krascha - påverkar
-   bara den enskilda etikettens Excel-inbäddning.
-2. Som en riktig bildfil i `WINECELLAR_LOCAL_IMAGE_FOLDER` (**samma**
-   miljövariabel som `ImportExcel`/`Bildmatchare` använder för att koppla
-   bilder vid import, döpt om från `WINECELLAR_IMPORT_IMAGE_FOLDER` när
-   detta byggdes - namnet ska spegla att mappen nu används åt båda
-   hållen, inte bara vid import), döpt exakt som vinets namn (samma
-   namnmatchning som `Bildmatchare` förväntar sig vid en återimport).
-   **Detta är den mekanism som gör rundtrippen fullständig** - alla
-   MIME-typer `Bildmatchare` känner igen skrivs hit, inklusive webp.
-   Om flera viner delar exakt samma namn skrivs en varning ut (bara den
-   sist skrivna filen blir kvar i mappen) - samma "varna istället för
-   att gissa"-linje som `Bildmatchare`s egna tvetydighetsfall vid import.
-
-En vanlig ankrad `Picture` är en helt annan, mycket enklare mekanism att
-SKRIVA än Excels ursprungliga "bild i cell" (inbäddad rich data) är att
-LÄSA - `ImportExcel` läser fortfarande inte bilder ur xlsx-filen själv
-(se ovan), men det spelar ingen roll för rundtrippen eftersom mekanism 2
-(bildmappen) är den som faktiskt läses tillbaka.
-
-**Full rundtripp kräver alltså att samma `WINECELLAR_LOCAL_IMAGE_FOLDER`
-pekas ut vid både export och en efterföljande återimport** - annars
-kommer text-datan tillbaka men inte bilderna (exakt samma begränsning
-som redan gäller ren import från en bildmapp, se ovan).
-
-Kör via `exec-maven-plugin`, som annars kör `ImportExcel` som standard -
-`ExportExcel` kräver ett explicit `-Dexec.mainClass`-argument:
+`ExportExcel` skriver `wines`-tabellen till en `.xlsx`-fil i samma
+kolumnlayout som importen förväntar sig - se
+[ADR 0011](docs/adr/0011-excel-image-roundtrip-dual-mechanism.md) för
+hur bilder hanteras. Kräver ett explicit `-Dexec.mainClass`-argument
+(annars körs `ImportExcel` som standard):
 
 ```powershell
 cd C:\projects\winecellar\tools\import-excel
@@ -717,348 +263,45 @@ $env:POSTGRESQL_ADDON_PORT = "<port>"
 $env:POSTGRESQL_ADDON_DB = "<databasnamn>"
 $env:POSTGRESQL_ADDON_USER = "<användare>"
 $env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
-$env:WINECELLAR_LOCAL_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"  # valfri - se ovan
+$env:WINECELLAR_LOCAL_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"  # valfri, se nedan
 
 mvn exec:java "-Dexec.mainClass=com.example.winecellar.importexcel.ExportExcel" "-Dexec.args=C:\Users\jonsw\Documents\Vin\Vinlista-export.xlsx"
 ```
 
 Utan `POSTGRESQL_ADDON_*`-miljövariabler används
-`localhost`/`winecellar`/`winecellar` (docker-compose-databasen), samma
-konvention som `ImportExcel`. Utan `WINECELLAR_LOCAL_IMAGE_FOLDER`
-skrivs inga bildfiler (bilderna bäddas ändå in i xlsx-filen där
-formatet stöds, se ovan) - mappen skapas automatiskt om den inte redan
-finns.
-
-**Tidigare känd rundturs-begränsning, löst 2026-07-22:** sedan webb-UI:t
-bara kräver `namn` för ett nytt vin (se ovan) kunde databasen innehålla
-viner som saknade vintyp/land/producent, och `VinradParser` krävde
-tidigare alla fyra vid återimport - ett sådant vin exporterades fint
-till Excel, men hoppades över vid återimport. Löst genom att lätta på
-`VinradParser`s krav till samma regel som webb-UI:t (bara namnet
-obligatoriskt, se ovan) - `ImportExcel.bindParametrar` fick samtidigt
-null-safe bindning för `wine_type`/`producer`/`country` (tidigare bundna
-direkt utan null-koll, eftersom `VinradParser` garanterade att de aldrig
-var `null`) - annars kraschade importen av en sådan rad med ett
-`NullPointerException` istället för att spara `null` i databasen. Fångat
-av den manuella verifieringen nedan, inte av något automatiskt test.
-
-**Verifierat lokalt (2026-07-22)** mot en tom docker-compose-databas: tre
-testviner (ett fullständigt ifyllt med bild, ett med bara namnet satt
-utan bild, ett med bara namnet satt **och** en bild) sparades via
-webb-UI:t, exporterades med `WINECELLAR_LOCAL_IMAGE_FOLDER` satt,
-databasen tömdes (`TRUNCATE`), och både xlsx-filen och bildmappen
-importerades tillbaka - alla tre viner återkom med identiska textvärden
-(kontrollerat via `psql`), och båda bilderna (inklusive det namn-bara
-vinets) återkom byte-för-byte identiska med originalen. Ingen rad
-hoppades över. `VinradSkrivareTest` har en motsvarande enhetstest
-(`ettVinMedBaraNamnetSkrivsOchÅterlässKorrekt`) som verifierar samma sak
-isolerat, utan en riktig databas.
-
-**Bildexporten verifierad separat, samma dag:** en riktig uppladdad
-JPEG-etikett exporterades både till xlsx-filens `xl/media/`-mapp (som
-ankrad `Picture`) och till bildmappen som en egen fil - båda kopiorna var
-byte-för-byte identiska med originalet. `VinradSkrivareTest` har motsvarande enhetstester för xlsx-inbäddningen:
-en som verifierar att en riktig (minimal) PNG bäddas in och kan hämtas ut
-via `Workbook.getAllPictures()`, en som verifierar att en webp-bild
-hoppas över där utan att kasta ett fel. Bildmappsskrivningen
-(`ExportExcel.skrivBildfiler`) har ingen egen enhetstest - verifierad
-manuellt enligt samma princip som resten av `ImportExcel`/`ExportExcel`s
-JDBC-integration (se Arbetsprocess-avsnittet).
-
-**Fälla som dök upp vid den manuella verifieringen:** `pom.xml`s
-`exec-maven-plugin`-konfiguration hade `<mainClass>` hårdkodat direkt till
-`ImportExcel` (inte via en `${...}`-property), så `-Dexec.mainClass=...`
-på kommandoraden tystades helt ner - `mvn exec:java` körde alltid
-`ImportExcel` oavsett vilken klass som angavs. Fixat genom att lägga till
-en `exec.mainClass`-property (standardvärde `ImportExcel`, oförändrat
-beteende för den vanliga importkörningen) och peka pluginkonfigurationens
-`<mainClass>` mot `${exec.mainClass}` - kommandoradsargumentet vinner nu
-över standardvärdet, som `-D`-egenskaper normalt förväntas göra.
+`localhost`/`winecellar`/`winecellar`. Bilder skrivs till
+`WINECELLAR_LOCAL_IMAGE_FOLDER` om variabeln är satt (mappen skapas
+automatiskt om den inte finns) - **samma mapp som import använder**,
+och det är den som gör en efterföljande återimport bildmedveten. Bilder
+bäddas dessutom alltid in direkt i xlsx-filens "Bild"-kolumn där
+formatet stöds (JPEG/PNG/GIF, inte WEBP) - bara en visuell bekvämlighet
+för att bläddra i Excel, läses inte tillbaka vid import.
 
 ## Deploy
 
-Samma plattform och samma mönster som `roombooking`: **Clever Cloud**,
-GitHub-länkad autodeploy, `clevercloud/maven.json` för att peka ut
-`spring-boot:run`, PostgreSQL-tillägget länkat till just den här appen.
-Samma kända fällor gäller (se `CLAUDE.md`): HikariCPs poolstorlek måste
-sänkas, tillägget måste länkas om appen skapas om.
-
-**Deployen är verifierad fungerande (2026-07-12):** riktig Postgres,
-GitHub-länkad autodeploy, `spring-boot:run` via `clevercloud/maven.json`,
-HTTP Basic-autentisering med ett riktigt lösenord satt via
-`WINECELLAR_ADMIN_PASSWORD` i Clever Cloud-konsolen (verifierat att
-standardlösenordet `admin`/`admin` **inte** längre fungerar, se
-CLAUDE.md:s "Säkerhet"). Appens URL är medvetet inte listad här - det här
-repot är delat.
-
-## Filtrering, sökning och sortering
-
-Tre relaterade tillägg till vinlistan, planerade tillsammans (mockup
-godkänd 2026-07-20, se `CLAUDE.md`) men byggda **var för sig** i egen takt
-- vald ordning: **sortering → filtrering → fritextsökning**, eftersom
-sortering inte kräver någon databasändring (hela listan läses redan in i
-minnet vid varje anrop, ingen paginering finns) medan fritextsökning
-kräver en riktig migrering (en `tsvector`-kolumn). Att börja med den
-enklaste av de tre lät hela mönstret - queryparametrar, htmx-verktygsrad,
-orkestrering i `WineService` - etableras innan de mer komplexa bitarna
-byggs ovanpå det.
-
-**Sortering (byggd 2026-07-21).** `Sorteringsfält` (`application`-paketet)
-är en enum med en konstant per sorterbart fält (Namn, Producent, Land,
-Årgång, Antal flaskor, Pris, Inköpsdatum, Eget betyg, Munskänkarnas
-betyg, Vivino-betyg), där varje konstant själv vet hur man jämför två
-`Wine` i given riktning (`comparator(SorteringsRiktning)`).
-
-Sorteringskontrollerna (två `<select>`, ett för fält och ett för
-riktning) ligger i en `<form>` ovanför listan, skickar `hx-get="/"
-hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change"
-hx-push-url="true"` - samma target/swap-mönster som "Ta bort" redan
-använder. `GET /` grenar därför på `HX-Request`-headern: en
-htmx-förfrågan får bara `vinkallare :: lista`-fragmentet tillbaka
-(verktygsraden och filterpanelen ligger utanför fragmentet och rörs
-alltså inte av swappen), en vanlig sidladdning får hela sidan.
-`hx-push-url="true"` gör att den valda sorteringen/filtreringen hamnar i
-webbläsarens adressfält (`?sortera=EGET_BETYG&riktning=FALLANDE&
-wineType=RED`) - bokmärkbart/delbart, och rätt alternativ är förvalt
-(`th:selected`/`th:checked`) om sidan laddas direkt med de
-queryparametrarna.
-
-**Filtrering (byggd 2026-07-21).** Vintyp (5 fasta kryssrutor) och
-ursprung (land→region→underregion, nästlade kryssrutor - Alternativ A
-från mockupen, statiska facetter) i en hopfällbar `<details
-class="filterpanel">` under sorteringskontrollerna. Land/region/
-underregion är fri text på `Wine` (ingen uppslagstabell, se
-Datamodell), så trädet för kryssrutorna härleds fräscht vid varje
-anrop av `WineService.härkomstträd()` från **samtliga** viner (statiska
-facetter - oavsett aktivt filter), inte lagrat. `HärkomstNod(namn,
-barn)` är samma rekursiva form på alla tre nivåer (en underregion är
-bara en nod utan barn); mallen renderar trädet med två nästlade
-`th:each` (inte en generisk rekursiv fragment - djupet är fast på tre
-nivåer, en rekursiv lösning hade varit onödig generalitet).
-
-Facetterna kombineras med OCH (vintyp OCH land OCH region OCH
-underregion måste alla matcha, om satta), inom en facett är flera
-valda värden ELLER (t.ex. Rött eller Vitt). Ingen explicit
-hierarki-logik behövs för land/region/underregion trots att de visas
-nästlat - varje facett filtrerar oberoende av de andra, och en kryssad
-underregion (t.ex. "Rías Baixas") råkar redan bara matcha viner från
-rätt land eftersom det är vad datan faktiskt innehåller.
-`WineService.sök(Sökkriterier)` ersatte den tvåparametrar-varianten
-(`sortering, riktning`) från sorteringsomgången - `Sökkriterier` är en
-`Builder`-baserad record (samma mönster som `Wine.Builder`, motiverat
-av samma skäl: för många fält för en positionell konstruktor så fort
-filter+sortering kombineras) med defaultvärden (inga filter, Namn
-stigande) så anropsplatser bara sätter det de faktiskt bryr sig om.
-
-En `<p class="traffrad">` ("Visar X av Y viner") ligger **inuti**
-`#vinlista`-fragmentet, inte ovanför det som ett första försök gjorde -
-annars uppdaterades inte träffantalet vid en htmx-filtrering (bara
-kortlistan bytte ut sig, texten blev kvar med det gamla antalet).
-Upptäckt via en Playwright-skärmdump av ett filtrerat resultat innan
-push, inte av något automatiskt test - `WineControllerTest`s
-`skaVisaAntalTräffar` verifierar bara att texten *finns* i svaret, inte
-var i DOM-trädet den ligger relativt fragmentgränsen, så den hade inte
-fångat buggen.
-
-**Filterpanelens träd fälls ut automatiskt runt redan valda filter, och
-knappen döljer panelen istället för att "använda" ett redan applicerat
-filter (fixat 2026-07-21, upptäckt av användaren mot produktionen).**
-Två separata problem, en gemensam orsak: den gamla `<button
-type="submit">Använd filter</button>` gjorde en riktig sidladdning
-(`hx-trigger="change"` är satt på hela formuläret, inte "submit", så en
-knapptryckning gick inte via htmx alls) - varje sådan omladdning
-återställde alla `<details>`-element i trädet till hopfällt, även de
-som täckte en redan vald region/underregion. Löst med två oberoende
-fixar:
-- `WineController.beräknaExpanderadeNoder(...)` räknar ut vilka
-  land-/regionnivåer i `härkomstträd()` som innehåller ett valt filter
-  (`expanderadeLänder`/`expanderadeRegioner`-modellattribut), och
-  mallen sätter `th:open` på respektive `<details>` utifrån det. Löser
-  problemet för varje *riktig* sidladdning (bokmärkt/delad URL,
-  webbläsarrefresh, eller knappen om JS är avstängt).
-- Knappen döptes om till "Dölj filter" och fick `onclick="event.
-  preventDefault(); this.closest('details').removeAttribute('open')"` -
-  en liten, väl avgränsad JS-rad (appen är i övrigt JS-fri förutom
-  htmx) eftersom det inte finns något rent HTML/CSS-sätt att stänga ett
-  `<details>`-element programmatiskt. `event.preventDefault()` stoppar
-  den gamla sidladdningen helt när JS är tillgängligt - kryssrutorna har
-  redan applicerat filtret live via `hx-trigger="change"`, så knappen
-  behöver inte skicka något själv. Utan JS faller den tillbaka till en
-  riktig formulärsubmit (nödvändigt eftersom kryssrutornas
-  auto-tillämpning också kräver JS/htmx för att fungera över huvud
-  taget) - vilket sidan `expanderadeLänder`/`expanderadeRegioner`-fixen
-  ovan gör ofarligt, eftersom den efterföljande sidladdningen ändå
-  fäller ut rätt grenar. `this.closest('details')` hittar den
-  omslutande `.filterpanel`, inte något av de nästlade land-/
-  region-`<details>`-elementen (de är kusiner till knappen i DOM:et,
-  inte förfäder).
-
-**Fritextsökning (byggd 2026-07-21/22) - den sista av de tre.** Sökfältet
-ligger i verktygsraden, till vänster om sorteringskontrollerna, och söker
-över namn, producent, tasting notes, Systembolagets beskrivning och
-Munskänkarnas bedömning.
-
-Postgres fulltextsökning valdes framför två alternativ som diskuterades:
-ren `ILIKE`-matchning (enkel men ingen böjningsform-medvetenhet, t.ex.
-"vin" hittar inte "viner") och en separat sök-tabell/"dubbellagring"
-("kanske kan det lösas genom dubbellagring" var frågan som ledde hit) -
-den senare avfärdades till förmån för en **genererad kolumn** på
-`wines` (`search_vector tsvector`, se `schema.sql`), eftersom det ger
-samma fördel (slippa beräkna sökbarheten vid varje fråga) utan att
-duplicera data eller behöva synk-logik; Postgres räknar om kolumnen
-automatiskt vid varje `INSERT`/`UPDATE`. Namn och producent viktas
-högre (`'A'`) än de längre fritextfälten (`'B'`) via `setweight(...)`,
-så en träff i namnet rankas högre än en träff djupt i en tasting note.
-`'swedish'`-textsökningskonfigurationen ger böjningsform-medvetenhet
-(stemming) - verifierat manuellt (`sök=kraftfull` hittar ett vin vars
-tasting notes bara innehåller "Kraftfulla", inte den exakta
-sökordsformen) och rankning (`ts_rank`, används i `ORDER BY` i den
-Postgres-specifika sökfrågan, se nedan).
-
-`schema.sql` kompletterar `ddl-auto: update`, som **inte** kan skapa en
-`GENERATED ALWAYS AS`-kolumn eller ett index - bara vanliga
-kolumner/tabeller. Till skillnad från den tidigare
-`db/migrations/2026-07-17-image-oid-to-bytea.sql` (ett manuellt
-engångsskript, se Datamodell ovan) är den här migreringen **helt
-automatisk och idempotent** (`ADD COLUMN IF NOT EXISTS`/`CREATE INDEX
-IF NOT EXISTS`), och körs av Spring Boot vid **varje** appstart
-(`spring.sql.init.mode: always` i `application.yml`) - en medveten
-avvikelse från det manuella mönstret, motiverad av att det här är ren
-schema-DDL utan datamigrering (ingen befintlig data behöver flyttas
-eller konverteras, Postgres beräknar kolumnvärdet automatiskt för både
-befintliga och nya rader), till skillnad från oid→bytea-migreringen som
-behövde flytta faktiska bytes och städa bort föräldralösa large
-objects. `spring.jpa.defer-datasource-initialization: true` säkerställer
-att `schema.sql` körs **efter** att Hibernate skapat `wines`-tabellen,
-inte innan (annars kraschar `ALTER TABLE` mot en tabell som ännu inte
-finns, t.ex. mot en helt ny databas) - detta är också varför
-`WineListResponsiveIT` (som startar en helt ny Testcontainers-Postgres
-per testkörning) fungerar som en indirekt verifiering av att
-migreringen är korrekt: om `schema.sql` vore trasig skulle den testen
-misslyckas vid varje körning, inte bara vid en enda produktionsdeploy.
-
-`WineRepository` fick en ny `search(String)`-metod. `JpaWineRepository`
-implementerar den med en native query (`WineJpaRepository.search`) mot
-`search_vector @@ plainto_tsquery('swedish', :query)`, med en explicit
-kolumnlista istället för `SELECT *` (Hibernate kan annars inte mappa
-den extra, omappade `search_vector`-kolumnen till `WineEntity`).
-`InMemoryWineRepository` implementerar samma metod med en enklare
-skiftlägesokänslig delsträngsmatchning över samma fält - **beter sig
-inte identiskt** (ingen böjningsform-medvetenhet eller rankning), men
-det är exakt samma avvägning som redan gäller för övrig DB-specifik
-funktionalitet i det här projektet (se `vin-persistens.feature`): fullt
-tillräckligt för de acceptanstester som bara bryr sig om VILKA viner
-som matchar, inte i vilken ordning.
-
-`Sökkriterier` fick ett `sökterm`-fält. `WineService.sök(...)` väljer
-baslista i tre steg: en sökterm ger `wineRepository.search(...)` som
-baslista, annars `findAll()` - facetterna filtrerar sedan den listan,
-och sorteringen appliceras sist. **Medveten avvägning:** sorteringen
-skriver därmed alltid över den relevansrankning `ts_rank` gav i
-sökfrågan (om användaren inte uttryckligen valt en annan sortering) -
-ingen separat "Relevans"-sorteringsalternativ är byggt, eftersom det
-hade krävt att rankningspoängen (som inte är ett Wine-fält) fanns
-tillgänglig även efter att `Sorteringsfält`s vanliga
-fält-comparatorer redan bestämmer ordningen. En naturlig, enkel
-utökning senare om det visar sig behövas - inte byggd nu.
-
-**Druvor (`grapes`) lades till i sökuttrycket (2026-07-22), viktat
-tillsammans med namn/producent (`'A'`)** - en druvträff (t.ex. "pinot
-noir") är lika precis/stark ett signal som en namn-/producentträff,
-till skillnad från en träff i en längre fritextnot. Det här kravde att
-`schema.sql` gick från "`ADD COLUMN IF NOT EXISTS`" till att **droppa
-och återskapa** `search_vector`-kolumnen (och dess index) vid varje
-appstart - se kommentaren i filen för varför: Postgres har inget sätt
-att ändra en genererad kolumns uttryck på plats, och `IF NOT EXISTS`
-hade gjort en redan existerande kolumn i produktion permanent fastlåst
-vid sin GAMLA definition (utan druvor). Kostnaden (hela kolumnen och
-indexet räknas om vid varje omstart) är försumbar för en samlingsstorlek
-i den här klassen. `InMemoryWineRepository.search(...)` fick motsvarande
-tillägg. Verifierat manuellt mot en riktig Postgres: sökning på "pinot
-noir" hittar bara det vin vars druvor faktiskt innehåller båda orden,
-inte ett vin med bara "Chardonnay".
-
-**Chips som visar aktivt filter/sökning (byggt 2026-07-22)** - en chip
-per valt värde (vintyp, land, region, underregion, sökterm), med en
-borttagningslänk som tar bort *bara* det värdet och behåller allt
-annat oförändrat. Byggd i `WineController` (inte `WineService` - rent
-en presentationsangelägenhet, ingen Gherkin-relevant logik), som en
-`Sökvy`-hjälprecord vars `urlUtan(facett, värde)` bygger om URL:en med
-`UriComponentsBuilder`. Chip-länkarna är **vanliga `<a href>`, inte
-htmx** - medvetet: en borttagning måste uppdatera hela verktygsraden
-(kryssrutor, sökfält), inte bara listan, och de ligger utanför
-`#vinlista`-fragmentet som en htmx-swap annars hade varit begränsad
-till. Verifierat med Playwright att en borttagen chip korrekt bara
-avmarkerar sin egen kryssruta och lämnar sökfältet/övriga kryssrutor
-orörda.
-
-**Fälla som dök upp under bygget:** `#vinlista`-fragmentet fick två
-nya ovillkorliga modellattributsreferenser (`antalTotalt`, `chips`) -
-`DELETE /wines/{id}` (`taBortVin`) hade aldrig uppdaterats när
-`antalTotalt` introducerades i filtreringsomgången (osynligt då,
-eftersom `th:text` på ett null-värde bara ger tom text) men kraschade
-med en `SpelEvaluationException` när `chips.isEmpty()` anropades på
-`null`. Fixat genom att sätta båda (tomt `chips`, `antalTotalt` lika
-med antalet kvarvarande viner) i `taBortVin` också.
-
-**"Ta bort" behåller nu aktivt filter/sökning/sortering (fixat
-2026-07-22).** Tidigare återställdes vyn alltid till standardläget
-efter en borttagning, eftersom borttagningsknapparna ligger utanför
-verktygsradens `<form>` och inte skickade med något sök-/filter-/
-sorteringstillstånd. Löst genom att dela orkestreringslogiken
-(`WineController.fyllIVinlistaModell(...)`) mellan `GET /` och
-`DELETE /wines/{id}`, och genom att bygga varje "Ta bort"-knapps
-`hx-delete`-URL med samma sju queryparametrar som verktygsraden -
-Thymeleafs `@{...}`-länkuttryck expanderar `Set`-värden (vintyp,
-land, region, underregion) till upprepade queryparametrar automatiskt,
-så knappen behöver inte läsa av formuläret vid klicktillfället. Se
-CLAUDE.md.
+**Clever Cloud**, GitHub-länkad autodeploy, `clevercloud/maven.json`
+pekar ut `spring-boot:run`, PostgreSQL-tillägget länkat till appen.
+Kända fällor (HikariCP-poolstorlek, tillägget måste länkas om appen
+skapas om) finns dokumenterade i `CLAUDE.md`. Appens URL är medvetet
+inte listad här - det här repot är delat.
 
 ## Nästa steg
 
-- [x] Skriva de första Gherkin-scenarierna tillsammans (lägg till vin, lista
-      viner, redigera, ta bort)
-- [x] `Wine`-domänobjekt, `WineService`, JPA-adapter (`JpaWineRepository`,
-      testad med Testcontainers, se `vin-persistens.feature`)
-- [x] Grundläggande webblager (`WineController` + `vinkallare.html`,
-      htmx-fragment för lägg till/ändra antal/ta bort, `@WebMvcTest`)
-- [x] Responsiv dubbel kortmall + `WineListResponsiveIT` - `vinkallare.html`
-      växlar mellan breda kort (desktop, `#vinlista-tabell`) och smala kort
-      med infälld Detaljer (mobil, `#vinlista-kort`) vid 960px, verifierat
-      med Playwright i flera viewport-bredder. Startade som en
-      tabell/kort-uppdelning vid 640px, men tabellvyn ersattes senare helt
-      av breda kort utan Detaljer (se "Tabellvyns designomgång" ovan)
-- [x] Bilduppladdning och -visning (`image` + `image_mime_type`,
-      del av `vin-formular.html`) - se Datamodell ovan för `oid`-avvikelsen
-- [x] Excel-importskript (`tools/import-excel/`) - fristående Maven-modul,
-      `Wine` utökad till 23 fält (`Rating`-enum m.m.) för att rymma hela
-      Vinlista.xlsx, körd mot produktionsdatabasen - se "Import av
-      befintlig Excel-data"
-- [x] Etikettimport från en bildmapp som ett tillägg till Excel-importen
-      (`Bildmatchare`, `WINECELLAR_LOCAL_IMAGE_FOLDER`) - matchar
-      filnamn mot vinnamn, se "Import av befintlig Excel-data"
-- [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
-      inte bara en admin-del, eftersom det inte finns någon publik läsvy
-      här och appen redan var nåbar från nätet
-- [x] Deploy till Clever Cloud (se "Deploy" ovan) - appen GitHub-länkad,
-      verifierad fungerande mot en riktig Postgres
-- [x] Readonly-konto (`readonly`/`readonly`, se CLAUDE.md:s "Säkerhet") -
-      får se listan och bilder men nekas lägg till/redigera/ta bort både
-      i UI:t (dolda länkar/knappar) och på serversidan
-      (`SecurityConfig`, `hasRole("ADMIN")` på formulär-/ändringsrouterna) -
-      så det inte går att komma åt funktionaliteten genom att gissa på
-      URL:en, verifierat av både `WineControllerTest` och
-      `WineListResponsiveIT`
-- [x] Sortering av vinlistan (`Sorteringsfält`, `WineService.sök`) - se
-      "Filtrering, sökning och sortering" ovan
-- [x] Filtrering av vinlistan på vintyp/land/region/underregion
-      (`HärkomstNod`, `Sökkriterier`) - se "Filtrering, sökning och
-      sortering" ovan
-- [x] Fritextsökning över namn/producent/tasting notes/Systembolagets
-      beskrivning/Munskänkarnas bedömning (`search_vector`, `schema.sql`)
-      - se "Filtrering, sökning och sortering" ovan
-- [x] Bara namnet obligatoriskt vid tillägg/redigering - se Datamodell-
-      avsnittets "Bara namnet obligatoriskt" ovan
-- [x] Exportskript (`ExportExcel`, `tools/import-excel/`) - databasen till
-      Excel i samma kolumnlayout som importen förväntar sig, se "Export
-      av databasen till Excel"
+- [x] Gherkin-scenarier, domänmodell, grundläggande CRUD
+- [x] Responsiv dubbel layout + `WineListResponsiveIT`
+- [x] Bilduppladdning och -visning
+- [x] Excel-import (`tools/import-excel/`), inklusive etikettimport
+      från en bildmapp
+- [x] Autentisering (HTTP Basic, admin + readonly)
+- [x] Deploy till Clever Cloud
+- [x] Sortering, filtrering och fritextsökning
+- [x] Bara namnet obligatoriskt vid tillägg/redigering
+- [x] Excel-export, inklusive fullständig bildrundtripp
+
+## Mer information
+
+- `docs/adr/` - arkitektur- och designbeslut med motivering
+  (Architecture Decision Records).
+- `CLAUDE.md` - detaljerad, kronologisk utvecklingslogg för AI-assisterat
+  arbete i repot: kända fällor, testmetodik, och resonemang bakom
+  enskilda implementationsval som inte är arkitektoniska nog för en ADR.

@@ -25,9 +25,10 @@ flaggade som gällande.
   abstraktioner som roombooking hade av domänskäl (t.ex. `Clock`-injicering
   för tidsberoende regler) - de har ingen motsvarighet här.
 - **UI-komplexiteten ligger i responsiviteten, inte i logiken.** Se
-  README:s "UI-test, utökat med Playwright" - `WineListResponsiveIT` är ett
-  nytt testlager som roombooking inte hade, eftersom roombooking aldrig
-  behövde verifiera CSS-beteende (bara ett htmx-fragments innehåll).
+  `docs/adr/0002-responsive-list-dual-layout.md` - `WineListResponsiveIT`
+  är ett nytt testlager som roombooking inte hade, eftersom roombooking
+  aldrig behövde verifiera CSS-beteende (bara ett htmx-fragments
+  innehåll).
 
 ## Namngivning
 
@@ -777,8 +778,8 @@ Maven-beroende. Klassificeraren påverkar inte `spring-boot:run` (körs mot
 
 Skriver direkt via JDBC mot `wines`-tabellen, inte via `WineService`/HTTP.
 Bild-kolumnen i själva Excel-filen (Excels "bild i cell", inbäddad rich
-data) importeras fortfarande medvetet inte - se README:s "Import av
-befintlig Excel-data" för kommandon och `VinradParser`/`ImportExcel` för
+data) importeras fortfarande medvetet inte - se README:s "Import och
+export av Excel-data" för kommandon och `VinradParser`/`ImportExcel` för
 implementationen.
 
 **Etikettimport från en bildmapp (byggt 2026-07-19, miljövariabeln döpt
@@ -818,8 +819,8 @@ vanliga `text(row, col)`-hjälparen, som två oberoende kolumner.
 
 **Exportskript tillagt, samma modul (byggt och verifierat 2026-07-22).**
 `ExportExcel` läser `wines`-tabellen och skriver en `.xlsx` i exakt samma
-kolumnlayout som `VinradParser` förväntar sig - se README:s "Export av
-databasen till Excel" för kommandot. Två nya klasser:
+kolumnlayout som `VinradParser` förväntar sig - se README:s "Import och
+export av Excel-data" för kommandot. Två nya klasser:
 - `VinradSkrivare` gör radskrivningen, en `Wine` → en POI-`Row`. Delar
   `VinradParser`s `COL_*`-konstanter (som därför gick från `private` till
   paketsynliga) istället för att duplicera kolumnindexen i en andra
@@ -1035,8 +1036,8 @@ dubbletter.
   argument räcker inte - vid nästa `mvn verify` upptäcker drivrutinen att
   Firefox/WebKit saknas och försöker ladda ner dem på nytt, vilket kraschar
   testet om nätverket är begränsat vid det tillfället. Kör installationen
-  utan att begränsa till en enskild motor (se README:s "UI-test, utökat med
-  Playwright") så slipper man den överraskningen.
+  utan att begränsa till en enskild motor (se README:s "Köra tester") så
+  slipper man den överraskningen.
 - **Clever Cloud injicerar apparens miljövariabler även i byggsteget, inte
   bara vid körning.** `WINECELLAR_ADMIN_PASSWORD` (det riktiga
   produktionslösenordet) fanns alltså tillgängligt när `mvn test` kördes
@@ -1055,7 +1056,7 @@ dubbletter.
   samma syntax utan problem - det är PowerShell-specifikt. Lösning: sätt
   flervärdesargument (t.ex. `ImportExcel`s jdbc-url/användare/lösenord) som
   miljövariabler istället och skicka bara ett enda värde (utan mellanslag)
-  via `-Dexec.args`, se README:s "Import av befintlig Excel-data".
+  via `-Dexec.args`, se README:s "Import och export av Excel-data".
 - **Utan `<meta name="viewport" content="width=device-width,
   initial-scale=1">` triggas aldrig CSS-brytpunkten på riktiga mobila
   webbläsare.** `vinkallare.html` saknade taggen - riktiga telefoner
