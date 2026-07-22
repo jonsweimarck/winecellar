@@ -4,13 +4,16 @@ import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -102,6 +105,43 @@ class VinradSkrivareTest {
                 .isInstanceOf(VinradParser.RadSaknarObligatoriskaFältException.class);
     }
 
+    /**
+     * En riktig, minimal 1x1-PNG (inte bara godtyckliga bytes) - POI
+     * läser inte bildinnehållet vid addPicture, men en verklig bild gör
+     * testet en trovärdig verifiering av att den faktiska etikettdatan
+     * skrivs, inte bara att metoden inte kraschar på slumpmässiga bytes.
+     */
+    private static final byte[] EN_PIXEL_PNG = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+
+    @Test
+    void skaBäddaInBildenAnkradIBildkolumnen() {
+        Wine original = minimaltVin().toBuilder().image(EN_PIXEL_PNG).imageMimeType("image/png").build();
+
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Vin");
+        Row row = sheet.createRow(1);
+        XSSFDrawing ritning = (XSSFDrawing) sheet.createDrawingPatriarch();
+        skrivare.skriv(original, row, datumformat(workbook), ritning);
+
+        assertThat(ritning.getShapes()).hasSize(1);
+        assertThat(workbook.getAllPictures()).hasSize(1);
+        assertThat(workbook.getAllPictures().get(0).getData()).isEqualTo(EN_PIXEL_PNG);
+    }
+
+    @Test
+    void skaHoppaÖverBildMedOstöddMimeTypUtanAttKrascha() {
+        Wine original = minimaltVin().toBuilder().image(new byte[]{1, 2, 3}).imageMimeType("image/webp").build();
+
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Vin");
+        Row row = sheet.createRow(1);
+        XSSFDrawing ritning = (XSSFDrawing) sheet.createDrawingPatriarch();
+        skrivare.skriv(original, row, datumformat(workbook), ritning);
+
+        assertThat(ritning.getShapes()).isEmpty();
+    }
+
     private Wine minimaltVin() {
         return Wine.builder()
                 .country("Frankrike").producer("Joseph Drouhin").name("Saint-Véran")
@@ -112,9 +152,14 @@ class VinradSkrivareTest {
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Vin");
         Row row = sheet.createRow(1);
+        Drawing<?> ritning = sheet.createDrawingPatriarch();
+        skrivare.skriv(vin, row, datumformat(workbook), ritning);
+        return row;
+    }
+
+    private CellStyle datumformat(XSSFWorkbook workbook) {
         CellStyle datumformat = workbook.createCellStyle();
         datumformat.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("yyyy-mm-dd"));
-        skrivare.skriv(vin, row, datumformat);
-        return row;
+        return datumformat;
     }
 }

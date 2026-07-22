@@ -834,8 +834,6 @@ databasen till Excel" för kommandot. Två nya klasser:
   flyttad) eftersom `ExportExcel` behövde exakt samma
   anslutningsuppslagning - först vid den andra verkliga anropsplatsen,
   inte i förväg.
-- Bilddata exporteras medvetet inte till Excel-celler, av samma skäl som
-  import inte läser dem.
 - `Wine.vintage`/`Wine.quantity` är `Integer` (inte primitiv `int`) sedan
   "bara namnet obligatoriskt"-ändringen ovan - `ExportExcel` läser dem med
   `ResultSet.getObject(kolumn, Integer.class)` (ger korrekt `null`, till
@@ -870,6 +868,50 @@ databasen till Excel" för kommandot. Två nya klasser:
   `VinradParser`, samma testfilosofi som modulens övriga tester (ingen
   Gherkin här, se README:s Arbetsprocess-avsnitt för varför den
   distinktionen finns).
+
+**Bildexport tillagd (byggt och verifierat 2026-07-22, samma dag - på
+användarens uppföljningsfråga "Går det att även exportera bilderna?").**
+`VinradSkrivare.bild(...)` ankrar varje vins `image` som en vanlig
+POI-`Picture` i `VinradParser.COL_BILD` (kolumn I, gick från en ren
+kommentar till en riktig delad konstant för tillfället, se
+`VinradParser`). **Detta är en helt annan mekanism än källfilens
+ursprungliga "bild i cell"** (inbäddad rich data, se klasskommentaren
+högst upp i det här avsnittet) - en vanlig ankrad `Picture` är mycket
+enklare att SKRIVA än rich-data-celler är att LÄSA, men `ImportExcel`
+läser fortfarande inte bilder från Excel-filen alls. En exporterad bild
+går alltså **inte** automatiskt tillbaka in i databasen vid en
+återimport - `WINECELLAR_IMPORT_IMAGE_FOLDER`/`Bildmatchare` är
+fortfarande den enda vägen in för bilder vid import. Medvetet inte
+byggt som en fullständig rundtur i det här steget - användarens fråga
+gällde specifikt export ("kan vi också exportera bilderna"), inte att
+återimporten också ska plocka upp dem; en naturlig, avgränsad
+utökning senare om det efterfrågas.
+- **MIME-typstöd:** JPEG/PNG/GIF (`POI_BILDTYP_PER_MIME` i
+  `VinradSkrivare`, mappar till `Workbook.PICTURE_TYPE_JPEG`/`_PNG` och
+  `XSSFWorkbook.PICTURE_TYPE_GIF` - GIF-konstanten finns bara på
+  `XSSFWorkbook`, inte basgränssnittet `Workbook`). **Inte WEBP** - trots
+  att `Bildmatchare` känner igen `.webp`-filer vid import finns inget
+  OOXML-bildformat för webp och ingen motsvarande POI-konstant. En
+  webp-bild hoppas över vid export med en utskriven varning
+  (`Varning: bilden för "X" har MIME-typen "image/webp"...`) istället
+  för att krascha - samma "hantera explicit med varning istället för
+  att gissa/krascha"-linje som `Bildmatchare`s egna tvetydighetsfall.
+- **API-detaljer:** `Drawing<?>` (sidans "canvas" för ankrade figurer)
+  skapas en gång per sheet (`sheet.createDrawingPatriarch()`) och delas
+  mellan alla rader, av samma återanvändningsskäl som `CellStyle
+  datumformat` redan delas - `ExportExcel.main` skapar båda en gång och
+  skickar in dem till `VinradSkrivare.skriv(...)`. Ankaret sätts med
+  `Drawing.createAnchor(0,0,0,0, COL_BILD, rad, COL_BILD+1, rad+1)` (en
+  cellstorlek, ingen anpassad radhöjd/kolumnbredd - ren
+  databackup-prioritet, inte visuell polish).
+- Verifierat lokalt: ett vin med en riktig uppladdad JPEG-etikett
+  (200×300, laddad upp via webb-UI:t) exporterades, `.xlsx`-filen
+  packades upp som zip (`xl/media/image1.jpeg`) och den extraherade
+  bilden var byte-för-byte identisk med originalet (öppnades korrekt av
+  Pillow, samma dimensioner). `VinradSkrivareTest` fick två nya tester:
+  en som verifierar att en riktig (minimal, Base64-kodad) PNG bäddas in
+  och kan hämtas tillbaka via `Workbook.getAllPictures()`, en som
+  verifierar att en webp-bild hoppas över utan att kasta ett fel.
 
 **Körd mot produktionsdatabasen (2026-07-17), 30 viner sparade utan fel.**
 Klever Cloud har inget CLI/konsol att köra verktyget *på* - det behövs

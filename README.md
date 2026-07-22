@@ -667,11 +667,28 @@ ställen, ett tidigare dokumenterat felmönster i det här projektet
 `ImportExcel` när export tillkom) delar
 jdbc-url/användare/lösenord-uppslagningen mellan de två verktygen.
 
-Precis som `ImportExcel` exporteras **inte** bilddata
-(`image`/`image_mime_type`) till Excel-celler - av samma skäl som import
-inte läser dem (Excels "bild i cell" är inbäddad rich data, inte värt
-komplexiteten för ett engångsskript). Etiketter finns bara i databasen/
-webb-UI:t efter en export, inte i den exporterade filen.
+**Etiketter exporteras också (byggt 2026-07-22, på användarens begäran).**
+`VinradSkrivare` ankrar varje vins `image` som en vanlig POI-`Picture` i
+"Bild"-kolumnen (samma kolumn som källfilens ursprungliga, men fylld på
+ett annat sätt - se nedan). Stödda MIME-typer: JPEG, PNG, GIF (samma
+mängd som `Bildmatchare` känner igen vid import, **minus** WEBP - OOXML/
+`.xlsx` har inget bildformat för webp, och POI har ingen
+`PICTURE_TYPE`-konstant för det). En webp-bild hoppas över vid export med
+en utskriven varning istället för att krascha - databasens rådata
+påverkas inte, bara den enskilda etikettens export.
+
+**Viktig skillnad mot källfilens "bild i cell", och en medveten
+begränsning:** en vanlig ankrad POI-`Picture` är en helt annan, mycket
+enklare mekanism än Excels ursprungliga "bild i cell" (inbäddad rich
+data) som `VinradParser` fortfarande medvetet inte läser vid import (se
+ovan). **`ImportExcel` läser fortfarande inte bilder från Excel-filen** -
+en ankrad exportbild går alltså inte automatiskt tillbaka in i databasen
+vid en återimport. Att koppla bilder vid återimport sker fortfarande
+bara via `WINECELLAR_IMPORT_IMAGE_FOLDER`/`Bildmatchare` (se "Import av
+befintlig Excel-data"). Exportfilen är alltså en fullständig *visuell*
+backup (bilderna syns och kan extraheras ur filen), men själva
+återimport-rundturen tar fortfarande bara med textdata - en naturlig,
+avgränsad utökning senare om det visar sig behövas.
 
 Kör via `exec-maven-plugin`, som annars kör `ImportExcel` som standard -
 `ExportExcel` kräver ett explicit `-Dexec.mainClass`-argument:
@@ -711,6 +728,16 @@ hoppades över med en varning precis som dokumenterat ovan. `VinradSkrivare`
 har också en egen enhetstest (`VinradSkrivareTest`) som skriver och
 direkt återläser samma rad via `VinradParser` och verifierar att den
 återlästa `Wine` är identisk med originalet.
+
+**Bildexporten verifierad separat, samma dag:** ett vin med en riktig
+uppladdad JPEG-etikett (200×300, laddad upp via webb-UI:t) exporterades,
+och den resulterande `.xlsx`-filen packades upp som ett zip-arkiv
+(`xl/media/image1.jpeg`) - bilden däri var byte-för-byte identisk med
+originalet (samma filstorlek, öppnades korrekt som en giltig JPEG).
+`VinradSkrivareTest` har motsvarande två enhetstester: en som verifierar
+att en riktig (minimal) PNG bäddas in och kan hämtas ut ur workbooken via
+`Workbook.getAllPictures()`, och en som verifierar att en webp-bild
+hoppas över utan att kasta ett fel.
 
 **Fälla som dök upp vid den manuella verifieringen:** `pom.xml`s
 `exec-maven-plugin`-konfiguration hade `<mainClass>` hårdkodat direkt till

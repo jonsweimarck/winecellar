@@ -42,7 +42,10 @@ final class VinradParser {
     static final int COL_PRODUCENT = 5;
     static final int COL_NAMN = 6;
     static final int COL_ARGANG = 7;
-    // COL_BILD = 8, hoppas över, se klasskommentar.
+    // Hoppas över vid IMPORT (se klasskommentar) - men används av
+    // VinradSkrivare/ExportExcel för att ankra exporterade bilder i rätt
+    // kolumn (byggt 2026-07-22, se CLAUDE.md).
+    static final int COL_BILD = 8;
     static final int COL_INKOPSDATUM = 9;
     static final int COL_PRIS = 10;
     static final int COL_ANTAL = 11;

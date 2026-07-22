@@ -4,6 +4,7 @@ import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -26,11 +27,11 @@ import java.util.List;
  * "Export av databasen till Excel". Körs manuellt, precis som
  * ImportExcel - inte en del av den körande applikationen.
  *
- * Bilddata (image/image_mime_type) exporteras medvetet inte till
- * Excel-celler, av samma skäl som ImportExcel medvetet inte läser dem:
- * Excels "bild i cell" är inbäddad rich data, inte värt komplexiteten
- * för ett engångsskript. Etiketter finns bara i databasen/webb-UI:t
- * efter en export - inte i den exporterade filen.
+ * Etiketter (image/image_mime_type) exporteras som vanliga ankrade
+ * bilder i "Bild"-kolumnen (byggt 2026-07-22) - se VinradSkrivares
+ * klasskommentar för skillnaden mot källfilens ursprungliga "bild i
+ * cell" och den viktiga begränsningen att ImportExcel inte läser dessa
+ * bilder tillbaka vid en återimport.
  *
  * En rad exporterad och sedan återimporterad utan att typ/producent/
  * land fylls i (möjligt sedan bara namnet blev obligatoriskt i
@@ -46,7 +47,8 @@ public final class ExportExcel {
             SELECT name, wine_type, producer, country, region, subregion, grapes, vintage,
                    purchase_date, price, quantity, purchase_reason, tasting_notes, own_rating,
                    systembolaget_product_number, systembolaget_description, munskankarna_review,
-                   munskankarna_rating, vivino_rating, other_reference, location
+                   munskankarna_rating, vivino_rating, other_reference, location,
+                   image, image_mime_type
             FROM wines
             ORDER BY name
             """;
@@ -85,11 +87,12 @@ public final class ExportExcel {
 
             CellStyle datumformat = workbook.createCellStyle();
             datumformat.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("yyyy-mm-dd"));
+            Drawing<?> ritning = sheet.createDrawingPatriarch();
 
             VinradSkrivare skrivare = new VinradSkrivare();
             int radnummer = 1;
             for (Wine vin : viner) {
-                skrivare.skriv(vin, sheet.createRow(radnummer++), datumformat);
+                skrivare.skriv(vin, sheet.createRow(radnummer++), datumformat, ritning);
             }
 
             try (OutputStream ut = new FileOutputStream(utfilSökväg)) {
@@ -129,6 +132,8 @@ public final class ExportExcel {
                 .vivinoRating(resultSet.getBigDecimal("vivino_rating"))
                 .otherReference(resultSet.getString("other_reference"))
                 .location(resultSet.getString("location"))
+                .image(resultSet.getBytes("image"))
+                .imageMimeType(resultSet.getString("image_mime_type"))
                 .build();
     }
 
