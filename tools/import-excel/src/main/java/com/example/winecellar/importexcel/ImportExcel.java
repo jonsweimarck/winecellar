@@ -57,9 +57,9 @@ public final class ImportExcel {
             System.exit(1);
         }
         String excelSökväg = args[0];
-        String jdbcUrl = args.length > 1 ? args[1] : jdbcUrlFrånMiljö();
-        String användare = args.length > 2 ? args[2] : miljövariabelEllerStandard("POSTGRESQL_ADDON_USER", "winecellar");
-        String lösenord = args.length > 3 ? args[3] : miljövariabelEllerStandard("POSTGRESQL_ADDON_PASSWORD", "winecellar");
+        String jdbcUrl = args.length > 1 ? args[1] : Databaskoppling.jdbcUrlFrånMiljö();
+        String användare = args.length > 2 ? args[2] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_USER", "winecellar");
+        String lösenord = args.length > 3 ? args[3] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_PASSWORD", "winecellar");
         String bildmappSökväg = System.getenv("WINECELLAR_IMPORT_IMAGE_FOLDER");
         Bildmatchare bildmatchare = bildmappSökväg == null || bildmappSökväg.isBlank()
                 ? null
@@ -125,10 +125,10 @@ public final class ImportExcel {
         settNullbarSträng(statement, i++, vin.region());
         settNullbarSträng(statement, i++, vin.subregion());
         settNullbarSträng(statement, i++, vin.grapes());
-        statement.setInt(i++, vin.vintage());
+        settNullbartHeltal(statement, i++, vin.vintage());
         settNullbartDatum(statement, i++, vin.purchaseDate());
         settNullbarBigDecimal(statement, i++, vin.price());
-        statement.setInt(i++, vin.quantity());
+        settNullbartHeltal(statement, i++, vin.quantity());
         settNullbarSträng(statement, i++, vin.purchaseReason());
         settNullbarSträng(statement, i++, vin.tastingNotes());
         settNullbartBetyg(statement, i++, vin.ownRating());
@@ -174,6 +174,14 @@ public final class ImportExcel {
         }
     }
 
+    private static void settNullbartHeltal(PreparedStatement statement, int index, Integer värde) throws java.sql.SQLException {
+        if (värde == null) {
+            statement.setNull(index, Types.INTEGER);
+        } else {
+            statement.setInt(index, värde);
+        }
+    }
+
     private static void settNullbarBild(PreparedStatement statement, int index, byte[] bild) throws java.sql.SQLException {
         if (bild == null) {
             statement.setNull(index, Types.BINARY);
@@ -188,18 +196,6 @@ public final class ImportExcel {
         } else {
             statement.setDate(index, Date.valueOf(värde));
         }
-    }
-
-    private static String jdbcUrlFrånMiljö() {
-        String host = miljövariabelEllerStandard("POSTGRESQL_ADDON_HOST", "localhost");
-        String port = miljövariabelEllerStandard("POSTGRESQL_ADDON_PORT", "5432");
-        String db = miljövariabelEllerStandard("POSTGRESQL_ADDON_DB", "winecellar");
-        return "jdbc:postgresql://" + host + ":" + port + "/" + db;
-    }
-
-    private static String miljövariabelEllerStandard(String namn, String standardvärde) {
-        String värde = System.getenv(namn);
-        return värde == null || värde.isBlank() ? standardvärde : värde;
     }
 
     private ImportExcel() {

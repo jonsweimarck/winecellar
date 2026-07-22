@@ -814,6 +814,63 @@ radbrytning kvar) och alla kolumner efter den ett steg åt höger
 vanliga `text(row, col)`-hjälparen, som två oberoende kolumner.
 `VinradParserTest` uppdaterad med de nya kolumnindexen.
 
+**Exportskript tillagt, samma modul (byggt och verifierat 2026-07-22).**
+`ExportExcel` läser `wines`-tabellen och skriver en `.xlsx` i exakt samma
+kolumnlayout som `VinradParser` förväntar sig - se README:s "Export av
+databasen till Excel" för kommandot. Två nya klasser:
+- `VinradSkrivare` gör radskrivningen, en `Wine` → en POI-`Row`. Delar
+  `VinradParser`s `COL_*`-konstanter (som därför gick från `private` till
+  paketsynliga) istället för att duplicera kolumnindexen i en andra
+  klass - att hålla två separata index-uppsättningar i synk manuellt är
+  precis det felmönster som redan hänt en gång i det här projektet
+  (Systembolagets-prodnummer-kolumnen ovan). `SVENSK_VINTYP` är en egen
+  lokal `Map<WineType,String>` i `VinradSkrivare` (den omvända mappningen
+  av `VinradParser`s `VINTYPER`) - `WineType` har fortfarande medvetet
+  ingen `.label()`-metod, se `WineType`-noteringen i Domänmodell-avsnittet;
+  varje anropsplats som behöver den svenska texten duplicerar sin egen
+  lilla karta, och det gäller nu även skrivriktningen.
+- `Databaskoppling` extraherades ur `ImportExcel` (samma
+  `jdbcUrlFrånMiljö`/`miljövariabelEllerStandard`-logik, ordagrant
+  flyttad) eftersom `ExportExcel` behövde exakt samma
+  anslutningsuppslagning - först vid den andra verkliga anropsplatsen,
+  inte i förväg.
+- Bilddata exporteras medvetet inte till Excel-celler, av samma skäl som
+  import inte läser dem.
+- `Wine.vintage`/`Wine.quantity` är `Integer` (inte primitiv `int`) sedan
+  "bara namnet obligatoriskt"-ändringen ovan - `ExportExcel` läser dem med
+  `ResultSet.getObject(kolumn, Integer.class)` (ger korrekt `null`, till
+  skillnad från `getInt` som ger `0` för både `0` och `NULL`), och
+  `VinradSkrivare.heltal(...)` tar `Integer` och lämnar cellen helt oskapad
+  vid `null` - inte en tom cell, ingen cell alls (samma mönster som
+  `text(...)`/`decimal(...)` redan använde).
+- **Känd, dokumenterad rundtursbegränsning:** `VinradParser` kräver
+  fortfarande vintyp/land/producent/namn för att inte hoppa över en rad -
+  ett vin sparat med bara namnet (möjligt sedan webb-UI:t bara kräver
+  namn) exporteras fint, men hoppas över vid en eventuell återimport, med
+  en utskriven varning. Medvetet inte löst genom att sänka
+  `VinradParser`s krav - det är importsidans egen, redan existerande
+  "ofullständig utkastrad"-hantering, inte ett fel exporten inför.
+  `VinradSkrivareTest.ettVinMedBaraNamnetSkrivsMenHoppasÖverVidÅterimport`
+  dokumenterar beteendet som ett test, inte bara en kommentar.
+- **Fälla som dök upp vid den manuella verifieringen:** `pom.xml`s
+  `exec-maven-plugin` hade `<mainClass>` hårdkodat direkt till
+  `ImportExcel` (inte via en `${...}`-property) - `-Dexec.mainClass=...
+  ExportExcel` på kommandoraden gjorde alltså ingenting, `mvn exec:java`
+  körde tyst `ImportExcel` istället. Fixat med en `exec.mainClass`-
+  property (standard `ImportExcel`, så den vanliga importkörningen är
+  opåverkad) och `<mainClass>${exec.mainClass}</mainClass>` i
+  pluginkonfigurationen.
+- Verifierat lokalt mot en tom docker-compose-databas: två testviner
+  (ett fullständigt, ett namn-bara) skapades via webb-UI:t, exporterades,
+  databasen tömdes (`TRUNCATE`), filen importerades tillbaka - det
+  fullständiga vinet återkom med identiska värden i alla fält
+  (kontrollerat via `psql`), det namn-bara vinet hoppades över med
+  varningen precis som förväntat. `VinradSkrivareTest` (4 tester) täcker
+  radskrivningen isolerat med en skriv-och-återläs-rundtur mot
+  `VinradParser`, samma testfilosofi som modulens övriga tester (ingen
+  Gherkin här, se README:s Arbetsprocess-avsnitt för varför den
+  distinktionen finns).
+
 **Körd mot produktionsdatabasen (2026-07-17), 30 viner sparade utan fel.**
 Klever Cloud har inget CLI/konsol att köra verktyget *på* - det behövs
 inte heller, det körs lokalt och pratar med Postgres-tillägget över

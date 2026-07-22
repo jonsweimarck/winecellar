@@ -651,6 +651,77 @@ fyllas i komplett sedan den lokala testkörningen ovan. Verktyget har ingen
 dedupliceringslogik - kör inte importen igen mot samma databas, det skulle
 skapa dubbletter.
 
+## Export av databasen till Excel
+
+`ExportExcel` (byggt 2026-07-22, samma modul: `tools/import-excel/`) är den
+omvända operationen av `ImportExcel` ovan: läser hela `wines`-tabellen och
+skriver en `.xlsx`-fil i exakt samma kolumnlayout (A-V) som
+`VinradParser`/`ImportExcel` förväntar sig, så filen kan redigeras och
+importeras tillbaka - och fungerar samtidigt som en enkel backup av
+databasens textdata. `VinradSkrivare` gör själva radskrivningen och delar
+`VinradParser`s `COL_*`-konstanter (paketsynliga, inte private, sedan
+export tillkom) istället för att duplicera kolumnindexen i en andra
+klass - samma kolumnlayout måste annars hållas i synk manuellt på två
+ställen, ett tidigare dokumenterat felmönster i det här projektet
+(Systembolagets prodnummer-kolumnen). `Databaskoppling` (extraherad ur
+`ImportExcel` när export tillkom) delar
+jdbc-url/användare/lösenord-uppslagningen mellan de två verktygen.
+
+Precis som `ImportExcel` exporteras **inte** bilddata
+(`image`/`image_mime_type`) till Excel-celler - av samma skäl som import
+inte läser dem (Excels "bild i cell" är inbäddad rich data, inte värt
+komplexiteten för ett engångsskript). Etiketter finns bara i databasen/
+webb-UI:t efter en export, inte i den exporterade filen.
+
+Kör via `exec-maven-plugin`, som annars kör `ImportExcel` som standard -
+`ExportExcel` kräver ett explicit `-Dexec.mainClass`-argument:
+
+```powershell
+cd C:\projects\winecellar\tools\import-excel
+
+$env:POSTGRESQL_ADDON_HOST = "<host>"
+$env:POSTGRESQL_ADDON_PORT = "<port>"
+$env:POSTGRESQL_ADDON_DB = "<databasnamn>"
+$env:POSTGRESQL_ADDON_USER = "<användare>"
+$env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
+
+mvn exec:java "-Dexec.mainClass=com.example.winecellar.importexcel.ExportExcel" "-Dexec.args=C:\Users\jonsw\Documents\Vin\Vinlista-export.xlsx"
+```
+
+Utan `POSTGRESQL_ADDON_*`-miljövariabler används
+`localhost`/`winecellar`/`winecellar` (docker-compose-databasen), samma
+konvention som `ImportExcel`.
+
+**Känd rundturs-begränsning, inte en bugg:** sedan webb-UI:t bara kräver
+`namn` för ett nytt vin (se ovan) kan databasen innehålla viner som
+saknar vintyp/land/producent - `VinradParser` kräver fortfarande alla
+fyra vid en eventuell återimport (samma "ofullständig utkastrad"-
+hantering som redan fanns för Excelns egna ofullständiga rader) och
+hoppar då över raden med en utskriven varning. Ett sådant vin exporteras
+fint till Excel, det är bara återimporten som hoppar över det. Om det
+visar sig vara ett problem i praktiken är det en enkel ändring att sänka
+`VinradParser`s krav - inte gjort nu, eftersom det inte är efterfrågat.
+
+**Verifierat lokalt (2026-07-22)** mot en tom docker-compose-databas: två
+testviner (ett fullständigt ifyllt, ett med bara namnet satt) sparades
+via webb-UI:t, exporterades, databasen tömdes (`TRUNCATE`), och filen
+importerades tillbaka - det fullständiga vinet återkom med identiska
+värden i samtliga fält (kontrollerat via `psql`), det namn-bara vinet
+hoppades över med en varning precis som dokumenterat ovan. `VinradSkrivare`
+har också en egen enhetstest (`VinradSkrivareTest`) som skriver och
+direkt återläser samma rad via `VinradParser` och verifierar att den
+återlästa `Wine` är identisk med originalet.
+
+**Fälla som dök upp vid den manuella verifieringen:** `pom.xml`s
+`exec-maven-plugin`-konfiguration hade `<mainClass>` hårdkodat direkt till
+`ImportExcel` (inte via en `${...}`-property), så `-Dexec.mainClass=...`
+på kommandoraden tystades helt ner - `mvn exec:java` körde alltid
+`ImportExcel` oavsett vilken klass som angavs. Fixat genom att lägga till
+en `exec.mainClass`-property (standardvärde `ImportExcel`, oförändrat
+beteende för den vanliga importkörningen) och peka pluginkonfigurationens
+`<mainClass>` mot `${exec.mainClass}` - kommandoradsargumentet vinner nu
+över standardvärdet, som `-D`-egenskaper normalt förväntas göra.
+
 ## Deploy
 
 Samma plattform och samma mönster som `roombooking`: **Clever Cloud**,
@@ -935,3 +1006,6 @@ CLAUDE.md.
       - se "Filtrering, sökning och sortering" ovan
 - [x] Bara namnet obligatoriskt vid tillägg/redigering - se Datamodell-
       avsnittets "Bara namnet obligatoriskt" ovan
+- [x] Exportskript (`ExportExcel`, `tools/import-excel/`) - databasen till
+      Excel i samma kolumnlayout som importen förväntar sig, se "Export
+      av databasen till Excel"

@@ -30,30 +30,34 @@ import java.util.regex.Pattern;
  */
 final class VinradParser {
 
-    private static final int COL_VINTYP = 0;
-    private static final int COL_LAND = 1;
-    private static final int COL_REGION = 2;
-    private static final int COL_UNDERREGION = 3;
-    private static final int COL_DRUVOR = 4;
-    private static final int COL_PRODUCENT = 5;
-    private static final int COL_NAMN = 6;
-    private static final int COL_ARGANG = 7;
+    // Paketsynliga (inte private) sedan ExportExcel/VinradSkrivare
+    // tillkom 2026-07-22 - samma kolumnlayout måste hållas i synk åt
+    // båda hållen, en delad källa till sanning är säkrare än att
+    // duplicera indexen i två klasser.
+    static final int COL_VINTYP = 0;
+    static final int COL_LAND = 1;
+    static final int COL_REGION = 2;
+    static final int COL_UNDERREGION = 3;
+    static final int COL_DRUVOR = 4;
+    static final int COL_PRODUCENT = 5;
+    static final int COL_NAMN = 6;
+    static final int COL_ARGANG = 7;
     // COL_BILD = 8, hoppas över, se klasskommentar.
-    private static final int COL_INKOPSDATUM = 9;
-    private static final int COL_PRIS = 10;
-    private static final int COL_ANTAL = 11;
-    private static final int COL_VARFOR_KOP = 12;
-    private static final int COL_TASTING_NOTES = 13;
-    private static final int COL_EGET_BETYG = 14;
+    static final int COL_INKOPSDATUM = 9;
+    static final int COL_PRIS = 10;
+    static final int COL_ANTAL = 11;
+    static final int COL_VARFOR_KOP = 12;
+    static final int COL_TASTING_NOTES = 13;
+    static final int COL_EGET_BETYG = 14;
     // "Systembolagets prodnummer" - egen kolumn sedan 2026-07-20, tidigare
     // ihopklistrad med beskrivningen i COL_SYSTEMBOLAGET (se git-historiken).
-    private static final int COL_SYSTEMBOLAGET_PRODUKTNUMMER = 15;
-    private static final int COL_SYSTEMBOLAGET = 16;
-    private static final int COL_MUNSKANKARNA_BEDOMNING = 17;
-    private static final int COL_MUNSKANKARNA_BETYG = 18;
-    private static final int COL_VIVINO = 19;
-    private static final int COL_ANNAN_REFERENS = 20;
-    private static final int COL_VAR = 21;
+    static final int COL_SYSTEMBOLAGET_PRODUKTNUMMER = 15;
+    static final int COL_SYSTEMBOLAGET = 16;
+    static final int COL_MUNSKANKARNA_BEDOMNING = 17;
+    static final int COL_MUNSKANKARNA_BETYG = 18;
+    static final int COL_VIVINO = 19;
+    static final int COL_ANNAN_REFERENS = 20;
+    static final int COL_VAR = 21;
 
     private static final Map<String, WineType> VINTYPER = Map.of(
             "rött", WineType.RED,

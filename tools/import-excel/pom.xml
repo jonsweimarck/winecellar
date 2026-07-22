@@ -22,6 +22,12 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <poi.version>5.2.5</poi.version>
+        <!-- Standard ImportExcel, men körbar via -Dexec.mainClass=...ExportExcel
+             för att köra exporten istället - se README. En hårdkodad
+             <mainClass> i pluginkonfigurationen (utan ${...}) hade tystat
+             ner -Dexec.mainClass helt, vilket exec-maven-plugin gjorde här
+             innan denna properties-indirection lades till (2026-07-22). -->
+        <exec.mainClass>com.example.winecellar.importexcel.ImportExcel</exec.mainClass>
     </properties>
 
     <dependencies>
@@ -82,7 +88,7 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
                 <configuration>
-                    <mainClass>com.example.winecellar.importexcel.ImportExcel</mainClass>
+                    <mainClass>${exec.mainClass}</mainClass>
                 </configuration>
             </plugin>
         </plugins>
