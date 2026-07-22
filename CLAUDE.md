@@ -781,9 +781,11 @@ data) importeras fortfarande medvetet inte - se README:s "Import av
 befintlig Excel-data" för kommandon och `VinradParser`/`ImportExcel` för
 implementationen.
 
-**Etikettimport från en bildmapp (byggt 2026-07-19).** Separat väg in för
+**Etikettimport från en bildmapp (byggt 2026-07-19, miljövariabeln döpt
+om till `WINECELLAR_LOCAL_IMAGE_FOLDER` 2026-07-22 när ExportExcel
+började skriva till samma mapp - se nedan).** Separat väg in för
 bilder: `Bildmatchare` (ny klass i samma modul) matchar filer i en mapp
-(`WINECELLAR_IMPORT_IMAGE_FOLDER`, valfri miljövariabel - miljövariabel
+(valfri miljövariabel - miljövariabel
 istället för ett nytt positionellt argument av samma PowerShell-
 citattecken-skäl som `jdbc-url`/`användare`/`lösenord`) mot varje vins
 `name`-fält, exakt filnamnsmatchning (stam utan ändelse, känner igen
@@ -841,15 +843,14 @@ databasen till Excel" för kommandot. Två nya klasser:
   `VinradSkrivare.heltal(...)` tar `Integer` och lämnar cellen helt oskapad
   vid `null` - inte en tom cell, ingen cell alls (samma mönster som
   `text(...)`/`decimal(...)` redan använde).
-- **Känd, dokumenterad rundtursbegränsning:** `VinradParser` kräver
-  fortfarande vintyp/land/producent/namn för att inte hoppa över en rad -
-  ett vin sparat med bara namnet (möjligt sedan webb-UI:t bara kräver
-  namn) exporteras fint, men hoppas över vid en eventuell återimport, med
-  en utskriven varning. Medvetet inte löst genom att sänka
-  `VinradParser`s krav - det är importsidans egen, redan existerande
-  "ofullständig utkastrad"-hantering, inte ett fel exporten inför.
-  `VinradSkrivareTest.ettVinMedBaraNamnetSkrivsMenHoppasÖverVidÅterimport`
-  dokumenterar beteendet som ett test, inte bara en kommentar.
+- **Rundtursbegränsningen (VinradParser krävde vintyp/land/producent/namn
+  vid återimport, trots att webb-UI:t bara kräver namn) löstes samma dag,
+  på användarens uttryckliga begäran om en fullständig rundtripp** - se
+  separat avsnitt nedan. `VinradSkrivareTest`s tidigare
+  `ettVinMedBaraNamnetSkrivsMenHoppasÖverVidÅterimport` (som dokumenterade
+  begränsningen som ett test) döptes om till
+  `ettVinMedBaraNamnetSkrivsOchÅterlässKorrekt` och asserterar nu att
+  raden läses tillbaka korrekt istället för att kasta ett undantag.
 - **Fälla som dök upp vid den manuella verifieringen:** `pom.xml`s
   `exec-maven-plugin` hade `<mainClass>` hårdkodat direkt till
   `ImportExcel` (inte via en `${...}`-property) - `-Dexec.mainClass=...
@@ -869,33 +870,28 @@ databasen till Excel" för kommandot. Två nya klasser:
   Gherkin här, se README:s Arbetsprocess-avsnitt för varför den
   distinktionen finns).
 
-**Bildexport tillagd (byggt och verifierat 2026-07-22, samma dag - på
-användarens uppföljningsfråga "Går det att även exportera bilderna?").**
-`VinradSkrivare.bild(...)` ankrar varje vins `image` som en vanlig
-POI-`Picture` i `VinradParser.COL_BILD` (kolumn I, gick från en ren
-kommentar till en riktig delad konstant för tillfället, se
+**Bildexport tillagd (byggt 2026-07-22, samma dag - på användarens
+uppföljningsfråga "Går det att även exportera bilderna?"), sedan utökad
+till en fullständig rundtripp samma dag (på uttrycklig begäran - "Ja,
+jag vill ha fullständig rundtripp").**
+
+Första omgången: `VinradSkrivare.bild(...)` ankrar varje vins `image`
+som en vanlig POI-`Picture` i `VinradParser.COL_BILD` (kolumn I, gick
+från en ren kommentar till en riktig delad konstant för tillfället, se
 `VinradParser`). **Detta är en helt annan mekanism än källfilens
 ursprungliga "bild i cell"** (inbäddad rich data, se klasskommentaren
 högst upp i det här avsnittet) - en vanlig ankrad `Picture` är mycket
 enklare att SKRIVA än rich-data-celler är att LÄSA, men `ImportExcel`
-läser fortfarande inte bilder från Excel-filen alls. En exporterad bild
-går alltså **inte** automatiskt tillbaka in i databasen vid en
-återimport - `WINECELLAR_IMPORT_IMAGE_FOLDER`/`Bildmatchare` är
-fortfarande den enda vägen in för bilder vid import. Medvetet inte
-byggt som en fullständig rundtur i det här steget - användarens fråga
-gällde specifikt export ("kan vi också exportera bilderna"), inte att
-återimporten också ska plocka upp dem; en naturlig, avgränsad
-utökning senare om det efterfrågas.
+läser fortfarande inte den ankrade bilden tillbaka från xlsx-filen.
 - **MIME-typstöd:** JPEG/PNG/GIF (`POI_BILDTYP_PER_MIME` i
   `VinradSkrivare`, mappar till `Workbook.PICTURE_TYPE_JPEG`/`_PNG` och
   `XSSFWorkbook.PICTURE_TYPE_GIF` - GIF-konstanten finns bara på
   `XSSFWorkbook`, inte basgränssnittet `Workbook`). **Inte WEBP** - trots
   att `Bildmatchare` känner igen `.webp`-filer vid import finns inget
   OOXML-bildformat för webp och ingen motsvarande POI-konstant. En
-  webp-bild hoppas över vid export med en utskriven varning
-  (`Varning: bilden för "X" har MIME-typen "image/webp"...`) istället
-  för att krascha - samma "hantera explicit med varning istället för
-  att gissa/krascha"-linje som `Bildmatchare`s egna tvetydighetsfall.
+  webp-bild hoppas över vid xlsx-inbäddning med en utskriven varning
+  istället för att krascha - samma "hantera explicit med varning istället
+  för att gissa/krascha"-linje som `Bildmatchare`s egna tvetydighetsfall.
 - **API-detaljer:** `Drawing<?>` (sidans "canvas" för ankrade figurer)
   skapas en gång per sheet (`sheet.createDrawingPatriarch()`) och delas
   mellan alla rader, av samma återanvändningsskäl som `CellStyle
@@ -904,14 +900,63 @@ utökning senare om det efterfrågas.
   `Drawing.createAnchor(0,0,0,0, COL_BILD, rad, COL_BILD+1, rad+1)` (en
   cellstorlek, ingen anpassad radhöjd/kolumnbredd - ren
   databackup-prioritet, inte visuell polish).
-- Verifierat lokalt: ett vin med en riktig uppladdad JPEG-etikett
-  (200×300, laddad upp via webb-UI:t) exporterades, `.xlsx`-filen
-  packades upp som zip (`xl/media/image1.jpeg`) och den extraherade
-  bilden var byte-för-byte identisk med originalet (öppnades korrekt av
-  Pillow, samma dimensioner). `VinradSkrivareTest` fick två nya tester:
-  en som verifierar att en riktig (minimal, Base64-kodad) PNG bäddas in
-  och kan hämtas tillbaka via `Workbook.getAllPictures()`, en som
-  verifierar att en webp-bild hoppas över utan att kasta ett fel.
+
+**Andra omgången (samma dag): full rundtripp, tre samverkande ändringar.**
+Xlsx-inbäddningen ovan blev kvar oförändrad (fortfarande bara en visuell
+bekvämlighet), men den faktiska rundtrippen löstes med tre samtidiga
+ändringar:
+1. `VinradParser` lättades till samma regel som webb-UI:t: bara namnet
+   är obligatoriskt, se "Bara namnet obligatoriskt" i Excel-import-
+   avsnittet ovan.
+2. `Bildmatchare.ÄNDELSE_PER_MIME` (ny, paketsynlig karta, omvänd
+   riktning av den befintliga `MIME_PER_ÄNDELSE` - jpg valt som kanonisk
+   ändelse för image/jpeg, inte jpeg) lades till för att `ExportExcel`
+   ska kunna räkna ut vilken filändelse en bild ska få.
+3. `ExportExcel.skrivBildfiler(...)` skriver varje vins bild som en
+   riktig fil i `WINECELLAR_LOCAL_IMAGE_FOLDER` (**samma miljövariabel
+   som import redan använde, döpt om från `WINECELLAR_IMPORT_IMAGE_FOLDER`
+   - namnet ska spegla att mappen nu delas åt båda hållen**), döpt exakt
+   som vinets namn. Det är DEN HÄR filen (inte den ankrade xlsx-bilden)
+   som `Bildmatchare` läser tillbaka vid en efterföljande `ImportExcel`-
+   körning - därför måste `WINECELLAR_LOCAL_IMAGE_FOLDER` pekas ut vid
+   BÅDE export och återimport för att bilder ska följa med. Till
+   skillnad från xlsx-inbäddningen har filskrivningen inget
+   formatstöd-hål: alla MIME-typer `Bildmatchare` känner igen (inklusive
+   webp) skrivs hit. Samma varningsmönster som `ImportExcel`s egen
+   `varnaOmDubblettnamnMedBild` tillämpas i omvänd riktning: om flera
+   viner delar exakt samma namn skrivs en varning ut (bara den sist
+   skrivna filen blir kvar i mappen) - en ny, separat metod i
+   `ExportExcel`, inte en delad abstraktion med importsidans variant
+   (olika meddelandetext, för liten kod för att vara värt att slå ihop).
+
+**Fälla som dök upp under den manuella rundtrippsverifieringen (inte av
+något automatiskt test):** `ImportExcel.bindParametrar` band tidigare
+`wine_type`/`producer`/`country` direkt (`statement.setString(i++,
+vin.wineType().name())` osv.) utan null-koll, eftersom `VinradParser`
+tidigare GARANTERADE att de aldrig var `null`. Så fort `VinradParser`
+lättades (ändring 1 ovan) kraschade en återimport av ett namn-bara vin
+med `NullPointerException: Cannot invoke "WineType.name()" ... is null`
+istället för att spara `null` i databasen. Fixat genom att binda alla
+tre null-safe via `settNullbarSträng(...)`, samma mönster som redan
+användes för `region`/`subregion`/`grapes` m.fl. **Lärdom:** en ändring
+i en delad parser/valideringsregel måste spåras till ALLA anropsplatser
+som förlitat sig på den gamla garantin, inte bara den plats ändringen
+gjordes - precis den sortens bugg som bara en verklig databasrundtur
+(inte en isolerad enhetstest av en enskild klass) avslöjar.
+
+Verifierat lokalt: tre testviner (ett fullständigt med bild, ett
+namn-bara utan bild, ett namn-bara **med** bild - det sista fallet är
+den viktigaste nya kombinationen) sparades via webb-UI:t, exporterades
+med `WINECELLAR_LOCAL_IMAGE_FOLDER` satt, databasen tömdes (`TRUNCATE`),
+och återimporterades från både xlsx-filen och bildmappen - alla tre
+viner återkom med identiska textvärden, båda bilderna (inklusive det
+namn-bara vinets) återkom byte-för-byte identiska med originalen, och
+ingen rad hoppades över. `VinradSkrivareTest` fick motsvarande
+enhetstester (byte-identiska PNG-inbäddning i xlsx via
+`Workbook.getAllPictures()`, webp hoppas över vid xlsx-inbäddning utan
+att krascha, ett namn-bara vin skrivs och återläses korrekt) - men
+`ExportExcel.skrivBildfiler` självt har ingen egen enhetstest, verifierad
+manuellt enligt samma princip som modulens övriga JDBC-integration.
 
 **Körd mot produktionsdatabasen (2026-07-17), 30 viner sparade utan fel.**
 Klever Cloud har inget CLI/konsol att köra verktyget *på* - det behövs

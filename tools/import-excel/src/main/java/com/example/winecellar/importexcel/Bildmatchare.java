@@ -29,6 +29,18 @@ final class Bildmatchare {
             "webp", "image/webp"
     );
 
+    // Omvänd riktning av kartan ovan, för ExportExcel som skriver
+    // bildfiler till samma mapp - en filändelse per MIME-typ (jpg valt
+    // som kanonisk för image/jpeg, inte jpeg). Paketsynlig, delad källa
+    // till sanning istället för att duplicera MIME-kunskapen i ett eget
+    // uttryck i ExportExcel (byggt 2026-07-22).
+    static final Map<String, String> ÄNDELSE_PER_MIME = Map.of(
+            "image/jpeg", "jpg",
+            "image/png", "png",
+            "image/gif", "gif",
+            "image/webp", "webp"
+    );
+
     private final Map<String, Path> filPerVinnamn;
 
     Bildmatchare(Path bildmapp) throws IOException {

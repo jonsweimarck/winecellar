@@ -92,6 +92,24 @@ class VinradParserTest {
     }
 
     @Test
+    void skaTillåtaRadMedBaraNamnIfyllt() {
+        Row row = radMed(sheet -> {
+        });
+        skrivCell(row, 6, "Anteckning om ett vin");
+        // Alla andra kolumner lämnas tomma - bara namnet är obligatoriskt,
+        // samma regel som webb-UI:t (se CLAUDE.md).
+
+        Wine vin = parser.parse(row);
+
+        assertThat(vin.name()).isEqualTo("Anteckning om ett vin");
+        assertThat(vin.wineType()).isNull();
+        assertThat(vin.country()).isNull();
+        assertThat(vin.producer()).isNull();
+        assertThat(vin.vintage()).isNull();
+        assertThat(vin.quantity()).isNull();
+    }
+
+    @Test
     void skaMatchaBetygMedDubblaMellanslagIKällfilen() {
         Row row = minimalRad();
         // Källfilens rad för 8,5 har dubbla mellanslag: "8,5  (6 - 8,5  Enkel vin)".

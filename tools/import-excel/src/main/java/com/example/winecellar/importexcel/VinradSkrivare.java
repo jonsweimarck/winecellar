@@ -25,11 +25,15 @@ import java.util.Map;
  * Excelkällfilens ursprungliga "bild i cell" (inbäddad rich data), som
  * VinradParser fortfarande medvetet inte läser vid import (se dess
  * klasskommentar). En vanlig ankrad bild är en helt annan, mycket
- * enklare mekanism att skriva än att läsa rich-data-celler - men
- * ImportExcel läser INTE denna bild tillbaka; att koppla bilder vid
- * återimport sker fortfarande bara via WINECELLAR_IMPORT_IMAGE_FOLDER/
- * Bildmatchare. Exportfilen är alltså en fullständig visuell backup,
- * men en re-import läser fortfarande om bilder separat.
+ * enklare mekanism att skriva än att läsa rich-data-celler.
+ *
+ * Den ankrade bilden i sig läses INTE tillbaka av ImportExcel - det är
+ * bara en visuell bekvämlighet för att kunna bläddra i xlsx-filen. Den
+ * fullständiga rundtrippen (byggd samma dag, se ExportExcels
+ * klasskommentar) går istället via WINECELLAR_LOCAL_IMAGE_FOLDER: samma
+ * bilddata skrivs ALLTID som en riktig fil i den mappen (oavsett om
+ * formatet stöds av xlsx-ankring eller inte), och det är den mappen
+ * ImportExcel/Bildmatchare läser tillbaka från vid en återimport.
  */
 final class VinradSkrivare {
 

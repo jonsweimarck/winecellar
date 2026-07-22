@@ -24,9 +24,14 @@ import java.util.regex.Pattern;
  * Wine-fält varje kolumn motsvarar. Bild-kolumnen (I) hoppas medvetet
  * över: bilderna är inbäddade som Excels "bild i cell" (rich data), inte
  * vanliga cellvärden, och att extrahera dem robust är inte värt det för
- * ett engångsskript. Etiketter kan istället importeras separat från en
+ * ett engångsskript. Etiketter importeras istället separat från en
  * vanlig bildmapp - se {@link Bildmatchare} och ImportExcel - eller laddas
  * upp manuellt via webb-UI:t (vin-formuläret) efteråt.
+ *
+ * **Bara namnet är obligatoriskt (ändrat 2026-07-22)** - samma regel som
+ * webb-UI:t använder (se CLAUDE.md:s "Bara namnet obligatoriskt"). Alla
+ * övriga fält, inklusive vintyp/land/producent som tidigare krävdes,
+ * tolkas nu som valfria och blir `null` om cellen är tom.
  */
 final class VinradParser {
 
@@ -77,31 +82,29 @@ final class VinradParser {
     /**
      * Kastar {@link RadSaknarObligatoriskaFältException} istället för att
      * returnera null - anroparen (ImportExcel) avgör om det ska hoppas
-     * över med en varning eller stoppa hela importen. Rader saknar
-     * ibland vintyp/land/producent/namn (ofullständiga utkast i kalkylen,
-     * se t.ex. rad 2 - inköpsdatum/pris/antal/plats saknas helt).
+     * över med en varning eller stoppa hela importen. Bara namnet krävs
+     * (se klasskommentaren) - en rad utan namn kan inte bli ett vin över
+     * huvud taget, men alla andra fält får gärna vara tomma.
      */
     Wine parse(Row row) {
-        String vintypText = text(row, COL_VINTYP);
-        String land = text(row, COL_LAND);
-        String producent = text(row, COL_PRODUCENT);
         String namn = text(row, COL_NAMN);
-        if (vintypText == null || land == null || producent == null || namn == null) {
+        if (namn == null) {
             throw new RadSaknarObligatoriskaFältException(row.getRowNum() + 1);
         }
+        String vintypText = text(row, COL_VINTYP);
 
         return Wine.builder()
-                .wineType(vinTypFrån(vintypText, row.getRowNum() + 1))
-                .country(land)
+                .wineType(vintypText == null ? null : vinTypFrån(vintypText, row.getRowNum() + 1))
+                .country(text(row, COL_LAND))
                 .region(text(row, COL_REGION))
                 .subregion(text(row, COL_UNDERREGION))
                 .grapes(text(row, COL_DRUVOR))
-                .producer(producent)
+                .producer(text(row, COL_PRODUCENT))
                 .name(namn)
-                .vintage(heltal(row, COL_ARGANG, 0))
+                .vintage(heltal(row, COL_ARGANG))
                 .purchaseDate(datum(row, COL_INKOPSDATUM))
                 .price(pris(row, COL_PRIS))
-                .quantity(heltal(row, COL_ANTAL, 0))
+                .quantity(heltal(row, COL_ANTAL))
                 .purchaseReason(text(row, COL_VARFOR_KOP))
                 .tastingNotes(text(row, COL_TASTING_NOTES))
                 .ownRating(betyg(row, COL_EGET_BETYG, row.getRowNum() + 1, "eget betyg"))
@@ -178,16 +181,16 @@ final class VinradParser {
         return dateTime.toLocalDate();
     }
 
-    private int heltal(Row row, int col, int standardvärde) {
+    private Integer heltal(Row row, int col) {
         Cell cell = row.getCell(col);
         if (cell == null) {
-            return standardvärde;
+            return null;
         }
         if (cell.getCellType() == CellType.NUMERIC) {
             return (int) Math.round(cell.getNumericCellValue());
         }
         String text = dataFormatter.formatCellValue(cell).trim();
-        return text.isEmpty() ? standardvärde : Integer.parseInt(text);
+        return text.isEmpty() ? null : Integer.parseInt(text);
     }
 
     private String text(Row row, int col) {
@@ -201,7 +204,7 @@ final class VinradParser {
 
     static final class RadSaknarObligatoriskaFältException extends RuntimeException {
         RadSaknarObligatoriskaFältException(int radnummer) {
-            super("Rad " + radnummer + ": saknar vintyp, land, producent eller namn - hoppas över");
+            super("Rad " + radnummer + ": saknar namn - hoppas över");
         }
     }
 }

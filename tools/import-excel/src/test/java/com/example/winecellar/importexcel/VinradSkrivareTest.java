@@ -16,7 +16,6 @@ import java.time.LocalDate;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Testar Wine->rad-skrivningen genom att skriva och sedan läsa tillbaka
@@ -88,21 +87,25 @@ class VinradSkrivareTest {
 
     /**
      * Ett vin som bara har namnet ifyllt (möjligt sedan bara namnet blev
-     * obligatoriskt i webb-UI:t, se CLAUDE.md) skrivs till Excel utan
-     * problem, men VinradParser hoppar över raden vid en eventuell
-     * återimport - samma "ofullständig utkastrad"-hantering som redan
-     * finns, inte en ny begränsning. Dokumenterar den kända avvägningen,
-     * inte ett fel.
+     * obligatoriskt i webb-UI:t, se CLAUDE.md) skrivs till Excel och
+     * återläses nu korrekt - VinradParser kräver sedan 2026-07-22 bara
+     * namnet, samma regel åt båda hållen (tidigare hoppade parsern över
+     * en sådan rad vid återimport; det var den kända begränsningen som
+     * ledde till den ändringen).
      */
     @Test
-    void ettVinMedBaraNamnetSkrivsMenHoppasÖverVidÅterimport() {
+    void ettVinMedBaraNamnetSkrivsOchÅterlässKorrekt() {
         Wine minimalt = Wine.builder().name("Anteckning om ett vin").build();
 
         Row row = skrivTillNyRad(minimalt);
+        Wine återinläst = parser.parse(row);
 
-        assertThat(row.getCell(VinradParser.COL_NAMN).getStringCellValue()).isEqualTo("Anteckning om ett vin");
-        assertThatThrownBy(() -> parser.parse(row))
-                .isInstanceOf(VinradParser.RadSaknarObligatoriskaFältException.class);
+        assertThat(återinläst.name()).isEqualTo("Anteckning om ett vin");
+        assertThat(återinläst.wineType()).isNull();
+        assertThat(återinläst.country()).isNull();
+        assertThat(återinläst.producer()).isNull();
+        assertThat(återinläst.vintage()).isNull();
+        assertThat(återinläst.quantity()).isNull();
     }
 
     /**

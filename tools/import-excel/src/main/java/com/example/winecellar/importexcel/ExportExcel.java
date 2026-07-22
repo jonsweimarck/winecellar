@@ -11,7 +11,10 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -19,6 +22,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Engångsexport av wines-tabellen -> en Excel-fil i samma format som
@@ -27,17 +32,18 @@ import java.util.List;
  * "Export av databasen till Excel". Körs manuellt, precis som
  * ImportExcel - inte en del av den körande applikationen.
  *
- * Etiketter (image/image_mime_type) exporteras som vanliga ankrade
- * bilder i "Bild"-kolumnen (byggt 2026-07-22) - se VinradSkrivares
- * klasskommentar för skillnaden mot källfilens ursprungliga "bild i
- * cell" och den viktiga begränsningen att ImportExcel inte läser dessa
- * bilder tillbaka vid en återimport.
- *
- * En rad exporterad och sedan återimporterad utan att typ/producent/
- * land fylls i (möjligt sedan bara namnet blev obligatoriskt i
- * webb-UI:t, se CLAUDE.md) hoppas över av VinradParser vid återimport,
- * med en utskriven varning - samma "ofullständig utkastrad"-hantering
- * som redan finns, inte en ny begränsning som exporten inför.
+ * **Fullständig rundtripp för bilder (byggt 2026-07-22, på användarens
+ * begäran).** Etiketter skrivs på TVÅ oberoende sätt:
+ * 1. Som vanliga ankrade bilder i xlsx-filens "Bild"-kolumn (se
+ *    VinradSkrivares klasskommentar) - bara JPEG/PNG/GIF, en visuell
+ *    "titta i Excel"-bekvämlighet.
+ * 2. Som riktiga bildfiler i WINECELLAR_LOCAL_IMAGE_FOLDER (samma
+ *    miljövariabel som ImportExcel/Bildmatchare redan använder för att
+ *    KOPPLA bilder vid import) - alla MIME-typer Bildmatchare känner
+ *    igen, inklusive webp. Det är DEN HÄR mekanismen som gör rundtrippen
+ *    fullständig: en efterföljande ImportExcel-körning mot samma mapp
+ *    plockar upp filerna via Bildmatchares namnmatchning, precis som vid
+ *    en vanlig import.
  */
 public final class ExportExcel {
 
@@ -64,12 +70,14 @@ public final class ExportExcel {
         if (args.length < 1) {
             System.err.println("Användning: ExportExcel <sökväg-till-utfil.xlsx> [jdbc-url] [användare] [lösenord]");
             System.err.println("Utan jdbc-url/användare/lösenord används POSTGRESQL_ADDON_*-miljövariabler (samma konvention som application.yml), annars localhost/winecellar.");
+            System.err.println("Sätt WINECELLAR_LOCAL_IMAGE_FOLDER för att även skriva ut etiketterna som bildfiler i en mapp, se README.");
             System.exit(1);
         }
         String utfilSökväg = args[0];
         String jdbcUrl = args.length > 1 ? args[1] : Databaskoppling.jdbcUrlFrånMiljö();
         String användare = args.length > 2 ? args[2] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_USER", "winecellar");
         String lösenord = args.length > 3 ? args[3] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_PASSWORD", "winecellar");
+        String bildmappSökväg = System.getenv("WINECELLAR_LOCAL_IMAGE_FOLDER");
 
         List<Wine> viner = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(jdbcUrl, användare, lösenord);
@@ -80,6 +88,10 @@ public final class ExportExcel {
             }
         }
         System.out.println("Läste " + viner.size() + " viner från databasen.");
+
+        if (bildmappSökväg != null && !bildmappSökväg.isBlank()) {
+            skrivBildfiler(viner, bildmappSökväg);
+        }
 
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet(SHEET_NAMN);
@@ -100,6 +112,47 @@ public final class ExportExcel {
             }
         }
         System.out.println("Skrev " + viner.size() + " viner till " + utfilSökväg + ".");
+    }
+
+    /**
+     * Skriver varje vins bild som en egen fil i bildmappen, döpt exakt
+     * som vinets namn (samma namnmatchning som Bildmatchare använder vid
+     * import) - det är denna mapp, inte xlsx-filens ankrade bilder, som
+     * gör en efterföljande återimport bildmedveten.
+     */
+    private static void skrivBildfiler(List<Wine> viner, String bildmappSökväg) throws IOException {
+        Path bildmapp = Path.of(bildmappSökväg);
+        Files.createDirectories(bildmapp);
+        varnaOmDubblettnamnMedBild(viner);
+
+        int skrivna = 0;
+        for (Wine vin : viner) {
+            if (vin.image() == null) {
+                continue;
+            }
+            String ändelse = Bildmatchare.ÄNDELSE_PER_MIME.get(vin.imageMimeType());
+            if (ändelse == null) {
+                System.out.println("Varning: bilden för \"" + vin.name() + "\" har MIME-typen \""
+                        + vin.imageMimeType() + "\", som inte känns igen - hoppar över filskrivning "
+                        + "(bilden bäddas fortfarande in i xlsx-filen om formatet stöds där).");
+                continue;
+            }
+            Files.write(bildmapp.resolve(vin.name() + "." + ändelse), vin.image());
+            skrivna++;
+        }
+        System.out.println("Skrev " + skrivna + " bildfiler till " + bildmappSökväg + ".");
+    }
+
+    private static void varnaOmDubblettnamnMedBild(List<Wine> viner) {
+        Map<String, Long> antalPerNamn = viner.stream()
+                .filter(Wine::harBild)
+                .collect(Collectors.groupingBy(Wine::name, Collectors.counting()));
+        antalPerNamn.forEach((namn, antal) -> {
+            if (antal > 1) {
+                System.out.println("Varning: " + antal + " viner heter \"" + namn
+                        + "\" - bara den sist skrivna bildfilen blir kvar i mappen.");
+            }
+        });
     }
 
     private static void skrivRubrikrad(Sheet sheet) {

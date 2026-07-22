@@ -30,11 +30,14 @@ import java.util.stream.Collectors;
  * via JpaWineRepository), inte en del av den körande applikationen.
  *
  * Etiketter kan valfritt importeras samtidigt: sätt miljövariabeln
- * WINECELLAR_IMPORT_IMAGE_FOLDER till en mapp med bildfiler döpta exakt
- * som respektive vins name-fält (t.ex. "Barolo.jpg"), se Bildmatchare.
- * Miljövariabel istället för ett positionellt argument, av samma skäl som
- * POSTGRESQL_ADDON_*-uppgifterna nedan - undviker PowerShells trassel med
- * flervärdesargument i -Dexec.args (se README).
+ * WINECELLAR_LOCAL_IMAGE_FOLDER (döpt om från WINECELLAR_IMPORT_IMAGE_FOLDER
+ * 2026-07-22, då ExportExcel började skriva till samma mapp - namnet ska
+ * spegla att mappen delas åt båda hållen, inte bara vid import) till en
+ * mapp med bildfiler döpta exakt som respektive vins name-fält (t.ex.
+ * "Barolo.jpg"), se Bildmatchare. Miljövariabel istället för ett
+ * positionellt argument, av samma skäl som POSTGRESQL_ADDON_*-uppgifterna
+ * nedan - undviker PowerShells trassel med flervärdesargument i
+ * -Dexec.args (se README).
  */
 public final class ImportExcel {
 
@@ -53,14 +56,14 @@ public final class ImportExcel {
         if (args.length < 1) {
             System.err.println("Användning: ImportExcel <sökväg-till-vinlista.xlsx> [jdbc-url] [användare] [lösenord]");
             System.err.println("Utan jdbc-url/användare/lösenord används POSTGRESQL_ADDON_*-miljövariabler (samma konvention som application.yml), annars localhost/winecellar.");
-            System.err.println("Sätt WINECELLAR_IMPORT_IMAGE_FOLDER för att även koppla etiketter från en bildmapp, se README.");
+            System.err.println("Sätt WINECELLAR_LOCAL_IMAGE_FOLDER för att även koppla etiketter från en bildmapp, se README.");
             System.exit(1);
         }
         String excelSökväg = args[0];
         String jdbcUrl = args.length > 1 ? args[1] : Databaskoppling.jdbcUrlFrånMiljö();
         String användare = args.length > 2 ? args[2] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_USER", "winecellar");
         String lösenord = args.length > 3 ? args[3] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_PASSWORD", "winecellar");
-        String bildmappSökväg = System.getenv("WINECELLAR_IMPORT_IMAGE_FOLDER");
+        String bildmappSökväg = System.getenv("WINECELLAR_LOCAL_IMAGE_FOLDER");
         Bildmatchare bildmatchare = bildmappSökväg == null || bildmappSökväg.isBlank()
                 ? null
                 : new Bildmatchare(Path.of(bildmappSökväg));
@@ -119,9 +122,9 @@ public final class ImportExcel {
     private static void bindParametrar(PreparedStatement statement, Wine vin) throws java.sql.SQLException {
         int i = 1;
         statement.setString(i++, vin.name());
-        statement.setString(i++, vin.wineType().name());
-        statement.setString(i++, vin.producer());
-        statement.setString(i++, vin.country());
+        settNullbarSträng(statement, i++, vin.wineType() == null ? null : vin.wineType().name());
+        settNullbarSträng(statement, i++, vin.producer());
+        settNullbarSträng(statement, i++, vin.country());
         settNullbarSträng(statement, i++, vin.region());
         settNullbarSträng(statement, i++, vin.subregion());
         settNullbarSträng(statement, i++, vin.grapes());

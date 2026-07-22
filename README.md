@@ -590,11 +590,15 @@ Utan `jdbc-url`/`användare`/`lösenord` som argument används
 
 Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `VinradParser` - se
 README:s Datamodell-avsnitt för vilket fält varje kolumn motsvarar.
-Rader som saknar vintyp, land, producent eller namn hoppas över med en
-utskriven varning (ofullständiga utkastrader förekommer i källfilen).
-Etikett-kolumnen (`Bild`) i själva Excel-filen läses **fortfarande inte**
-- Excels "bild i cell" är inbäddad rich data, inte ett vanligt cellvärde,
-och att extrahera den robust är inte värt det för ett engångsskript.
+**Bara namnet är obligatoriskt (ändrat 2026-07-22, samma regel som
+webb-UI:t** - se Datamodell-avsnittets "Bara namnet obligatoriskt"):
+en rad utan namn hoppas över med en utskriven varning, men alla andra
+fält (inklusive vintyp/land/producent, som tidigare krävdes) tolkas nu
+som valfria och blir `null` om cellen är tom. Etikett-kolumnen (`Bild`)
+i själva Excel-filen läses **fortfarande inte** - Excels "bild i cell"
+är inbäddad rich data, inte ett vanligt cellvärde, och att extrahera den
+robust är inte värt det för ett engångsskript. Etiketter importeras
+istället från en vanlig bildmapp, se nedan.
 
 **"Systembolagets prodnummer" fick en egen kolumn (2026-07-20).** Ligger
 efter "Eget betyg" (kolumn P), vilket sköt "Systembolaget"-kolumnen
@@ -606,14 +610,15 @@ på den första radbrytningen - den logiken är borttagen, båda fälten
 läses nu rätt av som två oberoende kolumner.
 
 **Etiketter kan istället importeras från en vanlig bildmapp (byggt
-2026-07-19):** sätt miljövariabeln `WINECELLAR_IMPORT_IMAGE_FOLDER` till
-sökvägen till en mapp där varje bildfil är döpt exakt som vinets
-`name`-fält (t.ex. `Barolo.jpg` för ett vin med namnet "Barolo") -
-`jpg`/`jpeg`/`png`/`gif`/`webp` känns igen, MIME-typen sätts utifrån
-filändelsen. `Bildmatchare` (`tools/import-excel/`) matchar filnamnets
-stam (utan ändelse) mot varje vins namn **exakt**, ingen normalisering av
-mellanslag/skiftläge. Två fällor hanteras explicit, med utskrivna
-varningar istället för att gissa:
+2026-07-19, miljövariabeln döpt om till `WINECELLAR_LOCAL_IMAGE_FOLDER`
+2026-07-22 - se "Export av databasen till Excel" nedan för varför):**
+sätt miljövariabeln till sökvägen till en mapp där varje bildfil är
+döpt exakt som vinets `name`-fält (t.ex. `Barolo.jpg` för ett vin med
+namnet "Barolo") - `jpg`/`jpeg`/`png`/`gif`/`webp` känns igen, MIME-typen
+sätts utifrån filändelsen. `Bildmatchare` (`tools/import-excel/`) matchar
+filnamnets stam (utan ändelse) mot varje vins namn **exakt**, ingen
+normalisering av mellanslag/skiftläge. Två fällor hanteras explicit, med
+utskrivna varningar istället för att gissa:
 - Flera bildfiler med samma stam men olika ändelse (t.ex. både
   `Barolo.jpg` och `Barolo.png`) - tvetydigt vilken som ska användas,
   den stammen hoppas över helt.
@@ -629,7 +634,7 @@ Variabeln är helt valfri - utan den beter sig importen precis som förut,
 ingen bild kopplas till något vin.
 
 ```powershell
-$env:WINECELLAR_IMPORT_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"
+$env:WINECELLAR_LOCAL_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"
 ```
 
 Om ingen fil matchar ett visst vin kopplas helt enkelt ingen bild till
@@ -667,28 +672,39 @@ ställen, ett tidigare dokumenterat felmönster i det här projektet
 `ImportExcel` när export tillkom) delar
 jdbc-url/användare/lösenord-uppslagningen mellan de två verktygen.
 
-**Etiketter exporteras också (byggt 2026-07-22, på användarens begäran).**
-`VinradSkrivare` ankrar varje vins `image` som en vanlig POI-`Picture` i
-"Bild"-kolumnen (samma kolumn som källfilens ursprungliga, men fylld på
-ett annat sätt - se nedan). Stödda MIME-typer: JPEG, PNG, GIF (samma
-mängd som `Bildmatchare` känner igen vid import, **minus** WEBP - OOXML/
-`.xlsx` har inget bildformat för webp, och POI har ingen
-`PICTURE_TYPE`-konstant för det). En webp-bild hoppas över vid export med
-en utskriven varning istället för att krascha - databasens rådata
-påverkas inte, bara den enskilda etikettens export.
+**Etiketter exporteras på två oberoende sätt (byggt 2026-07-22, på
+användarens begäran - fullständig rundtripp för både text och bilder).**
 
-**Viktig skillnad mot källfilens "bild i cell", och en medveten
-begränsning:** en vanlig ankrad POI-`Picture` är en helt annan, mycket
-enklare mekanism än Excels ursprungliga "bild i cell" (inbäddad rich
-data) som `VinradParser` fortfarande medvetet inte läser vid import (se
-ovan). **`ImportExcel` läser fortfarande inte bilder från Excel-filen** -
-en ankrad exportbild går alltså inte automatiskt tillbaka in i databasen
-vid en återimport. Att koppla bilder vid återimport sker fortfarande
-bara via `WINECELLAR_IMPORT_IMAGE_FOLDER`/`Bildmatchare` (se "Import av
-befintlig Excel-data"). Exportfilen är alltså en fullständig *visuell*
-backup (bilderna syns och kan extraheras ur filen), men själva
-återimport-rundturen tar fortfarande bara med textdata - en naturlig,
-avgränsad utökning senare om det visar sig behövas.
+1. Som en vanlig ankrad POI-`Picture` i xlsx-filens "Bild"-kolumn (samma
+   kolumn som källfilens ursprungliga, men fylld på ett helt annat sätt
+   - se nedan). Bara en visuell bekvämlighet för att kunna bläddra
+   bilderna direkt i Excel. Stödda MIME-typer: JPEG, PNG, GIF - **inte**
+   WEBP, eftersom OOXML/`.xlsx` inte har något bildformat för webp och
+   POI ingen `PICTURE_TYPE`-konstant för det. En webp-bild hoppas över
+   här med en utskriven varning istället för att krascha - påverkar
+   bara den enskilda etikettens Excel-inbäddning.
+2. Som en riktig bildfil i `WINECELLAR_LOCAL_IMAGE_FOLDER` (**samma**
+   miljövariabel som `ImportExcel`/`Bildmatchare` använder för att koppla
+   bilder vid import, döpt om från `WINECELLAR_IMPORT_IMAGE_FOLDER` när
+   detta byggdes - namnet ska spegla att mappen nu används åt båda
+   hållen, inte bara vid import), döpt exakt som vinets namn (samma
+   namnmatchning som `Bildmatchare` förväntar sig vid en återimport).
+   **Detta är den mekanism som gör rundtrippen fullständig** - alla
+   MIME-typer `Bildmatchare` känner igen skrivs hit, inklusive webp.
+   Om flera viner delar exakt samma namn skrivs en varning ut (bara den
+   sist skrivna filen blir kvar i mappen) - samma "varna istället för
+   att gissa"-linje som `Bildmatchare`s egna tvetydighetsfall vid import.
+
+En vanlig ankrad `Picture` är en helt annan, mycket enklare mekanism att
+SKRIVA än Excels ursprungliga "bild i cell" (inbäddad rich data) är att
+LÄSA - `ImportExcel` läser fortfarande inte bilder ur xlsx-filen själv
+(se ovan), men det spelar ingen roll för rundtrippen eftersom mekanism 2
+(bildmappen) är den som faktiskt läses tillbaka.
+
+**Full rundtripp kräver alltså att samma `WINECELLAR_LOCAL_IMAGE_FOLDER`
+pekas ut vid både export och en efterföljande återimport** - annars
+kommer text-datan tillbaka men inte bilderna (exakt samma begränsning
+som redan gäller ren import från en bildmapp, se ovan).
 
 Kör via `exec-maven-plugin`, som annars kör `ImportExcel` som standard -
 `ExportExcel` kräver ett explicit `-Dexec.mainClass`-argument:
@@ -701,43 +717,53 @@ $env:POSTGRESQL_ADDON_PORT = "<port>"
 $env:POSTGRESQL_ADDON_DB = "<databasnamn>"
 $env:POSTGRESQL_ADDON_USER = "<användare>"
 $env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
+$env:WINECELLAR_LOCAL_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"  # valfri - se ovan
 
 mvn exec:java "-Dexec.mainClass=com.example.winecellar.importexcel.ExportExcel" "-Dexec.args=C:\Users\jonsw\Documents\Vin\Vinlista-export.xlsx"
 ```
 
 Utan `POSTGRESQL_ADDON_*`-miljövariabler används
 `localhost`/`winecellar`/`winecellar` (docker-compose-databasen), samma
-konvention som `ImportExcel`.
+konvention som `ImportExcel`. Utan `WINECELLAR_LOCAL_IMAGE_FOLDER`
+skrivs inga bildfiler (bilderna bäddas ändå in i xlsx-filen där
+formatet stöds, se ovan) - mappen skapas automatiskt om den inte redan
+finns.
 
-**Känd rundturs-begränsning, inte en bugg:** sedan webb-UI:t bara kräver
-`namn` för ett nytt vin (se ovan) kan databasen innehålla viner som
-saknar vintyp/land/producent - `VinradParser` kräver fortfarande alla
-fyra vid en eventuell återimport (samma "ofullständig utkastrad"-
-hantering som redan fanns för Excelns egna ofullständiga rader) och
-hoppar då över raden med en utskriven varning. Ett sådant vin exporteras
-fint till Excel, det är bara återimporten som hoppar över det. Om det
-visar sig vara ett problem i praktiken är det en enkel ändring att sänka
-`VinradParser`s krav - inte gjort nu, eftersom det inte är efterfrågat.
+**Tidigare känd rundturs-begränsning, löst 2026-07-22:** sedan webb-UI:t
+bara kräver `namn` för ett nytt vin (se ovan) kunde databasen innehålla
+viner som saknade vintyp/land/producent, och `VinradParser` krävde
+tidigare alla fyra vid återimport - ett sådant vin exporterades fint
+till Excel, men hoppades över vid återimport. Löst genom att lätta på
+`VinradParser`s krav till samma regel som webb-UI:t (bara namnet
+obligatoriskt, se ovan) - `ImportExcel.bindParametrar` fick samtidigt
+null-safe bindning för `wine_type`/`producer`/`country` (tidigare bundna
+direkt utan null-koll, eftersom `VinradParser` garanterade att de aldrig
+var `null`) - annars kraschade importen av en sådan rad med ett
+`NullPointerException` istället för att spara `null` i databasen. Fångat
+av den manuella verifieringen nedan, inte av något automatiskt test.
 
-**Verifierat lokalt (2026-07-22)** mot en tom docker-compose-databas: två
-testviner (ett fullständigt ifyllt, ett med bara namnet satt) sparades
-via webb-UI:t, exporterades, databasen tömdes (`TRUNCATE`), och filen
-importerades tillbaka - det fullständiga vinet återkom med identiska
-värden i samtliga fält (kontrollerat via `psql`), det namn-bara vinet
-hoppades över med en varning precis som dokumenterat ovan. `VinradSkrivare`
-har också en egen enhetstest (`VinradSkrivareTest`) som skriver och
-direkt återläser samma rad via `VinradParser` och verifierar att den
-återlästa `Wine` är identisk med originalet.
+**Verifierat lokalt (2026-07-22)** mot en tom docker-compose-databas: tre
+testviner (ett fullständigt ifyllt med bild, ett med bara namnet satt
+utan bild, ett med bara namnet satt **och** en bild) sparades via
+webb-UI:t, exporterades med `WINECELLAR_LOCAL_IMAGE_FOLDER` satt,
+databasen tömdes (`TRUNCATE`), och både xlsx-filen och bildmappen
+importerades tillbaka - alla tre viner återkom med identiska textvärden
+(kontrollerat via `psql`), och båda bilderna (inklusive det namn-bara
+vinets) återkom byte-för-byte identiska med originalen. Ingen rad
+hoppades över. `VinradSkrivareTest` har en motsvarande enhetstest
+(`ettVinMedBaraNamnetSkrivsOchÅterlässKorrekt`) som verifierar samma sak
+isolerat, utan en riktig databas.
 
-**Bildexporten verifierad separat, samma dag:** ett vin med en riktig
-uppladdad JPEG-etikett (200×300, laddad upp via webb-UI:t) exporterades,
-och den resulterande `.xlsx`-filen packades upp som ett zip-arkiv
-(`xl/media/image1.jpeg`) - bilden däri var byte-för-byte identisk med
-originalet (samma filstorlek, öppnades korrekt som en giltig JPEG).
-`VinradSkrivareTest` har motsvarande två enhetstester: en som verifierar
-att en riktig (minimal) PNG bäddas in och kan hämtas ut ur workbooken via
-`Workbook.getAllPictures()`, och en som verifierar att en webp-bild
-hoppas över utan att kasta ett fel.
+**Bildexporten verifierad separat, samma dag:** en riktig uppladdad
+JPEG-etikett exporterades både till xlsx-filens `xl/media/`-mapp (som
+ankrad `Picture`) och till bildmappen som en egen fil - båda kopiorna var
+byte-för-byte identiska med originalet. `VinradSkrivareTest` har motsvarande enhetstester för xlsx-inbäddningen:
+en som verifierar att en riktig (minimal) PNG bäddas in och kan hämtas ut
+via `Workbook.getAllPictures()`, en som verifierar att en webp-bild
+hoppas över där utan att kasta ett fel. Bildmappsskrivningen
+(`ExportExcel.skrivBildfiler`) har ingen egen enhetstest - verifierad
+manuellt enligt samma princip som resten av `ImportExcel`/`ExportExcel`s
+JDBC-integration (se Arbetsprocess-avsnittet).
 
 **Fälla som dök upp vid den manuella verifieringen:** `pom.xml`s
 `exec-maven-plugin`-konfiguration hade `<mainClass>` hårdkodat direkt till
@@ -1009,7 +1035,7 @@ CLAUDE.md.
       Vinlista.xlsx, körd mot produktionsdatabasen - se "Import av
       befintlig Excel-data"
 - [x] Etikettimport från en bildmapp som ett tillägg till Excel-importen
-      (`Bildmatchare`, `WINECELLAR_IMPORT_IMAGE_FOLDER`) - matchar
+      (`Bildmatchare`, `WINECELLAR_LOCAL_IMAGE_FOLDER`) - matchar
       filnamn mot vinnamn, se "Import av befintlig Excel-data"
 - [x] Autentisering (se CLAUDE.md:s "Säkerhet") - HTTP Basic på hela appen,
       inte bara en admin-del, eftersom det inte finns någon publik läsvy
