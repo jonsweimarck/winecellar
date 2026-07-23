@@ -14,10 +14,32 @@
         fieldset { margin-top: 1.5rem; border: 1px solid #ddd; border-radius: 0.25rem; }
         legend { font-weight: bold; padding: 0 0.5rem; }
         .vinbild-formular { max-width: 10rem; max-height: 12rem; display: block; margin-bottom: 0.5rem; border-radius: 0.25rem; }
+        .dubblettvarning { border: 1px solid #d99; background: #fdf2f2; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
+        .dubblettvarning p { margin: 0; }
+        .dubblettvarning form { display: inline-block; margin-top: 0.75rem; }
     </style>
 </head>
 <body>
     <h1 th:text="${wine.id == null ? 'Lägg till vin' : 'Redigera ' + wine.name}"></h1>
+
+    <div class="dubblettvarning" th:if="${duplicateExisting != null}">
+        <p th:if="${duplicateIsFull}">
+            Det här vinet finns redan: <strong th:text="${duplicateExisting.name}"></strong>
+            (<span th:text="${duplicateExisting.producer}"></span>, <span th:text="${duplicateExisting.vintage}"></span>)
+            med <span th:text="${duplicateExisting.quantity}"></span> flaskor. Det går inte att spara som en
+            dubblett - öka antalet på det befintliga vinet, eller ändra namn, producent eller årgång ovan och
+            försök igen.
+        </p>
+        <p th:unless="${duplicateIsFull}">
+            Det finns redan ett vin som liknar det här: <strong th:text="${duplicateExisting.name}"></strong>
+            (<span th:text="${duplicateExisting.producer}"></span>, <span th:text="${duplicateExisting.vintage}"></span>)
+            med <span th:text="${duplicateExisting.quantity}"></span> flaskor. Vill du öka antalet på det i
+            stället, eller lägga till det här som ett nytt vin?
+        </p>
+        <form method="post" th:action="@{/wines/{id}/dubblett-oka-antal(id=${duplicateExisting.id.value})}">
+            <button type="submit">Öka antalet på det befintliga vinet med 1</button>
+        </form>
+    </div>
 
     <form method="post" enctype="multipart/form-data"
           th:action="${wine.id == null} ? @{/wines} : @{/wines/{id}/redigera(id=${wine.id.value})}">
@@ -27,7 +49,7 @@
                 <input type="text" name="name" th:value="${wine.name}" required>
             </label>
             <label>Etikett
-                <img th:if="${wine.hasImage()}" th:src="@{/wines/{id}/bild(id=${wine.id.value})}"
+                <img th:if="${wine.hasImage() and wine.id != null}" th:src="@{/wines/{id}/bild(id=${wine.id.value})}"
                      alt="Nuvarande etikett" class="vinbild-formular">
                 <input type="file" name="bild" accept="image/*">
             </label>
@@ -121,6 +143,8 @@
         </fieldset>
 
         <button type="submit" th:text="${wine.id == null ? 'Lägg till' : 'Spara'}"></button>
+        <button type="submit" name="confirmAdd" value="true"
+                th:if="${duplicateExisting != null and !duplicateIsFull}">Lägg till som nytt vin ändå</button>
         <a class="knapp" href="/">Avbryt</a>
     </form>
 </body>

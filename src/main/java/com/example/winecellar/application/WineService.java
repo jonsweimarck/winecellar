@@ -105,4 +105,33 @@ public class WineService {
     public void removeWine(WineId id) {
         wineRepository.deleteById(id);
     }
+
+    /**
+     * Hittar en möjlig/fullständig dubblett bland redan sparade viner, se
+     * Wine.matchesIdentityOf(...)/hasCompleteIdentity() och WINE-6. Linjär
+     * genomsökning av samtliga viner, precis som findAll()/originTree()
+     * redan gör - samlingens storlek gör det inte värt en särskild fråga.
+     */
+    public DuplicateCheck checkForDuplicate(Wine candidate) {
+        for (Wine existing : wineRepository.findAll()) {
+            if (candidate.matchesIdentityOf(existing)) {
+                return candidate.hasCompleteIdentity()
+                        ? new DuplicateCheck.FullDuplicate(existing)
+                        : new DuplicateCheck.PartialDuplicate(existing);
+            }
+        }
+        return new DuplicateCheck.NoDuplicate();
+    }
+
+    /**
+     * Ökar antalet flaskor på ett redan sparat vin med 1 - används av
+     * dubblettvarningens "öka antal istället"-val (WINE-6). Null-antal
+     * (aldrig satt) behandlas som 0.
+     */
+    public Wine increaseQuantity(WineId id) {
+        Wine existing = wineRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
+        int currentQuantity = existing.quantity() == null ? 0 : existing.quantity();
+        return wineRepository.save(existing.withQuantity(currentQuantity + 1));
+    }
 }

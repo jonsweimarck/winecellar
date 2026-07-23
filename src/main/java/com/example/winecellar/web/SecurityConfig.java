@@ -35,7 +35,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.GET, "/", "/wines/*/bild").hasAnyRole("ADMIN", "READONLY")
                         .requestMatchers(HttpMethod.GET, "/wines/nytt", "/wines/*/redigera").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/wines", "/wines/*/redigera").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/wines", "/wines/*/redigera", "/wines/*/dubblett-oka-antal").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/wines/*").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
