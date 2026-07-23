@@ -793,6 +793,53 @@ flaggade som gällande.
   miljövariabler vid processstart, så en sparad variabel kräver en
   omstart/redeploy av appen för att slå igenom, inte bara att den sparas.
 
+## Etikettskanning (LLM)
+
+**Byggd 2026-07-24 (WINE-5).** Appens första beroende av en extern
+tjänst (Anthropic) utöver Postgres - se
+[ADR 0012](docs/adr/0012-label-scanning-llm-integration.md) för
+motiveringen bakom de arkitektoniska valen (port/adapter,
+`RestClient` istället för den officiella SDK:n, konfiguration via
+miljövariabler, testuppdelningen mellan Cucumber/MockMvc/Playwright).
+Punkter värda att komma ihåg utöver ADR:n:
+
+- **`LabelInterpreter.interpret(...)` returnerar `Optional<InterpretedLabel>`,
+  inte ett värde-objekt med en egen "misslyckades"-flagga.** `empty()` =
+  total misslyckning (nätverksfel, LLM-fel, eller alla fem fälten blev
+  `null`) - ett `InterpretedLabel` med enstaka `null`-fält är fortfarande
+  ett LYCKAT resultat (bara namnet gick t.ex. att läsa). Att blanda ihop
+  dessa två hade gjort "bara namnet tolkades"-scenariot (WINE-5) omöjligt
+  att skilja från ett totalt misslyckande.
+- **`LabelInterpretationService.interpretedFields()` räknas ut från
+  vilka av de fem fälten som är icke-`null` i svaret** - ingen separat
+  boolesk flagga per fält behövdes, eftersom country/region (som FÅR
+  härledas) och name/producer/vintage (som INTE får det) ändå bara har
+  två tillstånd ur markeringens synvinkel: "kom med i svaret" eller
+  "gjorde det inte".
+- **Etikettskanningens formulärfält döljs helt vid redigering
+  (`th:if="${wine.id == null}"` i `vin-formular.html`)** - att skanna om
+  ett redan sparat vin är inte en del av WINE-5:s scope.
+- **`th:classappend`, inte `th:class`, för `tolkat-falt`-markeringen** -
+  `th:class` hade skrivit över hela `class`-attributet, vilket är
+  ofarligt just nu (inga andra klasser sätts på de fem fälten) men
+  `th:classappend` är den robusta varianten om ett fält någon gång får
+  en egen basklass.
+- **Klientsidans nedskalning (Canvas, före uppladdning) är projektets
+  första mer-än-triviala JavaScript** - `DataTransfer`/`File`-tricket
+  för att ersätta `<input type="file">`s valda fil efter nedskalning är
+  standardmönstret för detta, stöds av alla moderna webbläsare som
+  redan krävs för `capture="environment"`.
+- **`LabelScanFormIT` (Playwright) mockar `LabelInterpreter`
+  (porten), inte `LabelInterpretationService`** - den riktiga tjänsten
+  körs alltså i det testet, till skillnad från `WineControllerTest`
+  (`@WebMvcTest`) som mockar `LabelInterpretationService` direkt
+  eftersom den testet ändå bara stubbar bort hela applikationslagret.
+- **Playwrights `setInputFiles(...)` med en riktig, avkodningsbar
+  1x1-PNG (samma testbild som `WineRowWriterTest`), inte godtyckliga
+  bytes** - klient-JS:en laddar bilden i ett `Image`-element för att
+  läsa dess bredd/höjd inför nedskalningen, vilket kräver att
+  webbläsaren faktiskt kan avkoda testbilden.
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),
