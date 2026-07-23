@@ -1,6 +1,8 @@
 package com.example.winecellar.web;
 
 import com.example.winecellar.application.DuplicateCheck;
+import com.example.winecellar.application.LabelInterpretationResult;
+import com.example.winecellar.application.LabelInterpretationService;
 import com.example.winecellar.application.OriginNode;
 import com.example.winecellar.application.SortDirection;
 import com.example.winecellar.application.SortField;
@@ -67,6 +69,9 @@ class WineControllerTest {
 
     @MockBean
     private WineService wineService;
+
+    @MockBean
+    private LabelInterpretationService labelInterpretationService;
 
     private static final Wine BAROLO = Wine.builder()
             .id(new WineId(1L)).name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
@@ -756,6 +761,69 @@ class WineControllerTest {
                             containsString("name=\"bild\""),
                             containsString("Lägg till")
                     )));
+        }
+    }
+
+    @Nested
+    @DisplayName("när en etikett skannas")
+    class NärEnEtikettSkannas {
+
+        @Test
+        @DisplayName("ska visa ett förifyllt utkast med de tolkade fälten markerade")
+        void skaVisaEttFörifylltUtkastMedDeTolkadeFältenMarkerade() throws Exception {
+            Wine draft = Wine.builder().name("Barolo").producer("Pio Cesare").vintage(2018)
+                    .country("Italien").region("Piemonte").build();
+            when(labelInterpretationService.interpret(any(), any())).thenReturn(
+                    new LabelInterpretationResult.Interpreted(draft, Set.of("name", "producer", "vintage", "country", "region")));
+
+            mockMvc.perform(multipart("/wines/tolka-etikett")
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
+                            .with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("value=\"Barolo\""),
+                            containsString("value=\"Pio Cesare\""),
+                            containsString("value=\"2018\""),
+                            containsString("value=\"Italien\""),
+                            containsString("value=\"Piemonte\""),
+                            containsString("class=\"tolkat-falt\"")
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska visa ett felmeddelande och ett tomt formulär om tolkningen misslyckas")
+        void skaVisaFelmeddelandeOchTomtFormulärOmTolkningenMisslyckas() throws Exception {
+            when(labelInterpretationService.interpret(any(), any())).thenReturn(new LabelInterpretationResult.Failed());
+
+            mockMvc.perform(multipart("/wines/tolka-etikett")
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
+                            .with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Det gick inte att tolka etiketten"),
+                            not(containsString("class=\"tolkat-falt\""))
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska nekas utan inloggning och aldrig nå LabelInterpretationService")
+        void skaNekasUtanInloggning() throws Exception {
+            mockMvc.perform(multipart("/wines/tolka-etikett")
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3})))
+                    .andExpect(status().isUnauthorized());
+
+            verify(labelInterpretationService, never()).interpret(any(), any());
+        }
+
+        @Test
+        @DisplayName("ska nekas för readonly-kontot och aldrig nå LabelInterpretationService")
+        void skaNekasFörReadonlyKontot() throws Exception {
+            mockMvc.perform(multipart("/wines/tolka-etikett")
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
+                            .with(httpBasic("readonly", "readonly")))
+                    .andExpect(status().isForbidden());
+
+            verify(labelInterpretationService, never()).interpret(any(), any());
         }
     }
 

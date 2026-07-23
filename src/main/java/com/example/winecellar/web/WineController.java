@@ -1,6 +1,8 @@
 package com.example.winecellar.web;
 
 import com.example.winecellar.application.DuplicateCheck;
+import com.example.winecellar.application.LabelInterpretationResult;
+import com.example.winecellar.application.LabelInterpretationService;
 import com.example.winecellar.application.OriginNode;
 import com.example.winecellar.application.SearchCriteria;
 import com.example.winecellar.application.SortDirection;
@@ -41,9 +43,11 @@ import java.util.stream.Collectors;
 public class WineController {
 
     private final WineService wineService;
+    private final LabelInterpretationService labelInterpretationService;
 
-    public WineController(WineService wineService) {
+    public WineController(WineService wineService, LabelInterpretationService labelInterpretationService) {
         this.wineService = wineService;
+        this.labelInterpretationService = labelInterpretationService;
     }
 
     @GetMapping("/")
@@ -239,6 +243,28 @@ public class WineController {
     public String newWineForm(Model model) {
         model.addAttribute("wine", Wine.builder().build());
         model.addAttribute("ratings", Rating.values());
+        return "vin-formular";
+    }
+
+    /**
+     * Tolkar ett foto av en etikett till ett osparat utkast (WINE-5) -
+     * renderar om samma formulär, förifyllt med det som kunde
+     * läsas/härledas, istället för att spara något (se
+     * LabelInterpretationService/docs/adr/0012). Bara relevant vid
+     * TILLÄGG av ett nytt vin, inte redigering - därför ingen motsvarande
+     * rutt kopplad till redigeringsformuläret.
+     */
+    @PostMapping("/wines/tolka-etikett")
+    public String interpretLabel(@RequestParam("bild") MultipartFile image, Model model) throws IOException {
+        LabelInterpretationResult result = labelInterpretationService.interpret(image.getBytes(), image.getContentType());
+        model.addAttribute("ratings", Rating.values());
+        if (result instanceof LabelInterpretationResult.Interpreted interpreted) {
+            model.addAttribute("wine", interpreted.draft());
+            model.addAttribute("interpretedFields", interpreted.interpretedFields());
+        } else {
+            model.addAttribute("wine", Wine.builder().build());
+            model.addAttribute("labelInterpretationFailed", true);
+        }
         return "vin-formular";
     }
 

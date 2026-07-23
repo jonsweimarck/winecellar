@@ -33,6 +33,13 @@ mellan tillägg (`GET/POST /wines/nytt`) och redigering (`GET/POST
 /wines/{id}/redigera`) - samma mall, formuläret postar `multipart/
 form-data` med en valfri bildfil. Startsidan (`/`) visar bara listan.
 
+Vid tillägg går det att fotografera en etikett i stället för att skriva
+in fälten för hand - `POST /wines/tolka-etikett` skickar bilden till
+Anthropics API och renderar om samma formulär, förifyllt med det som
+kunde läsas/härledas (namn, producent, årgång, land, region), synligt
+markerat tills fältet redigeras. Se
+[ADR 0012](docs/adr/0012-label-scanning-llm-integration.md).
+
 ## Datamodell
 
 Tabell `wines`:
@@ -132,6 +139,11 @@ Hela appen kräver HTTP Basic-inloggning - se
 
 CSRF är avstängt globalt (htmx-formulären skickar ingen CSRF-token,
 autentiseringen är stateless Basic-auth per anrop).
+
+Etikettskanningen (se Vinlistan ovan) kräver `WINECELLAR_ANTHROPIC_API_KEY`
+- utan den startar appen ändå (tom lokal default), men skanningsanropet
+misslyckas. `WINECELLAR_ANTHROPIC_MODEL` är valfri (default
+`claude-sonnet-5`).
 
 ## Köra lokalt
 

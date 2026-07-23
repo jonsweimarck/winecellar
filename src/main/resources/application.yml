@@ -42,3 +42,10 @@ winecellar:
     # Byt ut i produktion via miljövariabeln - "admin" är bara en bekväm
     # standard för lokal utveckling.
     password: ${WINECELLAR_ADMIN_PASSWORD:admin}
+  anthropic:
+    # Tom standard lokalt - etikettskanning (WINE-5) fungerar inte utan en
+    # riktig nyckel, men appen ska ändå starta (AnthropicLabelInterpreter
+    # instansieras alltid, anropet mot Anthropic sker bara när skanningen
+    # faktiskt används).
+    api-key: ${WINECELLAR_ANTHROPIC_API_KEY:}
+    model: ${WINECELLAR_ANTHROPIC_MODEL:claude-sonnet-5}

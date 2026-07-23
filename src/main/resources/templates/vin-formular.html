@@ -17,10 +17,25 @@
         .dubblettvarning { border: 1px solid #d99; background: #fdf2f2; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
         .dubblettvarning p { margin: 0; }
         .dubblettvarning form { display: inline-block; margin-top: 0.75rem; }
+        .etikettskanning { border: 1px solid #ddd; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
+        .etikettvarning { border: 1px solid #d99; background: #fdf2f2; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
+        .etikettvarning p { margin: 0; }
+        .tolkat-falt { background: #eef6ff; border-color: #6699cc; }
     </style>
 </head>
 <body>
     <h1 th:text="${wine.id == null ? 'Lägg till vin' : 'Redigera ' + wine.name}"></h1>
+
+    <form method="post" enctype="multipart/form-data" th:action="@{/wines/tolka-etikett}"
+          th:if="${wine.id == null}" class="etikettskanning">
+        <label>Skanna etikett
+            <input type="file" name="bild" accept="image/*" capture="environment" id="etikett-input">
+        </label>
+    </form>
+
+    <div class="etikettvarning" th:if="${labelInterpretationFailed}">
+        <p>Det gick inte att tolka etiketten. Fotografera om, eller fyll i uppgifterna för hand nedan.</p>
+    </div>
 
     <div class="dubblettvarning" th:if="${duplicateExisting != null}">
         <p th:if="${duplicateIsFull}">
@@ -46,7 +61,8 @@
         <fieldset>
             <legend>Grunduppgifter</legend>
             <label>Namn
-                <input type="text" name="name" th:value="${wine.name}" required>
+                <input type="text" name="name" th:value="${wine.name}" required
+                       th:classappend="${interpretedFields != null and interpretedFields.contains('name')} ? 'tolkat-falt'">
             </label>
             <label>Etikett
                 <img th:if="${wine.hasImage() and wine.id != null}" th:src="@{/wines/{id}/bild(id=${wine.id.value})}"
@@ -64,13 +80,16 @@
                 </select>
             </label>
             <label>Producent
-                <input type="text" name="producer" th:value="${wine.producer}">
+                <input type="text" name="producer" th:value="${wine.producer}"
+                       th:classappend="${interpretedFields != null and interpretedFields.contains('producer')} ? 'tolkat-falt'">
             </label>
             <label>Land
-                <input type="text" name="country" th:value="${wine.country}">
+                <input type="text" name="country" th:value="${wine.country}"
+                       th:classappend="${interpretedFields != null and interpretedFields.contains('country')} ? 'tolkat-falt'">
             </label>
             <label>Region
-                <input type="text" name="region" th:value="${wine.region}">
+                <input type="text" name="region" th:value="${wine.region}"
+                       th:classappend="${interpretedFields != null and interpretedFields.contains('region')} ? 'tolkat-falt'">
             </label>
             <label>Underregion
                 <input type="text" name="subregion" th:value="${wine.subregion}">
@@ -79,7 +98,8 @@
                 <input type="text" name="grapes" th:value="${wine.grapes}">
             </label>
             <label>Årgång
-                <input type="number" name="vintage" th:value="${wine.vintage}">
+                <input type="number" name="vintage" th:value="${wine.vintage}"
+                       th:classappend="${interpretedFields != null and interpretedFields.contains('vintage')} ? 'tolkat-falt'">
             </label>
             <label>Plats
                 <input type="text" name="location" th:value="${wine.location}">
@@ -147,5 +167,57 @@
                 th:if="${duplicateExisting != null and !duplicateIsFull}">Lägg till som nytt vin ändå</button>
         <a class="knapp" href="/">Avbryt</a>
     </form>
+
+    <script>
+        // Skalar ner en vald/fotograferad etikettbild i webbläsaren innan
+        // uppladdning (WINE-5) - inte för filstorlekens skull (5 MB räcker
+        // för ett normalt foto redan) utan för att hålla nere hur stor bild
+        // som skickas till LLM:en. Skickar sedan om formuläret automatiskt,
+        // ingen separat "Tolka"-knapp behövs.
+        (function () {
+            var etikettInput = document.getElementById('etikett-input');
+            if (!etikettInput) {
+                return;
+            }
+            var MAX_SIDA = 1568;
+
+            etikettInput.addEventListener('change', function () {
+                var vald = etikettInput.files[0];
+                if (!vald) {
+                    return;
+                }
+                var bild = new Image();
+                var läsare = new FileReader();
+                läsare.onload = function (händelse) {
+                    bild.onload = function () {
+                        var skala = Math.min(1, MAX_SIDA / Math.max(bild.width, bild.height));
+                        var duk = document.createElement('canvas');
+                        duk.width = Math.round(bild.width * skala);
+                        duk.height = Math.round(bild.height * skala);
+                        duk.getContext('2d').drawImage(bild, 0, 0, duk.width, duk.height);
+                        duk.toBlob(function (nedskalad) {
+                            var överföring = new DataTransfer();
+                            överföring.items.add(new File([nedskalad], vald.name, {type: 'image/jpeg'}));
+                            etikettInput.files = överföring.files;
+                            etikettInput.closest('form').submit();
+                        }, 'image/jpeg', 0.85);
+                    };
+                    bild.src = händelse.target.result;
+                };
+                läsare.readAsDataURL(vald);
+            });
+        })();
+
+        // Släcker "tolkat"-markeringen (den blå bakgrunden) på ett fält så
+        // fort användaren rör det - markeringen är bara en indikation på
+        // vad som kom från etikettolkningen, inte en spärr mot att ändra.
+        document.querySelectorAll('.tolkat-falt').forEach(function (fält) {
+            var släckMarkering = function () {
+                fält.classList.remove('tolkat-falt');
+            };
+            fält.addEventListener('input', släckMarkering);
+            fält.addEventListener('change', släckMarkering);
+        });
+    </script>
 </body>
 </html>
