@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="${vin.id == null ? 'Lägg till vin' : 'Redigera vin'}"></title>
+    <title th:text="${wine.id == null ? 'Lägg till vin' : 'Redigera vin'}"></title>
     <style>
         body { font-family: sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
         label { display: block; margin-top: 0.75rem; font-weight: bold; }
@@ -17,79 +17,79 @@
     </style>
 </head>
 <body>
-    <h1 th:text="${vin.id == null ? 'Lägg till vin' : 'Redigera ' + vin.name}"></h1>
+    <h1 th:text="${wine.id == null ? 'Lägg till vin' : 'Redigera ' + wine.name}"></h1>
 
     <form method="post" enctype="multipart/form-data"
-          th:action="${vin.id == null} ? @{/wines} : @{/wines/{id}/redigera(id=${vin.id.value})}">
+          th:action="${wine.id == null} ? @{/wines} : @{/wines/{id}/redigera(id=${wine.id.value})}">
         <fieldset>
             <legend>Grunduppgifter</legend>
             <label>Namn
-                <input type="text" name="name" th:value="${vin.name}" required>
+                <input type="text" name="name" th:value="${wine.name}" required>
             </label>
             <label>Etikett
-                <img th:if="${vin.harBild()}" th:src="@{/wines/{id}/bild(id=${vin.id.value})}"
+                <img th:if="${wine.hasImage()}" th:src="@{/wines/{id}/bild(id=${wine.id.value})}"
                      alt="Nuvarande etikett" class="vinbild-formular">
                 <input type="file" name="bild" accept="image/*">
             </label>
             <label>Typ
                 <select name="wineType">
-                    <option value="" th:selected="${vin.wineType == null}">Ej valt</option>
-                    <option value="RED" th:selected="${vin.wineType != null and vin.wineType.name() == 'RED'}">Rött</option>
-                    <option value="WHITE" th:selected="${vin.wineType != null and vin.wineType.name() == 'WHITE'}">Vitt</option>
-                    <option value="ROSE" th:selected="${vin.wineType != null and vin.wineType.name() == 'ROSE'}">Rosé</option>
-                    <option value="SPARKLING" th:selected="${vin.wineType != null and vin.wineType.name() == 'SPARKLING'}">Mousserande</option>
-                    <option value="FORTIFIED" th:selected="${vin.wineType != null and vin.wineType.name() == 'FORTIFIED'}">Starkvin</option>
+                    <option value="" th:selected="${wine.wineType == null}">Ej valt</option>
+                    <option value="RED" th:selected="${wine.wineType != null and wine.wineType.name() == 'RED'}">Rött</option>
+                    <option value="WHITE" th:selected="${wine.wineType != null and wine.wineType.name() == 'WHITE'}">Vitt</option>
+                    <option value="ROSE" th:selected="${wine.wineType != null and wine.wineType.name() == 'ROSE'}">Rosé</option>
+                    <option value="SPARKLING" th:selected="${wine.wineType != null and wine.wineType.name() == 'SPARKLING'}">Mousserande</option>
+                    <option value="FORTIFIED" th:selected="${wine.wineType != null and wine.wineType.name() == 'FORTIFIED'}">Starkvin</option>
                 </select>
             </label>
             <label>Producent
-                <input type="text" name="producer" th:value="${vin.producer}">
+                <input type="text" name="producer" th:value="${wine.producer}">
             </label>
             <label>Land
-                <input type="text" name="country" th:value="${vin.country}">
+                <input type="text" name="country" th:value="${wine.country}">
             </label>
             <label>Region
-                <input type="text" name="region" th:value="${vin.region}">
+                <input type="text" name="region" th:value="${wine.region}">
             </label>
             <label>Underregion
-                <input type="text" name="subregion" th:value="${vin.subregion}">
+                <input type="text" name="subregion" th:value="${wine.subregion}">
             </label>
             <label>Druvor
-                <input type="text" name="grapes" th:value="${vin.grapes}">
+                <input type="text" name="grapes" th:value="${wine.grapes}">
             </label>
             <label>Årgång
-                <input type="number" name="vintage" th:value="${vin.vintage}">
+                <input type="number" name="vintage" th:value="${wine.vintage}">
             </label>
             <label>Plats
-                <input type="text" name="location" th:value="${vin.location}">
+                <input type="text" name="location" th:value="${wine.location}">
             </label>
             <label>Antal flaskor
-                <input type="number" name="quantity" min="0" th:value="${vin.quantity}">
+                <input type="number" name="quantity" min="0" th:value="${wine.quantity}">
             </label>
         </fieldset>
 
         <fieldset>
             <legend>Inköp</legend>
             <label>Inköpsdatum
-                <input type="date" name="purchaseDate" th:value="${vin.purchaseDate}">
+                <input type="date" name="purchaseDate" th:value="${wine.purchaseDate}">
             </label>
             <label>Pris
-                <input type="number" step="0.01" min="0" name="price" th:value="${vin.price}">
+                <input type="number" step="0.01" min="0" name="price" th:value="${wine.price}">
             </label>
             <label>Varför köpt
-                <textarea name="purchaseReason" th:text="${vin.purchaseReason}"></textarea>
+                <textarea name="purchaseReason" th:text="${wine.purchaseReason}"></textarea>
             </label>
         </fieldset>
 
         <fieldset>
             <legend>Eget intryck</legend>
             <label>Tasting notes
-                <textarea name="tastingNotes" th:text="${vin.tastingNotes}"></textarea>
+                <textarea name="tastingNotes" th:text="${wine.tastingNotes}"></textarea>
             </label>
             <label>Eget betyg
                 <select name="ownRating">
                     <option value="">Inget betyg</option>
-                    <option th:each="r : ${betyg}" th:value="${r.name()}" th:text="${r.label()}"
-                            th:selected="${vin.ownRating == r}"></option>
+                    <option th:each="r : ${ratings}" th:value="${r.name()}" th:text="${r.label()}"
+                            th:selected="${wine.ownRating == r}"></option>
                 </select>
             </label>
         </fieldset>
@@ -97,30 +97,30 @@
         <fieldset>
             <legend>Externa källor</legend>
             <label>Systembolagets produktnummer
-                <input type="text" name="systembolagetProductNumber" th:value="${vin.systembolagetProductNumber}">
+                <input type="text" name="systembolagetProductNumber" th:value="${wine.systembolagetProductNumber}">
             </label>
             <label>Systembolagets beskrivning
-                <textarea name="systembolagetDescription" th:text="${vin.systembolagetDescription}"></textarea>
+                <textarea name="systembolagetDescription" th:text="${wine.systembolagetDescription}"></textarea>
             </label>
             <label>Munskänkarnas bedömning
-                <textarea name="munskankarnaReview" th:text="${vin.munskankarnaReview}"></textarea>
+                <textarea name="munskankarnaReview" th:text="${wine.munskankarnaReview}"></textarea>
             </label>
             <label>Munskänkarnas betyg
                 <select name="munskankarnaRating">
                     <option value="">Inget betyg</option>
-                    <option th:each="r : ${betyg}" th:value="${r.name()}" th:text="${r.label()}"
-                            th:selected="${vin.munskankarnaRating == r}"></option>
+                    <option th:each="r : ${ratings}" th:value="${r.name()}" th:text="${r.label()}"
+                            th:selected="${wine.munskankarnaRating == r}"></option>
                 </select>
             </label>
             <label>Vivino-betyg
-                <input type="number" step="0.1" min="0" max="5" name="vivinoRating" th:value="${vin.vivinoRating}">
+                <input type="number" step="0.1" min="0" max="5" name="vivinoRating" th:value="${wine.vivinoRating}">
             </label>
             <label>Annan referens
-                <textarea name="otherReference" th:text="${vin.otherReference}"></textarea>
+                <textarea name="otherReference" th:text="${wine.otherReference}"></textarea>
             </label>
         </fieldset>
 
-        <button type="submit" th:text="${vin.id == null ? 'Lägg till' : 'Spara'}"></button>
+        <button type="submit" th:text="${wine.id == null ? 'Lägg till' : 'Spara'}"></button>
         <a class="knapp" href="/">Avbryt</a>
     </form>
 </body>

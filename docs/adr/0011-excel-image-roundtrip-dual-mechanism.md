@@ -12,7 +12,7 @@ Excel-exporten (se [0010](0010-excel-tool-standalone-module.md)) skulle
 textfälten.
 
 Källfilens ursprungliga bildformat ("bild i cell", Excels inbäddade rich
-data) läses medvetet inte av `VinradParser` - att extrahera den robust
+data) läses medvetet inte av `WineRowParser` - att extrahera den robust
 är inte värt komplexiteten för ett engångsskript, och det formatet är
 dessutom mycket enklare att SKRIVA än att LÄSA med Apache POI.
 
@@ -27,10 +27,10 @@ Bilder exporteras på två oberoende sätt:
    varning istället för att krascha.
 2. Som en riktig bildfil i en delad mapp
    (`WINECELLAR_LOCAL_IMAGE_FOLDER`, **samma** miljövariabel som
-   `Bildmatchare` redan använde för att koppla bilder vid import), döpt
+   `ImageMatcher` redan använde för att koppla bilder vid import), döpt
    exakt som vinets namn. **Det är den här mekanismen, inte den ankrade
    xlsx-bilden, som gör rundtrippen fullständig** - alla format
-   `Bildmatchare` känner igen (inklusive webp) skrivs hit, och
+   `ImageMatcher` känner igen (inklusive webp) skrivs hit, och
    `ImportExcel` läser tillbaka från samma mapp vid en efterföljande
    import.
 
@@ -43,7 +43,7 @@ Bilder exporteras på två oberoende sätt:
   `WINECELLAR_LOCAL_IMAGE_FOLDER` för att spegla att den nu delas åt
   båda hållen, inte bara vid import.
 - Denna bildrundtripp krävde i sin tur att [0005](0005-only-name-required.md)s
-  regel tillämpades konsekvent även på importsidan (`VinradParser`) -
+  regel tillämpades konsekvent även på importsidan (`WineRowParser`) -
   annars hade ett namn-bara vin med bild fortfarande hoppats över vid
   återimport, trots att både text och bild fanns tillgängliga.
 - Ingen egen automatiserad test täcker bildmappsskrivningen

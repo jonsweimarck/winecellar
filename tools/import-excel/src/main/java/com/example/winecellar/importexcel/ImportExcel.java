@@ -34,14 +34,14 @@ import java.util.stream.Collectors;
  * 2026-07-22, då ExportExcel började skriva till samma mapp - namnet ska
  * spegla att mappen delas åt båda hållen, inte bara vid import) till en
  * mapp med bildfiler döpta exakt som respektive vins name-fält (t.ex.
- * "Barolo.jpg"), se Bildmatchare. Miljövariabel istället för ett
+ * "Barolo.jpg"), se ImageMatcher. Miljövariabel istället för ett
  * positionellt argument, av samma skäl som POSTGRESQL_ADDON_*-uppgifterna
  * nedan - undviker PowerShells trassel med flervärdesargument i
  * -Dexec.args (se README).
  */
 public final class ImportExcel {
 
-    private static final String SHEET_NAMN = "Vin";
+    private static final String SHEET_NAME = "Vin";
 
     private static final String INSERT_SQL = """
             INSERT INTO wines (
@@ -59,145 +59,145 @@ public final class ImportExcel {
             System.err.println("Sätt WINECELLAR_LOCAL_IMAGE_FOLDER för att även koppla etiketter från en bildmapp, se README.");
             System.exit(1);
         }
-        String excelSökväg = args[0];
-        String jdbcUrl = args.length > 1 ? args[1] : Databaskoppling.jdbcUrlFrånMiljö();
-        String användare = args.length > 2 ? args[2] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_USER", "winecellar");
-        String lösenord = args.length > 3 ? args[3] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_PASSWORD", "winecellar");
-        String bildmappSökväg = System.getenv("WINECELLAR_LOCAL_IMAGE_FOLDER");
-        Bildmatchare bildmatchare = bildmappSökväg == null || bildmappSökväg.isBlank()
+        String excelPath = args[0];
+        String jdbcUrl = args.length > 1 ? args[1] : DatabaseConnection.jdbcUrlFromEnvironment();
+        String user = args.length > 2 ? args[2] : DatabaseConnection.environmentVariableOrDefault("POSTGRESQL_ADDON_USER", "winecellar");
+        String password = args.length > 3 ? args[3] : DatabaseConnection.environmentVariableOrDefault("POSTGRESQL_ADDON_PASSWORD", "winecellar");
+        String imageFolderPath = System.getenv("WINECELLAR_LOCAL_IMAGE_FOLDER");
+        ImageMatcher imageMatcher = imageFolderPath == null || imageFolderPath.isBlank()
                 ? null
-                : new Bildmatchare(Path.of(bildmappSökväg));
+                : new ImageMatcher(Path.of(imageFolderPath));
 
-        List<Wine> viner = new ArrayList<>();
-        int överhoppade = 0;
-        int bilderMatchade = 0;
-        VinradParser parser = new VinradParser();
+        List<Wine> wines = new ArrayList<>();
+        int skipped = 0;
+        int imagesMatched = 0;
+        WineRowParser parser = new WineRowParser();
 
-        try (InputStream in = new FileInputStream(excelSökväg); Workbook workbook = WorkbookFactory.create(in)) {
-            Sheet sheet = workbook.getSheet(SHEET_NAMN);
+        try (InputStream in = new FileInputStream(excelPath); Workbook workbook = WorkbookFactory.create(in)) {
+            Sheet sheet = workbook.getSheet(SHEET_NAME);
             if (sheet == null) {
-                throw new IllegalStateException("Hittar ingen flik som heter \"" + SHEET_NAMN + "\" i " + excelSökväg);
+                throw new IllegalStateException("Hittar ingen flik som heter \"" + SHEET_NAME + "\" i " + excelPath);
             }
             for (Row row : sheet) {
                 if (row.getRowNum() == 0) {
                     continue; // rubrikrad
                 }
                 try {
-                    Wine vin = parser.parse(row);
-                    if (bildmatchare != null) {
-                        Bildmatchare.Bild bild = bildmatchare.hittaBild(vin.name());
-                        if (bild != null) {
-                            vin = vin.withImage(bild.data(), bild.mimeType());
-                            bilderMatchade++;
+                    Wine wine = parser.parse(row);
+                    if (imageMatcher != null) {
+                        ImageMatcher.Image image = imageMatcher.findImage(wine.name());
+                        if (image != null) {
+                            wine = wine.withImage(image.data(), image.mimeType());
+                            imagesMatched++;
                         }
                     }
-                    viner.add(vin);
-                } catch (VinradParser.RadSaknarObligatoriskaFältException e) {
+                    wines.add(wine);
+                } catch (WineRowParser.RowMissingRequiredFieldsException e) {
                     System.out.println("Hoppar över: " + e.getMessage());
-                    överhoppade++;
+                    skipped++;
                 }
             }
         }
 
-        System.out.println("Tolkade " + viner.size() + " viner från " + excelSökväg + " (" + överhoppade + " rader överhoppade).");
-        if (bildmatchare != null) {
-            System.out.println(bilderMatchade + " av " + viner.size() + " viner fick en etikett kopplad från " + bildmappSökväg + ".");
-            varnaOmDubblettnamnMedBild(viner);
+        System.out.println("Tolkade " + wines.size() + " viner från " + excelPath + " (" + skipped + " rader överhoppade).");
+        if (imageMatcher != null) {
+            System.out.println(imagesMatched + " av " + wines.size() + " viner fick en etikett kopplad från " + imageFolderPath + ".");
+            warnAboutDuplicateNamesWithImage(wines);
         }
 
-        try (Connection connection = DriverManager.getConnection(jdbcUrl, användare, lösenord)) {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, user, password)) {
             connection.setAutoCommit(false);
             try (PreparedStatement statement = connection.prepareStatement(INSERT_SQL)) {
-                for (Wine vin : viner) {
-                    bindParametrar(statement, vin);
+                for (Wine wine : wines) {
+                    bindParameters(statement, wine);
                     statement.addBatch();
                 }
                 statement.executeBatch();
             }
             connection.commit();
-            System.out.println("Sparade " + viner.size() + " viner i databasen.");
+            System.out.println("Sparade " + wines.size() + " viner i databasen.");
         }
     }
 
-    private static void bindParametrar(PreparedStatement statement, Wine vin) throws java.sql.SQLException {
+    private static void bindParameters(PreparedStatement statement, Wine wine) throws java.sql.SQLException {
         int i = 1;
-        statement.setString(i++, vin.name());
-        settNullbarSträng(statement, i++, vin.wineType() == null ? null : vin.wineType().name());
-        settNullbarSträng(statement, i++, vin.producer());
-        settNullbarSträng(statement, i++, vin.country());
-        settNullbarSträng(statement, i++, vin.region());
-        settNullbarSträng(statement, i++, vin.subregion());
-        settNullbarSträng(statement, i++, vin.grapes());
-        settNullbartHeltal(statement, i++, vin.vintage());
-        settNullbartDatum(statement, i++, vin.purchaseDate());
-        settNullbarBigDecimal(statement, i++, vin.price());
-        settNullbartHeltal(statement, i++, vin.quantity());
-        settNullbarSträng(statement, i++, vin.purchaseReason());
-        settNullbarSträng(statement, i++, vin.tastingNotes());
-        settNullbartBetyg(statement, i++, vin.ownRating());
-        settNullbarSträng(statement, i++, vin.systembolagetProductNumber());
-        settNullbarSträng(statement, i++, vin.systembolagetDescription());
-        settNullbarSträng(statement, i++, vin.munskankarnaReview());
-        settNullbartBetyg(statement, i++, vin.munskankarnaRating());
-        settNullbarBigDecimal(statement, i++, vin.vivinoRating());
-        settNullbarSträng(statement, i++, vin.otherReference());
-        settNullbarSträng(statement, i++, vin.location());
-        settNullbarBild(statement, i++, vin.image());
-        settNullbarSträng(statement, i, vin.imageMimeType());
+        statement.setString(i++, wine.name());
+        setNullableString(statement, i++, wine.wineType() == null ? null : wine.wineType().name());
+        setNullableString(statement, i++, wine.producer());
+        setNullableString(statement, i++, wine.country());
+        setNullableString(statement, i++, wine.region());
+        setNullableString(statement, i++, wine.subregion());
+        setNullableString(statement, i++, wine.grapes());
+        setNullableInteger(statement, i++, wine.vintage());
+        setNullableDate(statement, i++, wine.purchaseDate());
+        setNullableBigDecimal(statement, i++, wine.price());
+        setNullableInteger(statement, i++, wine.quantity());
+        setNullableString(statement, i++, wine.purchaseReason());
+        setNullableString(statement, i++, wine.tastingNotes());
+        setNullableRating(statement, i++, wine.ownRating());
+        setNullableString(statement, i++, wine.systembolagetProductNumber());
+        setNullableString(statement, i++, wine.systembolagetDescription());
+        setNullableString(statement, i++, wine.munskankarnaReview());
+        setNullableRating(statement, i++, wine.munskankarnaRating());
+        setNullableBigDecimal(statement, i++, wine.vivinoRating());
+        setNullableString(statement, i++, wine.otherReference());
+        setNullableString(statement, i++, wine.location());
+        setNullableImage(statement, i++, wine.image());
+        setNullableString(statement, i, wine.imageMimeType());
     }
 
-    private static void varnaOmDubblettnamnMedBild(List<Wine> viner) {
-        Map<String, Long> antalPerNamn = viner.stream()
-                .filter(Wine::harBild)
+    private static void warnAboutDuplicateNamesWithImage(List<Wine> wines) {
+        Map<String, Long> countByName = wines.stream()
+                .filter(Wine::hasImage)
                 .collect(Collectors.groupingBy(Wine::name, Collectors.counting()));
-        antalPerNamn.forEach((namn, antal) -> {
-            if (antal > 1) {
-                System.out.println("Varning: " + antal + " viner heter \"" + namn + "\" - samma etikett kopplades till alla.");
+        countByName.forEach((name, count) -> {
+            if (count > 1) {
+                System.out.println("Varning: " + count + " viner heter \"" + name + "\" - samma etikett kopplades till alla.");
             }
         });
     }
 
-    private static void settNullbarSträng(PreparedStatement statement, int index, String värde) throws java.sql.SQLException {
-        if (värde == null) {
+    private static void setNullableString(PreparedStatement statement, int index, String value) throws java.sql.SQLException {
+        if (value == null) {
             statement.setNull(index, Types.VARCHAR);
         } else {
-            statement.setString(index, värde);
+            statement.setString(index, value);
         }
     }
 
-    private static void settNullbartBetyg(PreparedStatement statement, int index, Rating rating) throws java.sql.SQLException {
-        settNullbarSträng(statement, index, rating == null ? null : rating.name());
+    private static void setNullableRating(PreparedStatement statement, int index, Rating rating) throws java.sql.SQLException {
+        setNullableString(statement, index, rating == null ? null : rating.name());
     }
 
-    private static void settNullbarBigDecimal(PreparedStatement statement, int index, BigDecimal värde) throws java.sql.SQLException {
-        if (värde == null) {
+    private static void setNullableBigDecimal(PreparedStatement statement, int index, BigDecimal value) throws java.sql.SQLException {
+        if (value == null) {
             statement.setNull(index, Types.NUMERIC);
         } else {
-            statement.setBigDecimal(index, värde);
+            statement.setBigDecimal(index, value);
         }
     }
 
-    private static void settNullbartHeltal(PreparedStatement statement, int index, Integer värde) throws java.sql.SQLException {
-        if (värde == null) {
+    private static void setNullableInteger(PreparedStatement statement, int index, Integer value) throws java.sql.SQLException {
+        if (value == null) {
             statement.setNull(index, Types.INTEGER);
         } else {
-            statement.setInt(index, värde);
+            statement.setInt(index, value);
         }
     }
 
-    private static void settNullbarBild(PreparedStatement statement, int index, byte[] bild) throws java.sql.SQLException {
-        if (bild == null) {
+    private static void setNullableImage(PreparedStatement statement, int index, byte[] image) throws java.sql.SQLException {
+        if (image == null) {
             statement.setNull(index, Types.BINARY);
         } else {
-            statement.setBytes(index, bild);
+            statement.setBytes(index, image);
         }
     }
 
-    private static void settNullbartDatum(PreparedStatement statement, int index, LocalDate värde) throws java.sql.SQLException {
-        if (värde == null) {
+    private static void setNullableDate(PreparedStatement statement, int index, LocalDate value) throws java.sql.SQLException {
+        if (value == null) {
             statement.setNull(index, Types.DATE);
         } else {
-            statement.setDate(index, Date.valueOf(värde));
+            statement.setDate(index, Date.valueOf(value));
         }
     }
 

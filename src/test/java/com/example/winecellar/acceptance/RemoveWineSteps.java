@@ -10,7 +10,7 @@ import io.cucumber.java.sv.Så;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class TaBortVinSteps {
+public class RemoveWineSteps {
 
     private WineService wineService;
 
@@ -20,17 +20,17 @@ public class TaBortVinSteps {
     }
 
     @Givet("att vinet {string} finns i källaren")
-    public void attVinetFinnsIKällaren(String namn) {
-        wineService.save(Stegstöd.vinMedNamn(namn));
+    public void attVinetFinnsIKällaren(String name) {
+        wineService.save(StepSupport.wineWithName(name));
     }
 
     @När("jag tar bort vinet {string}")
-    public void jagTarBortVinet(String namn) {
-        wineService.removeWine(Stegstöd.hittaVin(wineService, namn).id());
+    public void jagTarBortVinet(String name) {
+        wineService.removeWine(StepSupport.findWine(wineService, name).id());
     }
 
     @Så("ska källaren inte längre innehålla {string}")
-    public void skaKällarenInteLängreInnehålla(String namn) {
-        assertThat(wineService.listWines()).extracting(Wine::name).doesNotContain(namn);
+    public void skaKällarenInteLängreInnehålla(String name) {
+        assertThat(wineService.listWines()).extracting(Wine::name).doesNotContain(name);
     }
 }

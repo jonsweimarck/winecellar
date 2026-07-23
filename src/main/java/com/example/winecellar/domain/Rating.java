@@ -54,8 +54,8 @@ public enum Rating {
         return label;
     }
 
-    private static final Map<String, Rating> PER_NORMALISERAD_ETIKETT = Stream.of(values())
-            .collect(Collectors.toMap(r -> normalisera(r.label), r -> r));
+    private static final Map<String, Rating> BY_NORMALIZED_LABEL = Stream.of(values())
+            .collect(Collectors.toMap(r -> normalize(r.label), r -> r));
 
     /**
      * Källfilens etiketter har inkonsekvent mellanslag (t.ex. dubbla
@@ -63,15 +63,15 @@ public enum Rating {
      * inte meningsfulla skillnader. Both etiketten här och indata
      * normaliseras (mellanslag kollapsas) innan de jämförs.
      */
-    public static Rating fraEtikett(String etikett) {
-        Rating funnen = PER_NORMALISERAD_ETIKETT.get(normalisera(etikett));
-        if (funnen == null) {
-            throw new IllegalArgumentException("Okänt betyg i indata: \"" + etikett + "\"");
+    public static Rating fromLabel(String label) {
+        Rating found = BY_NORMALIZED_LABEL.get(normalize(label));
+        if (found == null) {
+            throw new IllegalArgumentException("Okänt betyg i indata: \"" + label + "\"");
         }
-        return funnen;
+        return found;
     }
 
-    private static String normalisera(String text) {
+    private static String normalize(String text) {
         return text.trim().replaceAll("\\s+", " ").toLowerCase(Locale.of("sv", "SE"));
     }
 }

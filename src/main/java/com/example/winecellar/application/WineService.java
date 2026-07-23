@@ -41,18 +41,18 @@ public class WineService {
      * "Filtrering, sökning och sortering" för den medvetna avvägningen
      * (ingen separat "Relevans"-sortering byggd ännu).
      */
-    public List<Wine> sök(Sökkriterier kriterier) {
-        List<Wine> baslista = kriterier.sökterm() == null || kriterier.sökterm().isBlank()
+    public List<Wine> search(SearchCriteria criteria) {
+        List<Wine> baseList = criteria.searchTerm() == null || criteria.searchTerm().isBlank()
                 ? wineRepository.findAll()
-                : wineRepository.search(kriterier.sökterm());
-        List<Wine> resultat = baslista.stream()
-                .filter(vin -> kriterier.vintyper().isEmpty() || kriterier.vintyper().contains(vin.wineType()))
-                .filter(vin -> kriterier.länder().isEmpty() || kriterier.länder().contains(vin.country()))
-                .filter(vin -> kriterier.regioner().isEmpty() || kriterier.regioner().contains(vin.region()))
-                .filter(vin -> kriterier.underregioner().isEmpty() || kriterier.underregioner().contains(vin.subregion()))
+                : wineRepository.search(criteria.searchTerm());
+        List<Wine> result = baseList.stream()
+                .filter(wine -> criteria.wineTypes().isEmpty() || criteria.wineTypes().contains(wine.wineType()))
+                .filter(wine -> criteria.countries().isEmpty() || criteria.countries().contains(wine.country()))
+                .filter(wine -> criteria.regions().isEmpty() || criteria.regions().contains(wine.region()))
+                .filter(wine -> criteria.subregions().isEmpty() || criteria.subregions().contains(wine.subregion()))
                 .collect(Collectors.toCollection(ArrayList::new));
-        resultat.sort(kriterier.sortering().comparator(kriterier.riktning()));
-        return resultat;
+        result.sort(criteria.sortField().comparator(criteria.sortDirection()));
+        return result;
     }
 
     /**
@@ -67,35 +67,35 @@ public class WineService {
      * - TreeMap tillåter inte en null-nyckel, och ett vin utan land kan
      * ändå inte placeras i något land-/regiongren i trädet.
      */
-    public List<HärkomstNod> härkomstträd() {
-        Map<String, Map<String, Set<String>>> perLandOchRegion = new TreeMap<>();
-        for (Wine vin : wineRepository.findAll()) {
-            if (vin.country() == null) {
+    public List<OriginNode> originTree() {
+        Map<String, Map<String, Set<String>>> byCountryAndRegion = new TreeMap<>();
+        for (Wine wine : wineRepository.findAll()) {
+            if (wine.country() == null) {
                 continue;
             }
-            Map<String, Set<String>> perRegion =
-                    perLandOchRegion.computeIfAbsent(vin.country(), k -> new TreeMap<>());
-            if (vin.region() != null) {
-                Set<String> underregioner =
-                        perRegion.computeIfAbsent(vin.region(), k -> new TreeSet<>());
-                if (vin.subregion() != null) {
-                    underregioner.add(vin.subregion());
+            Map<String, Set<String>> byRegion =
+                    byCountryAndRegion.computeIfAbsent(wine.country(), k -> new TreeMap<>());
+            if (wine.region() != null) {
+                Set<String> subregions =
+                        byRegion.computeIfAbsent(wine.region(), k -> new TreeSet<>());
+                if (wine.subregion() != null) {
+                    subregions.add(wine.subregion());
                 }
             }
         }
 
-        List<HärkomstNod> träd = new ArrayList<>();
-        for (Map.Entry<String, Map<String, Set<String>>> landEntry : perLandOchRegion.entrySet()) {
-            List<HärkomstNod> regionNoder = new ArrayList<>();
-            for (Map.Entry<String, Set<String>> regionEntry : landEntry.getValue().entrySet()) {
-                List<HärkomstNod> underregionNoder = regionEntry.getValue().stream()
-                        .map(underregion -> new HärkomstNod(underregion, List.of()))
+        List<OriginNode> tree = new ArrayList<>();
+        for (Map.Entry<String, Map<String, Set<String>>> countryEntry : byCountryAndRegion.entrySet()) {
+            List<OriginNode> regionNodes = new ArrayList<>();
+            for (Map.Entry<String, Set<String>> regionEntry : countryEntry.getValue().entrySet()) {
+                List<OriginNode> subregionNodes = regionEntry.getValue().stream()
+                        .map(subregion -> new OriginNode(subregion, List.of()))
                         .toList();
-                regionNoder.add(new HärkomstNod(regionEntry.getKey(), underregionNoder));
+                regionNodes.add(new OriginNode(regionEntry.getKey(), subregionNodes));
             }
-            träd.add(new HärkomstNod(landEntry.getKey(), regionNoder));
+            tree.add(new OriginNode(countryEntry.getKey(), regionNodes));
         }
-        return träd;
+        return tree;
     }
 
     public Optional<Wine> findById(WineId id) {

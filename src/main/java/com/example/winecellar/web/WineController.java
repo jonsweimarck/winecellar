@@ -1,9 +1,9 @@
 package com.example.winecellar.web;
 
-import com.example.winecellar.application.HärkomstNod;
-import com.example.winecellar.application.SorteringsRiktning;
-import com.example.winecellar.application.Sorteringsfält;
-import com.example.winecellar.application.Sökkriterier;
+import com.example.winecellar.application.OriginNode;
+import com.example.winecellar.application.SearchCriteria;
+import com.example.winecellar.application.SortDirection;
+import com.example.winecellar.application.SortField;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
@@ -46,17 +46,17 @@ public class WineController {
     }
 
     @GetMapping("/")
-    public String vinkällare(
-            @RequestParam(required = false) String sok,
-            @RequestParam(required = false, defaultValue = "NAMN") Sorteringsfält sortera,
-            @RequestParam(required = false, defaultValue = "STIGANDE") SorteringsRiktning riktning,
+    public String wineCellar(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "NAME") SortField sort,
+            @RequestParam(required = false, defaultValue = "ASCENDING") SortDirection direction,
             @RequestParam(required = false) Set<String> wineType,
             @RequestParam(required = false) Set<String> country,
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model, Authentication authentication) {
-        fyllIVinlistaModell(model, sok, sortera, riktning, wineType, country, region, subregion, authentication);
+        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, authentication);
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
 
@@ -67,50 +67,50 @@ public class WineController {
      * 2026-07-22, se CLAUDE.md) - borttagningsknapparna postar nu med
      * exakt samma queryparametrar som verktygsraden, se vinkallare.html.
      */
-    private void fyllIVinlistaModell(
-            Model model, String sok, Sorteringsfält sortera, SorteringsRiktning riktning,
+    private void populateWineListModel(
+            Model model, String search, SortField sort, SortDirection direction,
             Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion,
             Authentication authentication) {
-        Set<String> valdaVintyper = tomOmNull(wineType);
-        Set<String> valdaLänder = tomOmNull(country);
-        Set<String> valdaRegioner = tomOmNull(region);
-        Set<String> valdaUnderregioner = tomOmNull(subregion);
+        Set<String> selectedWineTypes = emptyIfNull(wineType);
+        Set<String> selectedCountries = emptyIfNull(country);
+        Set<String> selectedRegions = emptyIfNull(region);
+        Set<String> selectedSubregions = emptyIfNull(subregion);
 
-        Sökkriterier kriterier = Sökkriterier.builder()
-                .sökterm(sok)
-                .sortering(sortera).riktning(riktning)
-                .vintyper(valdaVintyper.stream().map(WineType::valueOf).collect(Collectors.toSet()))
-                .länder(valdaLänder)
-                .regioner(valdaRegioner)
-                .underregioner(valdaUnderregioner)
+        SearchCriteria criteria = SearchCriteria.builder()
+                .searchTerm(search)
+                .sortField(sort).sortDirection(direction)
+                .wineTypes(selectedWineTypes.stream().map(WineType::valueOf).collect(Collectors.toSet()))
+                .countries(selectedCountries)
+                .regions(selectedRegions)
+                .subregions(selectedSubregions)
                 .build();
-        List<Wine> resultat = wineService.sök(kriterier);
-        List<HärkomstNod> härkomstträd = wineService.härkomstträd();
-        ExpanderadeNoder expanderade = beräknaExpanderadeNoder(härkomstträd, valdaRegioner, valdaUnderregioner);
-        Sökvy sökvy = new Sökvy(sok, sortera, riktning, valdaVintyper, valdaLänder, valdaRegioner, valdaUnderregioner);
+        List<Wine> result = wineService.search(criteria);
+        List<OriginNode> originTree = wineService.originTree();
+        ExpandedNodes expanded = calculateExpandedNodes(originTree, selectedRegions, selectedSubregions);
+        SearchView searchView = new SearchView(search, sort, direction, selectedWineTypes, selectedCountries, selectedRegions, selectedSubregions);
 
-        model.addAttribute("viner", resultat);
-        model.addAttribute("antalTotalt", wineService.listWines().size());
-        model.addAttribute("sok", sok == null ? "" : sok);
-        model.addAttribute("sorteringsfält", Sorteringsfält.values());
-        model.addAttribute("sortera", sortera);
-        model.addAttribute("riktning", riktning);
-        model.addAttribute("valdaVintyper", valdaVintyper);
-        model.addAttribute("härkomstträd", härkomstträd);
-        model.addAttribute("valdaLänder", valdaLänder);
-        model.addAttribute("valdaRegioner", valdaRegioner);
-        model.addAttribute("valdaUnderregioner", valdaUnderregioner);
-        model.addAttribute("expanderadeLänder", expanderade.länder());
-        model.addAttribute("expanderadeRegioner", expanderade.regioner());
-        model.addAttribute("chips", byggChips(sökvy));
-        model.addAttribute("kanRedigera", harRollAdmin(authentication));
+        model.addAttribute("wines", result);
+        model.addAttribute("totalCount", wineService.listWines().size());
+        model.addAttribute("search", search == null ? "" : search);
+        model.addAttribute("sortFields", SortField.values());
+        model.addAttribute("sort", sort);
+        model.addAttribute("direction", direction);
+        model.addAttribute("selectedWineTypes", selectedWineTypes);
+        model.addAttribute("originTree", originTree);
+        model.addAttribute("selectedCountries", selectedCountries);
+        model.addAttribute("selectedRegions", selectedRegions);
+        model.addAttribute("selectedSubregions", selectedSubregions);
+        model.addAttribute("expandedCountries", expanded.countries());
+        model.addAttribute("expandedRegions", expanded.regions());
+        model.addAttribute("chips", buildChips(searchView));
+        model.addAttribute("canEdit", hasAdminRole(authentication));
     }
 
-    private static Set<String> tomOmNull(Set<String> värde) {
-        return värde == null ? Set.of() : värde;
+    private static Set<String> emptyIfNull(Set<String> value) {
+        return value == null ? Set.of() : value;
     }
 
-    private static final Map<String, String> VINTYP_ETIKETT = Map.of(
+    private static final Map<String, String> WINE_TYPE_LABEL = Map.of(
             "RED", "Rött",
             "WHITE", "Vitt",
             "ROSE", "Rosé",
@@ -128,22 +128,22 @@ public class WineController {
      * ligger utanför #vinlista-fragmentet som en htmx-swap annars hade
      * varit begränsad till.
      */
-    private static List<Chip> byggChips(Sökvy sökvy) {
+    private static List<Chip> buildChips(SearchView searchView) {
         List<Chip> chips = new ArrayList<>();
-        if (sökvy.sok() != null && !sökvy.sok().isBlank()) {
-            chips.add(new Chip(sökordsEtikett(sökvy.sok()), sökvy.urlUtan("sok", null)));
+        if (searchView.search() != null && !searchView.search().isBlank()) {
+            chips.add(new Chip(searchTermLabel(searchView.search()), searchView.urlWithout("search", null)));
         }
-        for (String vintyp : sökvy.vintyper()) {
-            chips.add(new Chip(VINTYP_ETIKETT.getOrDefault(vintyp, vintyp), sökvy.urlUtan("wineType", vintyp)));
+        for (String wineType : searchView.wineTypes()) {
+            chips.add(new Chip(WINE_TYPE_LABEL.getOrDefault(wineType, wineType), searchView.urlWithout("wineType", wineType)));
         }
-        for (String land : sökvy.länder()) {
-            chips.add(new Chip(land, sökvy.urlUtan("country", land)));
+        for (String country : searchView.countries()) {
+            chips.add(new Chip(country, searchView.urlWithout("country", country)));
         }
-        for (String region : sökvy.regioner()) {
-            chips.add(new Chip(region, sökvy.urlUtan("region", region)));
+        for (String region : searchView.regions()) {
+            chips.add(new Chip(region, searchView.urlWithout("region", region)));
         }
-        for (String underregion : sökvy.underregioner()) {
-            chips.add(new Chip(underregion, sökvy.urlUtan("subregion", underregion)));
+        for (String subregion : searchView.subregions()) {
+            chips.add(new Chip(subregion, searchView.urlWithout("subregion", subregion)));
         }
         return chips;
     }
@@ -155,43 +155,43 @@ public class WineController {
      * "+" mellan orden signalerar OCH utan att kräva förklarande text i
      * det trånga chip-utrymmet.
      */
-    private static String sökordsEtikett(String sok) {
-        return "Sök: " + String.join(" + ", sok.trim().split("\\s+"));
+    private static String searchTermLabel(String search) {
+        return "Sök: " + String.join(" + ", search.trim().split("\\s+"));
     }
 
-    private record Chip(String etikett, String taBortUrl) {
+    private record Chip(String label, String removeUrl) {
     }
 
     /**
      * Nuvarande sök-/filter-/sorteringstillstånd, med förmågan att bygga
      * en URL för "samma vy, men utan det här enskilda värdet" - det
-     * chipsen länkar till. facett/värde är null-säkra: facett == "sok"
+     * chipsen länkar till. facet/value är null-säkra: facet == "search"
      * utelämnar sökordet oavsett värde, annars tas bara det angivna
      * värdet bort ur just den facettens set - övriga värden i samma
      * facett (och alla andra facetter) behålls oförändrade.
      */
-    private record Sökvy(
-            String sok, Sorteringsfält sortera, SorteringsRiktning riktning,
-            Set<String> vintyper, Set<String> länder, Set<String> regioner, Set<String> underregioner
+    private record SearchView(
+            String search, SortField sort, SortDirection direction,
+            Set<String> wineTypes, Set<String> countries, Set<String> regions, Set<String> subregions
     ) {
-        String urlUtan(String facett, String värde) {
+        String urlWithout(String facet, String value) {
             UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/");
-            if (sok != null && !sok.isBlank() && !"sok".equals(facett)) {
-                builder.queryParam("sok", sok);
+            if (search != null && !search.isBlank() && !"search".equals(facet)) {
+                builder.queryParam("search", search);
             }
-            builder.queryParam("sortera", sortera.name());
-            builder.queryParam("riktning", riktning.name());
-            läggTillUtom(builder, "wineType", vintyper, facett, värde);
-            läggTillUtom(builder, "country", länder, facett, värde);
-            läggTillUtom(builder, "region", regioner, facett, värde);
-            läggTillUtom(builder, "subregion", underregioner, facett, värde);
+            builder.queryParam("sort", sort.name());
+            builder.queryParam("direction", direction.name());
+            addAllExcept(builder, "wineType", wineTypes, facet, value);
+            addAllExcept(builder, "country", countries, facet, value);
+            addAllExcept(builder, "region", regions, facet, value);
+            addAllExcept(builder, "subregion", subregions, facet, value);
             return builder.build().encode().toUriString();
         }
 
-        private static void läggTillUtom(
-                UriComponentsBuilder builder, String param, Set<String> värden, String facett, String taBortVärde) {
-            for (String v : värden) {
-                if (param.equals(facett) && v.equals(taBortVärde)) {
+        private static void addAllExcept(
+                UriComponentsBuilder builder, String param, Set<String> values, String facet, String valueToRemove) {
+            for (String v : values) {
+                if (param.equals(facet) && v.equals(valueToRemove)) {
                     continue;
                 }
                 builder.queryParam(param, v);
@@ -208,41 +208,41 @@ public class WineController {
      * gång filterpanelen öppnas (upptäckt av användaren mot produktionen
      * 2026-07-21).
      */
-    private static ExpanderadeNoder beräknaExpanderadeNoder(
-            List<HärkomstNod> träd, Set<String> valdaRegioner, Set<String> valdaUnderregioner) {
-        Set<String> länder = new HashSet<>();
-        Set<String> regioner = new HashSet<>();
-        for (HärkomstNod land : träd) {
-            boolean landHarValtBarn = false;
-            for (HärkomstNod region : land.barn()) {
-                boolean harValdUnderregion = region.barn().stream()
-                        .anyMatch(underregion -> valdaUnderregioner.contains(underregion.namn()));
-                if (harValdUnderregion) {
-                    regioner.add(region.namn());
+    private static ExpandedNodes calculateExpandedNodes(
+            List<OriginNode> tree, Set<String> selectedRegions, Set<String> selectedSubregions) {
+        Set<String> countries = new HashSet<>();
+        Set<String> regions = new HashSet<>();
+        for (OriginNode country : tree) {
+            boolean countryHasSelectedChild = false;
+            for (OriginNode region : country.children()) {
+                boolean hasSelectedSubregion = region.children().stream()
+                        .anyMatch(subregion -> selectedSubregions.contains(subregion.name()));
+                if (hasSelectedSubregion) {
+                    regions.add(region.name());
                 }
-                if (valdaRegioner.contains(region.namn()) || harValdUnderregion) {
-                    landHarValtBarn = true;
+                if (selectedRegions.contains(region.name()) || hasSelectedSubregion) {
+                    countryHasSelectedChild = true;
                 }
             }
-            if (landHarValtBarn) {
-                länder.add(land.namn());
+            if (countryHasSelectedChild) {
+                countries.add(country.name());
             }
         }
-        return new ExpanderadeNoder(länder, regioner);
+        return new ExpandedNodes(countries, regions);
     }
 
-    private record ExpanderadeNoder(Set<String> länder, Set<String> regioner) {
+    private record ExpandedNodes(Set<String> countries, Set<String> regions) {
     }
 
     @GetMapping("/wines/nytt")
-    public String nyttVinFormulär(Model model) {
-        model.addAttribute("vin", Wine.builder().build());
-        model.addAttribute("betyg", Rating.values());
+    public String newWineForm(Model model) {
+        model.addAttribute("wine", Wine.builder().build());
+        model.addAttribute("ratings", Rating.values());
         return "vin-formular";
     }
 
     @PostMapping("/wines")
-    public String läggTillVin(
+    public String addWine(
             @RequestParam String name,
             @RequestParam(required = false) String wineType,
             @RequestParam(required = false) String producer,
@@ -264,15 +264,15 @@ public class WineController {
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
             @RequestParam(required = false) String location,
-            @RequestParam(value = "bild", required = false) MultipartFile bild
+            @RequestParam(value = "bild", required = false) MultipartFile image
     ) throws IOException {
-        Wine.Builder vin = tillämpaFormulärfält(Wine.builder(),
+        Wine.Builder wine = applyFormFields(Wine.builder(),
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                 systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
                 munskankarnaRating, vivinoRating, otherReference, location
         );
-        wineService.save(medBildOmVald(vin, bild).build());
+        wineService.save(withImageIfProvided(wine, image).build());
         return "redirect:/";
     }
 
@@ -285,43 +285,43 @@ public class WineController {
      * här också.
      */
     @DeleteMapping("/wines/{id}")
-    public String taBortVin(
+    public String removeWine(
             @PathVariable Long id,
-            @RequestParam(required = false) String sok,
-            @RequestParam(required = false, defaultValue = "NAMN") Sorteringsfält sortera,
-            @RequestParam(required = false, defaultValue = "STIGANDE") SorteringsRiktning riktning,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "NAME") SortField sort,
+            @RequestParam(required = false, defaultValue = "ASCENDING") SortDirection direction,
             @RequestParam(required = false) Set<String> wineType,
             @RequestParam(required = false) Set<String> country,
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
             Model model, Authentication authentication) {
         wineService.removeWine(new WineId(id));
-        fyllIVinlistaModell(model, sok, sortera, riktning, wineType, country, region, subregion, authentication);
+        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, authentication);
         return "vinkallare :: lista";
     }
 
     @GetMapping("/wines/{id}/bild")
     @ResponseBody
-    public ResponseEntity<byte[]> visaBild(@PathVariable Long id) {
-        Wine vin = wineService.findById(new WineId(id))
-                .filter(Wine::harBild)
+    public ResponseEntity<byte[]> showImage(@PathVariable Long id) {
+        Wine wine = wineService.findById(new WineId(id))
+                .filter(Wine::hasImage)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(vin.imageMimeType()))
-                .body(vin.image());
+                .contentType(MediaType.parseMediaType(wine.imageMimeType()))
+                .body(wine.image());
     }
 
     @GetMapping("/wines/{id}/redigera")
-    public String redigeraFormulär(@PathVariable Long id, Model model) {
-        Wine vin = wineService.findById(new WineId(id))
+    public String editForm(@PathVariable Long id, Model model) {
+        Wine wine = wineService.findById(new WineId(id))
                 .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
-        model.addAttribute("vin", vin);
-        model.addAttribute("betyg", Rating.values());
+        model.addAttribute("wine", wine);
+        model.addAttribute("ratings", Rating.values());
         return "vin-formular";
     }
 
     @PostMapping("/wines/{id}/redigera")
-    public String sparaRedigering(
+    public String saveEdit(
             @PathVariable Long id,
             @RequestParam String name,
             @RequestParam(required = false) String wineType,
@@ -344,17 +344,17 @@ public class WineController {
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
             @RequestParam(required = false) String location,
-            @RequestParam(value = "bild", required = false) MultipartFile bild
+            @RequestParam(value = "bild", required = false) MultipartFile image
     ) throws IOException {
-        Wine befintligt = wineService.findById(new WineId(id))
+        Wine existing = wineService.findById(new WineId(id))
                 .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
-        Wine.Builder vin = tillämpaFormulärfält(befintligt.toBuilder(),
+        Wine.Builder wine = applyFormFields(existing.toBuilder(),
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                 systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
                 munskankarnaRating, vivinoRating, otherReference, location
         );
-        wineService.save(medBildOmVald(vin, bild).build());
+        wineService.save(withImageIfProvided(wine, image).build());
         return "redirect:/";
     }
 
@@ -364,9 +364,9 @@ public class WineController {
      * SecurityConfig, som nekar READONLY-kontot dessa routes oavsett vad
      * som visas i gränssnittet.
      */
-    private static boolean harRollAdmin(Authentication authentication) {
+    private static boolean hasAdminRole(Authentication authentication) {
         return authentication.getAuthorities().stream()
-                .anyMatch(auktoritet -> auktoritet.getAuthority().equals("ROLE_ADMIN"));
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
     }
 
     /**
@@ -377,27 +377,27 @@ public class WineController {
      * imageMimeType. Annars behåller Builder:n vad den redan hade (null vid
      * tillägg, befintlig bild vid redigering utan ny fil).
      */
-    private static Wine.Builder medBildOmVald(Wine.Builder builder, MultipartFile bild) throws IOException {
-        if (bild != null && !bild.isEmpty()) {
-            return builder.image(bild.getBytes()).imageMimeType(bild.getContentType());
+    private static Wine.Builder withImageIfProvided(Wine.Builder builder, MultipartFile image) throws IOException {
+        if (image != null && !image.isEmpty()) {
+            return builder.image(image.getBytes()).imageMimeType(image.getContentType());
         }
         return builder;
     }
 
     /**
-     * Delad av läggTillVin och sparaRedigering - båda formulären har samma
+     * Delad av addWine och saveEdit - båda formulären har samma
      * fält, skillnaden är bara vilken Builder de startar från (tom vid
      * tillägg, befintligt.toBuilder() vid redigering). Tar emot ALLA fält
      * som rå String och tolkar dem själv istället för att låta Spring
      * binda direkt till WineType/Integer/Rating/LocalDate/BigDecimal - ett
      * tomt formulärfält blir annars en tom sträng som Spring försöker
      * binda rakt av och kraschar på, inte null. Samma sorts hantering som
-     * VinradParser gör för Excel-celler. Namn är sedan 2026-07-22 det enda
+     * WineRowParser gör för Excel-celler. Namn är sedan 2026-07-22 det enda
      * obligatoriska fältet (se CLAUDE.md) - övriga tolkas alla till null
      * om blanka, inklusive wineType/vintage/quantity/producer/country/
      * location som tidigare krävdes ifyllda.
      */
-    private static Wine.Builder tillämpaFormulärfält(
+    private static Wine.Builder applyFormFields(
             Wine.Builder builder,
             String name, String wineType, String producer, String country,
             String region, String subregion, String grapes,
@@ -408,43 +408,43 @@ public class WineController {
             String otherReference, String location
     ) {
         return builder
-                .name(name).wineType(tolkaVinTyp(wineType))
-                .producer(tomBlirNull(producer)).country(tomBlirNull(country))
-                .region(tomBlirNull(region)).subregion(tomBlirNull(subregion)).grapes(tomBlirNull(grapes))
-                .vintage(tolkaHeltal(vintage)).purchaseDate(tolkaDatum(purchaseDate)).price(tolkaDecimal(price))
-                .quantity(tolkaHeltal(quantity))
-                .purchaseReason(tomBlirNull(purchaseReason)).tastingNotes(tomBlirNull(tastingNotes))
-                .ownRating(tolkaBetyg(ownRating))
-                .systembolagetProductNumber(tomBlirNull(systembolagetProductNumber))
-                .systembolagetDescription(tomBlirNull(systembolagetDescription))
-                .munskankarnaReview(tomBlirNull(munskankarnaReview))
-                .munskankarnaRating(tolkaBetyg(munskankarnaRating))
-                .vivinoRating(tolkaDecimal(vivinoRating))
-                .otherReference(tomBlirNull(otherReference))
-                .location(tomBlirNull(location));
+                .name(name).wineType(parseWineType(wineType))
+                .producer(blankToNull(producer)).country(blankToNull(country))
+                .region(blankToNull(region)).subregion(blankToNull(subregion)).grapes(blankToNull(grapes))
+                .vintage(parseInteger(vintage)).purchaseDate(parseDate(purchaseDate)).price(parseDecimal(price))
+                .quantity(parseInteger(quantity))
+                .purchaseReason(blankToNull(purchaseReason)).tastingNotes(blankToNull(tastingNotes))
+                .ownRating(parseRating(ownRating))
+                .systembolagetProductNumber(blankToNull(systembolagetProductNumber))
+                .systembolagetDescription(blankToNull(systembolagetDescription))
+                .munskankarnaReview(blankToNull(munskankarnaReview))
+                .munskankarnaRating(parseRating(munskankarnaRating))
+                .vivinoRating(parseDecimal(vivinoRating))
+                .otherReference(blankToNull(otherReference))
+                .location(blankToNull(location));
     }
 
-    private static String tomBlirNull(String värde) {
-        return (värde == null || värde.isBlank()) ? null : värde;
+    private static String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value;
     }
 
-    private static WineType tolkaVinTyp(String värde) {
-        return tomBlirNull(värde) == null ? null : WineType.valueOf(värde);
+    private static WineType parseWineType(String value) {
+        return blankToNull(value) == null ? null : WineType.valueOf(value);
     }
 
-    private static Integer tolkaHeltal(String värde) {
-        return tomBlirNull(värde) == null ? null : Integer.valueOf(värde.trim());
+    private static Integer parseInteger(String value) {
+        return blankToNull(value) == null ? null : Integer.valueOf(value.trim());
     }
 
-    private static Rating tolkaBetyg(String värde) {
-        return tomBlirNull(värde) == null ? null : Rating.valueOf(värde);
+    private static Rating parseRating(String value) {
+        return blankToNull(value) == null ? null : Rating.valueOf(value);
     }
 
-    private static LocalDate tolkaDatum(String värde) {
-        return tomBlirNull(värde) == null ? null : LocalDate.parse(värde);
+    private static LocalDate parseDate(String value) {
+        return blankToNull(value) == null ? null : LocalDate.parse(value);
     }
 
-    private static BigDecimal tolkaDecimal(String värde) {
-        return tomBlirNull(värde) == null ? null : new BigDecimal(värde);
+    private static BigDecimal parseDecimal(String value) {
+        return blankToNull(value) == null ? null : new BigDecimal(value);
     }
 }

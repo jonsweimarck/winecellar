@@ -12,10 +12,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class ListaVinerSteps {
+public class ListWinesSteps {
 
     private WineService wineService;
-    private List<Wine> visadLista;
+    private List<Wine> shownList;
 
     @Before
     public void setUp() {
@@ -23,18 +23,18 @@ public class ListaVinerSteps {
     }
 
     @Givet("att källaren innehåller vinerna {string} och {string}")
-    public void attKällarenInnehållerVinerna(String namn1, String namn2) {
-        wineService.save(Stegstöd.vinMedNamn(namn1));
-        wineService.save(Stegstöd.vinMedNamn(namn2));
+    public void attKällarenInnehållerVinerna(String name1, String name2) {
+        wineService.save(StepSupport.wineWithName(name1));
+        wineService.save(StepSupport.wineWithName(name2));
     }
 
     @När("jag visar vinlistan")
     public void jagVisarVinlistan() {
-        visadLista = wineService.listWines();
+        shownList = wineService.listWines();
     }
 
     @Så("ska listan innehålla {string} och {string}")
-    public void skaListanInnehålla(String namn1, String namn2) {
-        assertThat(visadLista).extracting(Wine::name).contains(namn1, namn2);
+    public void skaListanInnehålla(String name1, String name2) {
+        assertThat(shownList).extracting(Wine::name).contains(name1, name2);
     }
 }

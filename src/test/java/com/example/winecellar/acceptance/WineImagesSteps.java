@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class VinbilderSteps {
+public class WineImagesSteps {
 
     private WineService wineService;
 
@@ -21,20 +21,20 @@ public class VinbilderSteps {
     }
 
     @Givet("att vinet {string} finns utan bild")
-    public void attVinetFinnsUtanBild(String namn) {
-        wineService.save(Stegstöd.vinMedNamn(namn));
+    public void attVinetFinnsUtanBild(String name) {
+        wineService.save(StepSupport.wineWithName(name));
     }
 
     @När("jag laddar upp en bild av typen {string} för vinet {string}")
-    public void jagLaddarUppEnBildAvTypenFörVinet(String mimeTyp, String namn) {
-        byte[] bilddata = "fejkade bilddata".getBytes(StandardCharsets.UTF_8);
-        wineService.save(Stegstöd.hittaVin(wineService, namn).withImage(bilddata, mimeTyp));
+    public void jagLaddarUppEnBildAvTypenFörVinet(String mimeType, String name) {
+        byte[] imageData = "fejkade bilddata".getBytes(StandardCharsets.UTF_8);
+        wineService.save(StepSupport.findWine(wineService, name).withImage(imageData, mimeType));
     }
 
     @Så("ska vinet {string} ha en sparad bild av typen {string}")
-    public void skaVinetHaEnSparadBildAvTypen(String namn, String mimeTyp) {
-        var vin = Stegstöd.hittaVin(wineService, namn);
-        assertThat(vin.harBild()).isTrue();
-        assertThat(vin.imageMimeType()).isEqualTo(mimeTyp);
+    public void skaVinetHaEnSparadBildAvTypen(String name, String mimeType) {
+        var wine = StepSupport.findWine(wineService, name);
+        assertThat(wine.hasImage()).isTrue();
+        assertThat(wine.imageMimeType()).isEqualTo(mimeType);
     }
 }

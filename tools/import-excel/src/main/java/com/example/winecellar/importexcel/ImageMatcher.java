@@ -19,9 +19,9 @@ import java.util.stream.Stream;
  * användas - den stammen hoppas då över med en varning istället för att
  * gissa.
  */
-final class Bildmatchare {
+final class ImageMatcher {
 
-    private static final Map<String, String> MIME_PER_ÄNDELSE = Map.of(
+    private static final Map<String, String> MIME_BY_EXTENSION = Map.of(
             "jpg", "image/jpeg",
             "jpeg", "image/jpeg",
             "png", "image/png",
@@ -34,58 +34,58 @@ final class Bildmatchare {
     // som kanonisk för image/jpeg, inte jpeg). Paketsynlig, delad källa
     // till sanning istället för att duplicera MIME-kunskapen i ett eget
     // uttryck i ExportExcel (byggt 2026-07-22).
-    static final Map<String, String> ÄNDELSE_PER_MIME = Map.of(
+    static final Map<String, String> EXTENSION_BY_MIME = Map.of(
             "image/jpeg", "jpg",
             "image/png", "png",
             "image/gif", "gif",
             "image/webp", "webp"
     );
 
-    private final Map<String, Path> filPerVinnamn;
+    private final Map<String, Path> fileByWineName;
 
-    Bildmatchare(Path bildmapp) throws IOException {
-        Map<String, List<Path>> kandidaterPerStam = new HashMap<>();
-        try (Stream<Path> filer = Files.list(bildmapp)) {
-            for (Path fil : filer.filter(Files::isRegularFile).toList()) {
-                String filnamn = fil.getFileName().toString();
-                int punktIndex = filnamn.lastIndexOf('.');
-                if (punktIndex <= 0) {
+    ImageMatcher(Path imageFolder) throws IOException {
+        Map<String, List<Path>> candidatesByStem = new HashMap<>();
+        try (Stream<Path> files = Files.list(imageFolder)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                String fileName = file.getFileName().toString();
+                int dotIndex = fileName.lastIndexOf('.');
+                if (dotIndex <= 0) {
                     continue;
                 }
-                String ändelse = filnamn.substring(punktIndex + 1).toLowerCase(Locale.ROOT);
-                if (!MIME_PER_ÄNDELSE.containsKey(ändelse)) {
+                String extension = fileName.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+                if (!MIME_BY_EXTENSION.containsKey(extension)) {
                     continue;
                 }
-                String stam = filnamn.substring(0, punktIndex);
-                kandidaterPerStam.computeIfAbsent(stam, k -> new ArrayList<>()).add(fil);
+                String stem = fileName.substring(0, dotIndex);
+                candidatesByStem.computeIfAbsent(stem, k -> new ArrayList<>()).add(file);
             }
         }
 
-        filPerVinnamn = new HashMap<>();
-        for (Map.Entry<String, List<Path>> entry : kandidaterPerStam.entrySet()) {
+        fileByWineName = new HashMap<>();
+        for (Map.Entry<String, List<Path>> entry : candidatesByStem.entrySet()) {
             if (entry.getValue().size() > 1) {
                 System.out.println("Varning: flera bildfiler heter \"" + entry.getKey()
                         + "\" (" + entry.getValue() + ") - hoppar över, tvetydigt vilken som ska användas.");
                 continue;
             }
-            filPerVinnamn.put(entry.getKey(), entry.getValue().get(0));
+            fileByWineName.put(entry.getKey(), entry.getValue().get(0));
         }
     }
 
     /**
-     * Null om ingen fil i mappen heter exakt {@code vinNamn} (bortsett
+     * Null om ingen fil i mappen heter exakt {@code wineName} (bortsett
      * från filändelsen), eller om namnet var tvetydigt (se konstruktorn).
      */
-    Bild hittaBild(String vinNamn) throws IOException {
-        Path fil = filPerVinnamn.get(vinNamn);
-        if (fil == null) {
+    Image findImage(String wineName) throws IOException {
+        Path file = fileByWineName.get(wineName);
+        if (file == null) {
             return null;
         }
-        String filnamn = fil.getFileName().toString();
-        String ändelse = filnamn.substring(filnamn.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
-        return new Bild(Files.readAllBytes(fil), MIME_PER_ÄNDELSE.get(ändelse));
+        String fileName = file.getFileName().toString();
+        String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        return new Image(Files.readAllBytes(file), MIME_BY_EXTENSION.get(extension));
     }
 
-    record Bild(byte[] data, String mimeType) {
+    record Image(byte[] data, String mimeType) {
     }
 }

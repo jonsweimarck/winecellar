@@ -14,7 +14,7 @@ spara ett vin. Användaren upplevde detta som ett irritationsmoment -
 ## Decision
 
 `name` är det enda obligatoriska fältet, både i webb-UI:t
-(`WineController`) och vid Excel-import (`VinradParser`) - samma regel
+(`WineController`) och vid Excel-import (`WineRowParser`) - samma regel
 på båda ställena. Alla övriga fält sparas som `null` om de lämnas tomma.
 
 ## Consequences
@@ -25,7 +25,7 @@ på båda ställena. Alla övriga fält sparas som `null` om de lämnas tomma.
 - `wine_type`/`country`/`producer`-kolumnerna, som Hibernate/`ddl-auto`
   tidigare implicit behandlat som ifyllda, kräver null-safe hantering
   genomgående - inklusive `ImportExcel`s JDBC-bindning, som en gång
-  kraschade med `NullPointerException` när `VinradParser` lättades utan
+  kraschade med `NullPointerException` när `WineRowParser` lättades utan
   att bindningen uppdaterades i samma steg.
 - UI-mallar behöver explicita `th:if`-vakter för varje fält som tidigare
   antogs alltid vara satt (typ, årgång, antal, producent, land, plats)
@@ -36,4 +36,4 @@ på båda ställena. Alla övriga fält sparas som `null` om de lämnas tomma.
   en `null`-nyckel.
 - Excel-export och -import är fortfarande symmetriska: ett vin sparat
   med bara namnet exporteras och återimporteras korrekt, eftersom
-  `VinradParser` följer samma regel som webb-UI:t.
+  `WineRowParser` följer samma regel som webb-UI:t.

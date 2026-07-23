@@ -40,11 +40,11 @@ körs manuellt mot en redan existerande databas.
 - Ingen Gherkin-täckning för den här modulen (dess JDBC-integration
   testas inte av Cucumber-suiten) - verifiering av den fulla
   import-/exportflödet sker manuellt mot en riktig databas, medan
-  radmappningslogiken (`VinradParser`/`VinradSkrivare`) har vanliga
+  radmappningslogiken (`WineRowParser`/`WineRowWriter`) har vanliga
   JUnit-enhetstester.
-- Kolumnlayouten (A-V) delas mellan `VinradParser` (läsning) och
-  `VinradSkrivare` (skrivning) via paketsynliga `COL_*`-konstanter i
-  `VinradParser` - en delad källa till sanning istället för att
+- Kolumnlayouten (A-V) delas mellan `WineRowParser` (läsning) och
+  `WineRowWriter` (skrivning) via paketsynliga `COL_*`-konstanter i
+  `WineRowParser` - en delad källa till sanning istället för att
   duplicera kolumnindexen i två klasser.
 - Verktygen körs lokalt och pratar med Postgres-tillägget över
   nätverket när de riktas mot produktion - Clever Cloud har inget

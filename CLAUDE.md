@@ -39,6 +39,43 @@ flaggade som gällande.
   `systembolaget_description`. Översätt inte dessa till påhittade engelska
   motsvarigheter ("association_review" etc.) - det är fel typ av
   konsekvens; ett egennamn ska vara igenkännbart, inte översatt.
+- **Språket i koden är engelska, rakt igenom - inte bara i domänlagret
+  (byggt 2026-07-23, WINE-4).** Applikationslagret hade drivit iväg mot
+  svenska klass-/metod-/fältnamn (`Sökkriterier`, `Sorteringsfält`,
+  `SorteringsRiktning`, `HärkomstNod`, `WineService.sök(...)`,
+  `WineController.vinkällare(...)` m.fl.), medan domänlagret redan var
+  konsekvent engelskt - WINE-4 städade bort den snedheten. Regeln
+  framåt, för all ny kod i `domain/`, `application/`, `infrastructure/`,
+  `web/` och testkoden (klassnamn, metodnamn, fält-/variabelnamn,
+  enum-konstanter, Thymeleafs modellattributnycklar och URL-
+  frågeparametrar som exponerar dem, t.ex. `sok→search`,
+  `sortera→sort`, `riktning→direction`, `viner→wines`): engelska.
+  **Tre undantag, oförändrade av WINE-4:**
+  1. Kodkommentarer och Javadoc förblir på svenska (som hela den här
+     filen visar).
+  2. Cucumber-stegdefinitionernas `@Given`/`@När`/`@Så`/`@Och`-uttryck
+     (den Gherkin-matchande textsträngen) och samtliga `.feature`-filer
+     förblir på svenska - de är den del av testsviten som avsiktligt
+     ska vara läsbar för icke-utvecklare. De underliggande Java-
+     metodnamnen för själva stegdefinitionerna lämnades också
+     oförändrade (t.ex. `attKällarenInnehållerFöljandeViner`) eftersom
+     de är namngivna direkt efter Gherkin-frasen de matchar - men lokala
+     variabler/fält/privata hjälpmetoder i samma stegklasser (t.ex.
+     `SearchAndFilterSteps`, tidigare `SökOchFilterSteps`) är omdöpta
+     till engelska, liksom själva klassnamnen.
+  3. Egennamn som redan var etablerade undantag (Systembolaget,
+     Munskänkarna, se ovan) förblir oöversatta.
+  CSS-klassnamn, HTML-`id`/`class`-attribut och den svenska UI-texten
+  användaren faktiskt ser (etiketter, knapptexter, `<title>` osv.)
+  rördes INTE av WINE-4 - det är produktens språk mot en svensk
+  användare, inte kodens ubiquitous language, och principerna gäller
+  olika saker. **Historiska CLAUDE.md-poster nedan som nämner de gamla
+  svenska namnen (`Sökkriterier`, `.harBild()`, `VinradParser` osv.) är
+  medvetet INTE uppdaterade** - den här filen är en kronologisk logg
+  (se README:s "Mer information"), och poster ska spegla vad som var
+  sant/korrekt när de skrevs, inte skrivas om i efterhand. Lita på
+  `git log`/den faktiska koden för nuvarande namn, inte på äldre
+  loggposter.
 
 ## Domänmodell - viktiga vägval
 

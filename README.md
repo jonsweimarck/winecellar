@@ -73,7 +73,7 @@ egennamn som syftar på svenska institutioner behåller sitt svenska namn
 `own_rating`/`munskankarna_rating` är begränsade till exakt de 29
 värdena från källfilens `Listor`-flik. `Rating` (`domain/Rating.java`)
 har korta konstantnamn (`R16`, `R14_5`) med den fulla svenska etiketten
-som ett separat fält; `Rating.fraEtikett(text)` normaliserar mellanslag
+som ett separat fält; `Rating.fromLabel(text)` normaliserar mellanslag
 innan matchning.
 
 Se [ADR 0004](docs/adr/0004-images-in-bytea.md) för varför bilder
@@ -116,9 +116,9 @@ Verktygsraden ovanför listan har:
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md).
 
 Vald sortering/filtrering/sökning hamnar i URL:en
-(`?sok=...&sortera=...&riktning=...&wineType=...`) - bokmärkbart och
-delbart. Orkestreringen ligger i `WineService.sök(Sökkriterier)`, inte
-i controllern - se
+(`?search=...&sort=...&direction=...&wineType=...`) - bokmärkbart och
+delbart. Orkestreringen ligger i `WineService.search(SearchCriteria)`,
+inte i controllern - se
 [ADR 0006](docs/adr/0006-search-orchestration-in-application-layer.md).
 
 ## Säkerhet
@@ -188,7 +188,7 @@ cd C:\projects\winecellar
 mvn install -DskipTests
 ```
 
-Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `VinradParser`:
+Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `WineRowParser`:
 
 | Kolumn | Fält | Kolumn | Fält |
 |---|---|---|---|

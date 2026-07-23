@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 
 /**
  * Engångsexport av wines-tabellen -> en Excel-fil i samma format som
- * VinradParser/ImportExcel förväntar sig (samma kolumnlayout, "Vin" som
+ * WineRowParser/ImportExcel förväntar sig (samma kolumnlayout, "Vin" som
  * fliknamn) - den omvända operationen av ImportExcel, se README:s
  * "Export av databasen till Excel". Körs manuellt, precis som
  * ImportExcel - inte en del av den körande applikationen.
@@ -35,19 +35,19 @@ import java.util.stream.Collectors;
  * **Fullständig rundtripp för bilder (byggt 2026-07-22, på användarens
  * begäran).** Etiketter skrivs på TVÅ oberoende sätt:
  * 1. Som vanliga ankrade bilder i xlsx-filens "Bild"-kolumn (se
- *    VinradSkrivares klasskommentar) - bara JPEG/PNG/GIF, en visuell
+ *    WineRowWriters klasskommentar) - bara JPEG/PNG/GIF, en visuell
  *    "titta i Excel"-bekvämlighet.
  * 2. Som riktiga bildfiler i WINECELLAR_LOCAL_IMAGE_FOLDER (samma
- *    miljövariabel som ImportExcel/Bildmatchare redan använder för att
- *    KOPPLA bilder vid import) - alla MIME-typer Bildmatchare känner
+ *    miljövariabel som ImportExcel/ImageMatcher redan använder för att
+ *    KOPPLA bilder vid import) - alla MIME-typer ImageMatcher känner
  *    igen, inklusive webp. Det är DEN HÄR mekanismen som gör rundtrippen
  *    fullständig: en efterföljande ImportExcel-körning mot samma mapp
- *    plockar upp filerna via Bildmatchares namnmatchning, precis som vid
+ *    plockar upp filerna via ImageMatchers namnmatchning, precis som vid
  *    en vanlig import.
  */
 public final class ExportExcel {
 
-    private static final String SHEET_NAMN = "Vin";
+    private static final String SHEET_NAME = "Vin";
 
     private static final String SELECT_SQL = """
             SELECT name, wine_type, producer, country, region, subregion, grapes, vintage,
@@ -59,7 +59,7 @@ public final class ExportExcel {
             ORDER BY name
             """;
 
-    private static final String[] RUBRIKER = {
+    private static final String[] HEADERS = {
             "Vintyp", "Land", "Region", "Underregion", "Druvor", "Producent", "Namn", "Årgång",
             "Bild", "Inköpsdatum", "Pris", "Antal", "Varför köpt", "Tasting notes", "Eget betyg",
             "Systembolagets prodnummer", "Systembolagets beskrivning", "Munskänkarnas bedömning",
@@ -73,99 +73,99 @@ public final class ExportExcel {
             System.err.println("Sätt WINECELLAR_LOCAL_IMAGE_FOLDER för att även skriva ut etiketterna som bildfiler i en mapp, se README.");
             System.exit(1);
         }
-        String utfilSökväg = args[0];
-        String jdbcUrl = args.length > 1 ? args[1] : Databaskoppling.jdbcUrlFrånMiljö();
-        String användare = args.length > 2 ? args[2] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_USER", "winecellar");
-        String lösenord = args.length > 3 ? args[3] : Databaskoppling.miljövariabelEllerStandard("POSTGRESQL_ADDON_PASSWORD", "winecellar");
-        String bildmappSökväg = System.getenv("WINECELLAR_LOCAL_IMAGE_FOLDER");
+        String outputPath = args[0];
+        String jdbcUrl = args.length > 1 ? args[1] : DatabaseConnection.jdbcUrlFromEnvironment();
+        String user = args.length > 2 ? args[2] : DatabaseConnection.environmentVariableOrDefault("POSTGRESQL_ADDON_USER", "winecellar");
+        String password = args.length > 3 ? args[3] : DatabaseConnection.environmentVariableOrDefault("POSTGRESQL_ADDON_PASSWORD", "winecellar");
+        String imageFolderPath = System.getenv("WINECELLAR_LOCAL_IMAGE_FOLDER");
 
-        List<Wine> viner = new ArrayList<>();
-        try (Connection connection = DriverManager.getConnection(jdbcUrl, användare, lösenord);
+        List<Wine> wines = new ArrayList<>();
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, user, password);
              PreparedStatement statement = connection.prepareStatement(SELECT_SQL);
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
-                viner.add(läsVin(resultSet));
+                wines.add(readWine(resultSet));
             }
         }
-        System.out.println("Läste " + viner.size() + " viner från databasen.");
+        System.out.println("Läste " + wines.size() + " viner från databasen.");
 
-        if (bildmappSökväg != null && !bildmappSökväg.isBlank()) {
-            skrivBildfiler(viner, bildmappSökväg);
+        if (imageFolderPath != null && !imageFolderPath.isBlank()) {
+            writeImageFiles(wines, imageFolderPath);
         }
 
         try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet(SHEET_NAMN);
-            skrivRubrikrad(sheet);
+            Sheet sheet = workbook.createSheet(SHEET_NAME);
+            writeHeaderRow(sheet);
 
-            CellStyle datumformat = workbook.createCellStyle();
-            datumformat.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("yyyy-mm-dd"));
-            Drawing<?> ritning = sheet.createDrawingPatriarch();
+            CellStyle dateFormat = workbook.createCellStyle();
+            dateFormat.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("yyyy-mm-dd"));
+            Drawing<?> drawing = sheet.createDrawingPatriarch();
 
-            VinradSkrivare skrivare = new VinradSkrivare();
-            int radnummer = 1;
-            for (Wine vin : viner) {
-                skrivare.skriv(vin, sheet.createRow(radnummer++), datumformat, ritning);
+            WineRowWriter writer = new WineRowWriter();
+            int rowNumber = 1;
+            for (Wine wine : wines) {
+                writer.write(wine, sheet.createRow(rowNumber++), dateFormat, drawing);
             }
 
-            try (OutputStream ut = new FileOutputStream(utfilSökväg)) {
-                workbook.write(ut);
+            try (OutputStream out = new FileOutputStream(outputPath)) {
+                workbook.write(out);
             }
         }
-        System.out.println("Skrev " + viner.size() + " viner till " + utfilSökväg + ".");
+        System.out.println("Skrev " + wines.size() + " viner till " + outputPath + ".");
     }
 
     /**
      * Skriver varje vins bild som en egen fil i bildmappen, döpt exakt
-     * som vinets namn (samma namnmatchning som Bildmatchare använder vid
+     * som vinets namn (samma namnmatchning som ImageMatcher använder vid
      * import) - det är denna mapp, inte xlsx-filens ankrade bilder, som
      * gör en efterföljande återimport bildmedveten.
      */
-    private static void skrivBildfiler(List<Wine> viner, String bildmappSökväg) throws IOException {
-        Path bildmapp = Path.of(bildmappSökväg);
-        Files.createDirectories(bildmapp);
-        varnaOmDubblettnamnMedBild(viner);
+    private static void writeImageFiles(List<Wine> wines, String imageFolderPath) throws IOException {
+        Path imageFolder = Path.of(imageFolderPath);
+        Files.createDirectories(imageFolder);
+        warnAboutDuplicateNamesWithImage(wines);
 
-        int skrivna = 0;
-        for (Wine vin : viner) {
-            if (vin.image() == null) {
+        int written = 0;
+        for (Wine wine : wines) {
+            if (wine.image() == null) {
                 continue;
             }
-            String ändelse = Bildmatchare.ÄNDELSE_PER_MIME.get(vin.imageMimeType());
-            if (ändelse == null) {
-                System.out.println("Varning: bilden för \"" + vin.name() + "\" har MIME-typen \""
-                        + vin.imageMimeType() + "\", som inte känns igen - hoppar över filskrivning "
+            String extension = ImageMatcher.EXTENSION_BY_MIME.get(wine.imageMimeType());
+            if (extension == null) {
+                System.out.println("Varning: bilden för \"" + wine.name() + "\" har MIME-typen \""
+                        + wine.imageMimeType() + "\", som inte känns igen - hoppar över filskrivning "
                         + "(bilden bäddas fortfarande in i xlsx-filen om formatet stöds där).");
                 continue;
             }
-            Files.write(bildmapp.resolve(vin.name() + "." + ändelse), vin.image());
-            skrivna++;
+            Files.write(imageFolder.resolve(wine.name() + "." + extension), wine.image());
+            written++;
         }
-        System.out.println("Skrev " + skrivna + " bildfiler till " + bildmappSökväg + ".");
+        System.out.println("Skrev " + written + " bildfiler till " + imageFolderPath + ".");
     }
 
-    private static void varnaOmDubblettnamnMedBild(List<Wine> viner) {
-        Map<String, Long> antalPerNamn = viner.stream()
-                .filter(Wine::harBild)
+    private static void warnAboutDuplicateNamesWithImage(List<Wine> wines) {
+        Map<String, Long> countByName = wines.stream()
+                .filter(Wine::hasImage)
                 .collect(Collectors.groupingBy(Wine::name, Collectors.counting()));
-        antalPerNamn.forEach((namn, antal) -> {
-            if (antal > 1) {
-                System.out.println("Varning: " + antal + " viner heter \"" + namn
+        countByName.forEach((name, count) -> {
+            if (count > 1) {
+                System.out.println("Varning: " + count + " viner heter \"" + name
                         + "\" - bara den sist skrivna bildfilen blir kvar i mappen.");
             }
         });
     }
 
-    private static void skrivRubrikrad(Sheet sheet) {
-        Row rubrikrad = sheet.createRow(0);
-        for (int kolumn = 0; kolumn < RUBRIKER.length; kolumn++) {
-            rubrikrad.createCell(kolumn).setCellValue(RUBRIKER[kolumn]);
+    private static void writeHeaderRow(Sheet sheet) {
+        Row headerRow = sheet.createRow(0);
+        for (int column = 0; column < HEADERS.length; column++) {
+            headerRow.createCell(column).setCellValue(HEADERS[column]);
         }
     }
 
-    private static Wine läsVin(ResultSet resultSet) throws SQLException {
+    private static Wine readWine(ResultSet resultSet) throws SQLException {
         return Wine.builder()
                 .name(resultSet.getString("name"))
-                .wineType(nullbarVinTyp(resultSet.getString("wine_type")))
+                .wineType(nullableWineType(resultSet.getString("wine_type")))
                 .producer(resultSet.getString("producer"))
                 .country(resultSet.getString("country"))
                 .region(resultSet.getString("region"))
@@ -177,11 +177,11 @@ public final class ExportExcel {
                 .quantity(resultSet.getObject("quantity", Integer.class))
                 .purchaseReason(resultSet.getString("purchase_reason"))
                 .tastingNotes(resultSet.getString("tasting_notes"))
-                .ownRating(nullbartBetyg(resultSet.getString("own_rating")))
+                .ownRating(nullableRating(resultSet.getString("own_rating")))
                 .systembolagetProductNumber(resultSet.getString("systembolaget_product_number"))
                 .systembolagetDescription(resultSet.getString("systembolaget_description"))
                 .munskankarnaReview(resultSet.getString("munskankarna_review"))
-                .munskankarnaRating(nullbartBetyg(resultSet.getString("munskankarna_rating")))
+                .munskankarnaRating(nullableRating(resultSet.getString("munskankarna_rating")))
                 .vivinoRating(resultSet.getBigDecimal("vivino_rating"))
                 .otherReference(resultSet.getString("other_reference"))
                 .location(resultSet.getString("location"))
@@ -190,12 +190,12 @@ public final class ExportExcel {
                 .build();
     }
 
-    private static WineType nullbarVinTyp(String värde) {
-        return värde == null ? null : WineType.valueOf(värde);
+    private static WineType nullableWineType(String value) {
+        return value == null ? null : WineType.valueOf(value);
     }
 
-    private static Rating nullbartBetyg(String värde) {
-        return värde == null ? null : Rating.valueOf(värde);
+    private static Rating nullableRating(String value) {
+        return value == null ? null : Rating.valueOf(value);
     }
 
     private ExportExcel() {
