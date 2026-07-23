@@ -9,7 +9,7 @@ import io.cucumber.java.sv.Så;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RedigeraVinSteps {
+public class EditWineSteps {
 
     private WineService wineService;
 
@@ -19,17 +19,17 @@ public class RedigeraVinSteps {
     }
 
     @Givet("att vinet {string} finns med {int} flaskor")
-    public void attVinetFinnsMedFlaskor(String namn, int flaskor) {
-        wineService.save(Stegstöd.vinMedNamnOchAntal(namn, flaskor));
+    public void attVinetFinnsMedFlaskor(String name, int bottles) {
+        wineService.save(StepSupport.wineWithNameAndQuantity(name, bottles));
     }
 
     @När("jag ändrar antalet flaskor för {string} till {int}")
-    public void jagÄndrarAntaletFlaskorFörTill(String namn, int nyttAntal) {
-        wineService.save(Stegstöd.hittaVin(wineService, namn).withQuantity(nyttAntal));
+    public void jagÄndrarAntaletFlaskorFörTill(String name, int newQuantity) {
+        wineService.save(StepSupport.findWine(wineService, name).withQuantity(newQuantity));
     }
 
     @Så("ska vinet {string} visas med {int} flaskor")
-    public void skaVinetVisasMedFlaskor(String namn, int flaskor) {
-        assertThat(Stegstöd.hittaVin(wineService, namn).quantity()).isEqualTo(flaskor);
+    public void skaVinetVisasMedFlaskor(String name, int bottles) {
+        assertThat(StepSupport.findWine(wineService, name).quantity()).isEqualTo(bottles);
     }
 }

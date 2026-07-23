@@ -53,22 +53,22 @@ public class InMemoryWineRepository implements WineRepository {
      */
     @Override
     public List<Wine> search(String query) {
-        String normaliseradSökterm = query.toLowerCase(Locale.ROOT);
+        String normalizedSearchTerm = query.toLowerCase(Locale.ROOT);
         return wines.values().stream()
-                .filter(vin -> matchar(vin, normaliseradSökterm))
+                .filter(wine -> matches(wine, normalizedSearchTerm))
                 .toList();
     }
 
-    private static boolean matchar(Wine vin, String normaliseradSökterm) {
-        return innehåller(vin.name(), normaliseradSökterm)
-                || innehåller(vin.producer(), normaliseradSökterm)
-                || innehåller(vin.grapes(), normaliseradSökterm)
-                || innehåller(vin.tastingNotes(), normaliseradSökterm)
-                || innehåller(vin.systembolagetDescription(), normaliseradSökterm)
-                || innehåller(vin.munskankarnaReview(), normaliseradSökterm);
+    private static boolean matches(Wine wine, String normalizedSearchTerm) {
+        return contains(wine.name(), normalizedSearchTerm)
+                || contains(wine.producer(), normalizedSearchTerm)
+                || contains(wine.grapes(), normalizedSearchTerm)
+                || contains(wine.tastingNotes(), normalizedSearchTerm)
+                || contains(wine.systembolagetDescription(), normalizedSearchTerm)
+                || contains(wine.munskankarnaReview(), normalizedSearchTerm);
     }
 
-    private static boolean innehåller(String fältvärde, String normaliseradSökterm) {
-        return fältvärde != null && fältvärde.toLowerCase(Locale.ROOT).contains(normaliseradSökterm);
+    private static boolean contains(String fieldValue, String normalizedSearchTerm) {
+        return fieldValue != null && fieldValue.toLowerCase(Locale.ROOT).contains(normalizedSearchTerm);
     }
 }

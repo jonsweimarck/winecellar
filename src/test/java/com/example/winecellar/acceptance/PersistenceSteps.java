@@ -28,13 +28,13 @@ public class PersistenceSteps {
     private EntityManager entityManager;
 
     @Before
-    public void nollställ() {
+    public void reset() {
         wineRepository.deleteAll();
     }
 
     @Givet("att vinet {string} är sparat i källaren")
-    public void attVinetÄrSparatIKällaren(String namn) {
-        wineService.save(Stegstöd.vinMedNamn(namn));
+    public void attVinetÄrSparatIKällaren(String name) {
+        wineService.save(StepSupport.wineWithName(name));
     }
 
     @När("applikationen startas om")
@@ -43,7 +43,7 @@ public class PersistenceSteps {
     }
 
     @Så("ska vinet {string} fortfarande finnas i källaren")
-    public void skaVinetFortfarandeFinnasIKällaren(String namn) {
-        assertThat(wineService.listWines()).anySatisfy(vin -> assertThat(vin.name()).isEqualTo(namn));
+    public void skaVinetFortfarandeFinnasIKällaren(String name) {
+        assertThat(wineService.listWines()).anySatisfy(wine -> assertThat(wine.name()).isEqualTo(name));
     }
 }

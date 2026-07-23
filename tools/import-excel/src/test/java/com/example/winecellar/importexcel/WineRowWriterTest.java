@@ -19,14 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Testar Wine->rad-skrivningen genom att skriva och sedan läsa tillbaka
- * samma rad med VinradParser - den mest direkta verifieringen av att
+ * samma rad med WineRowParser - den mest direkta verifieringen av att
  * export verkligen är "import baklänges" (samma kolumnlayout, samma
  * tolkning åt båda hållen).
  */
-class VinradSkrivareTest {
+class WineRowWriterTest {
 
-    private final VinradSkrivare skrivare = new VinradSkrivare();
-    private final VinradParser parser = new VinradParser();
+    private final WineRowWriter writer = new WineRowWriter();
+    private final WineRowParser parser = new WineRowParser();
 
     @Test
     void skaÅterläsaExaktSammaVärdenSomSkrevs() {
@@ -54,58 +54,58 @@ class VinradSkrivareTest {
                 .location("Låda 2")
                 .build();
 
-        Row row = skrivTillNyRad(original);
-        Wine återinläst = parser.parse(row);
+        Row row = writeToNewRow(original);
+        Wine readBack = parser.parse(row);
 
-        assertThat(återinläst).isEqualTo(original);
+        assertThat(readBack).isEqualTo(original);
     }
 
     @Test
     void skaÅterläsaAllaFemVintyperKorrekt() {
-        for (WineType typ : WineType.values()) {
-            Wine original = minimaltVin().toBuilder().wineType(typ).build();
+        for (WineType type : WineType.values()) {
+            Wine original = minimalWine().toBuilder().wineType(type).build();
 
-            Row row = skrivTillNyRad(original);
-            Wine återinläst = parser.parse(row);
+            Row row = writeToNewRow(original);
+            Wine readBack = parser.parse(row);
 
-            assertThat(återinläst.wineType()).isEqualTo(typ);
+            assertThat(readBack.wineType()).isEqualTo(type);
         }
     }
 
     @Test
     void skaLämnaCellerTommaFörFältSomInteÄrSatta() {
-        Wine minimalt = Wine.builder()
+        Wine minimal = Wine.builder()
                 .wineType(WineType.RED).country("Italien").producer("Antinori").name("Chianti")
                 .build();
 
-        Row row = skrivTillNyRad(minimalt);
+        Row row = writeToNewRow(minimal);
 
-        assertThat(row.getCell(VinradParser.COL_VIVINO)).isNull();
-        assertThat(row.getCell(VinradParser.COL_INKOPSDATUM)).isNull();
-        assertThat(row.getCell(VinradParser.COL_EGET_BETYG)).isNull();
+        assertThat(row.getCell(WineRowParser.COL_VIVINO)).isNull();
+        assertThat(row.getCell(WineRowParser.COL_PURCHASE_DATE)).isNull();
+        assertThat(row.getCell(WineRowParser.COL_OWN_RATING)).isNull();
     }
 
     /**
      * Ett vin som bara har namnet ifyllt (möjligt sedan bara namnet blev
      * obligatoriskt i webb-UI:t, se CLAUDE.md) skrivs till Excel och
-     * återläses nu korrekt - VinradParser kräver sedan 2026-07-22 bara
+     * återläses nu korrekt - WineRowParser kräver sedan 2026-07-22 bara
      * namnet, samma regel åt båda hållen (tidigare hoppade parsern över
      * en sådan rad vid återimport; det var den kända begränsningen som
      * ledde till den ändringen).
      */
     @Test
     void ettVinMedBaraNamnetSkrivsOchÅterlässKorrekt() {
-        Wine minimalt = Wine.builder().name("Anteckning om ett vin").build();
+        Wine minimal = Wine.builder().name("Anteckning om ett vin").build();
 
-        Row row = skrivTillNyRad(minimalt);
-        Wine återinläst = parser.parse(row);
+        Row row = writeToNewRow(minimal);
+        Wine readBack = parser.parse(row);
 
-        assertThat(återinläst.name()).isEqualTo("Anteckning om ett vin");
-        assertThat(återinläst.wineType()).isNull();
-        assertThat(återinläst.country()).isNull();
-        assertThat(återinläst.producer()).isNull();
-        assertThat(återinläst.vintage()).isNull();
-        assertThat(återinläst.quantity()).isNull();
+        assertThat(readBack.name()).isEqualTo("Anteckning om ett vin");
+        assertThat(readBack.wineType()).isNull();
+        assertThat(readBack.country()).isNull();
+        assertThat(readBack.producer()).isNull();
+        assertThat(readBack.vintage()).isNull();
+        assertThat(readBack.quantity()).isNull();
     }
 
     /**
@@ -114,55 +114,55 @@ class VinradSkrivareTest {
      * testet en trovärdig verifiering av att den faktiska etikettdatan
      * skrivs, inte bara att metoden inte kraschar på slumpmässiga bytes.
      */
-    private static final byte[] EN_PIXEL_PNG = Base64.getDecoder().decode(
+    private static final byte[] ONE_PIXEL_PNG = Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
 
     @Test
     void skaBäddaInBildenAnkradIBildkolumnen() {
-        Wine original = minimaltVin().toBuilder().image(EN_PIXEL_PNG).imageMimeType("image/png").build();
+        Wine original = minimalWine().toBuilder().image(ONE_PIXEL_PNG).imageMimeType("image/png").build();
 
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Vin");
         Row row = sheet.createRow(1);
-        XSSFDrawing ritning = (XSSFDrawing) sheet.createDrawingPatriarch();
-        skrivare.skriv(original, row, datumformat(workbook), ritning);
+        XSSFDrawing drawing = (XSSFDrawing) sheet.createDrawingPatriarch();
+        writer.write(original, row, dateFormat(workbook), drawing);
 
-        assertThat(ritning.getShapes()).hasSize(1);
+        assertThat(drawing.getShapes()).hasSize(1);
         assertThat(workbook.getAllPictures()).hasSize(1);
-        assertThat(workbook.getAllPictures().get(0).getData()).isEqualTo(EN_PIXEL_PNG);
+        assertThat(workbook.getAllPictures().get(0).getData()).isEqualTo(ONE_PIXEL_PNG);
     }
 
     @Test
     void skaHoppaÖverBildMedOstöddMimeTypUtanAttKrascha() {
-        Wine original = minimaltVin().toBuilder().image(new byte[]{1, 2, 3}).imageMimeType("image/webp").build();
+        Wine original = minimalWine().toBuilder().image(new byte[]{1, 2, 3}).imageMimeType("image/webp").build();
 
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Vin");
         Row row = sheet.createRow(1);
-        XSSFDrawing ritning = (XSSFDrawing) sheet.createDrawingPatriarch();
-        skrivare.skriv(original, row, datumformat(workbook), ritning);
+        XSSFDrawing drawing = (XSSFDrawing) sheet.createDrawingPatriarch();
+        writer.write(original, row, dateFormat(workbook), drawing);
 
-        assertThat(ritning.getShapes()).isEmpty();
+        assertThat(drawing.getShapes()).isEmpty();
     }
 
-    private Wine minimaltVin() {
+    private Wine minimalWine() {
         return Wine.builder()
                 .country("Frankrike").producer("Joseph Drouhin").name("Saint-Véran")
                 .build();
     }
 
-    private Row skrivTillNyRad(Wine vin) {
+    private Row writeToNewRow(Wine wine) {
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Vin");
         Row row = sheet.createRow(1);
-        Drawing<?> ritning = sheet.createDrawingPatriarch();
-        skrivare.skriv(vin, row, datumformat(workbook), ritning);
+        Drawing<?> drawing = sheet.createDrawingPatriarch();
+        writer.write(wine, row, dateFormat(workbook), drawing);
         return row;
     }
 
-    private CellStyle datumformat(XSSFWorkbook workbook) {
-        CellStyle datumformat = workbook.createCellStyle();
-        datumformat.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("yyyy-mm-dd"));
-        return datumformat;
+    private CellStyle dateFormat(XSSFWorkbook workbook) {
+        CellStyle dateFormat = workbook.createCellStyle();
+        dateFormat.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("yyyy-mm-dd"));
+        return dateFormat;
     }
 }

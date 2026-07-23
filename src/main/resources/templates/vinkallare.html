@@ -256,70 +256,70 @@
 <body>
     <h1>Vinkällaren</h1>
 
-    <a class="knapp" th:if="${kanRedigera}" href="/wines/nytt">Lägg till vin</a>
+    <a class="knapp" th:if="${canEdit}" href="/wines/nytt">Lägg till vin</a>
 
     <form hx-get="/" hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
         <div class="verktygsrad">
             <div class="falt-grupp sok-grupp">
-                <label for="sok">Sök</label>
-                <input type="search" id="sok" name="sok" th:value="${sok}"
+                <label for="search">Sök</label>
+                <input type="search" id="search" name="search" th:value="${search}"
                        placeholder="Namn, producent, tasting notes, Systembolaget, Munskänkarna …">
             </div>
             <div class="falt-grupp">
-                <label for="sortera">Sortera efter</label>
-                <select id="sortera" name="sortera">
-                    <option th:each="falt : ${sorteringsfält}"
-                            th:value="${falt.name()}"
-                            th:text="${falt.etikett()}"
-                            th:selected="${falt == sortera}"></option>
+                <label for="sort">Sortera efter</label>
+                <select id="sort" name="sort">
+                    <option th:each="field : ${sortFields}"
+                            th:value="${field.name()}"
+                            th:text="${field.label()}"
+                            th:selected="${field == sort}"></option>
                 </select>
             </div>
             <div class="falt-grupp">
-                <label for="riktning">Riktning</label>
-                <select id="riktning" name="riktning">
-                    <option value="STIGANDE" th:selected="${riktning.name() == 'STIGANDE'}">Stigande</option>
-                    <option value="FALLANDE" th:selected="${riktning.name() == 'FALLANDE'}">Fallande</option>
+                <label for="direction">Riktning</label>
+                <select id="direction" name="direction">
+                    <option value="ASCENDING" th:selected="${direction.name() == 'ASCENDING'}">Stigande</option>
+                    <option value="DESCENDING" th:selected="${direction.name() == 'DESCENDING'}">Fallande</option>
                 </select>
             </div>
         </div>
 
         <details class="filterpanel">
             <summary>Filter <span class="antal-badge"
-                                   th:if="${valdaVintyper.size() + valdaLänder.size() + valdaRegioner.size() + valdaUnderregioner.size() > 0}"
-                                   th:text="${valdaVintyper.size() + valdaLänder.size() + valdaRegioner.size() + valdaUnderregioner.size()}"></span></summary>
+                                   th:if="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size() > 0}"
+                                   th:text="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size()}"></span></summary>
             <div class="filterinnehall">
                 <fieldset>
                     <legend>Vintyp</legend>
-                    <label class="kryssrad"><input type="checkbox" name="wineType" value="RED" th:checked="${valdaVintyper.contains('RED')}"> Rött</label>
-                    <label class="kryssrad"><input type="checkbox" name="wineType" value="WHITE" th:checked="${valdaVintyper.contains('WHITE')}"> Vitt</label>
-                    <label class="kryssrad"><input type="checkbox" name="wineType" value="ROSE" th:checked="${valdaVintyper.contains('ROSE')}"> Rosé</label>
-                    <label class="kryssrad"><input type="checkbox" name="wineType" value="SPARKLING" th:checked="${valdaVintyper.contains('SPARKLING')}"> Mousserande</label>
-                    <label class="kryssrad"><input type="checkbox" name="wineType" value="FORTIFIED" th:checked="${valdaVintyper.contains('FORTIFIED')}"> Starkvin</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="RED" th:checked="${selectedWineTypes.contains('RED')}"> Rött</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="WHITE" th:checked="${selectedWineTypes.contains('WHITE')}"> Vitt</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="ROSE" th:checked="${selectedWineTypes.contains('ROSE')}"> Rosé</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="SPARKLING" th:checked="${selectedWineTypes.contains('SPARKLING')}"> Mousserande</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="FORTIFIED" th:checked="${selectedWineTypes.contains('FORTIFIED')}"> Starkvin</label>
                 </fieldset>
 
                 <fieldset>
                     <legend>Ursprung</legend>
                     <ul class="ursprung-tree">
-                        <li th:each="land : ${härkomstträd}">
+                        <li th:each="country : ${originTree}">
                             <label class="kryssrad">
-                                <input type="checkbox" name="country" th:value="${land.namn()}" th:checked="${valdaLänder.contains(land.namn())}">
-                                <span th:text="${land.namn()}"></span>
+                                <input type="checkbox" name="country" th:value="${country.name()}" th:checked="${selectedCountries.contains(country.name())}">
+                                <span th:text="${country.name()}"></span>
                             </label>
-                            <details th:if="${!land.barn().isEmpty()}" th:open="${expanderadeLänder.contains(land.namn())}">
+                            <details th:if="${!country.children().isEmpty()}" th:open="${expandedCountries.contains(country.name())}">
                                 <summary>Regioner</summary>
                                 <ul>
-                                    <li th:each="region : ${land.barn()}">
+                                    <li th:each="region : ${country.children()}">
                                         <label class="kryssrad">
-                                            <input type="checkbox" name="region" th:value="${region.namn()}" th:checked="${valdaRegioner.contains(region.namn())}">
-                                            <span th:text="${region.namn()}"></span>
+                                            <input type="checkbox" name="region" th:value="${region.name()}" th:checked="${selectedRegions.contains(region.name())}">
+                                            <span th:text="${region.name()}"></span>
                                         </label>
-                                        <details th:if="${!region.barn().isEmpty()}" th:open="${expanderadeRegioner.contains(region.namn())}">
+                                        <details th:if="${!region.children().isEmpty()}" th:open="${expandedRegions.contains(region.name())}">
                                             <summary>Underregioner</summary>
                                             <ul>
-                                                <li th:each="underregion : ${region.barn()}">
+                                                <li th:each="subregion : ${region.children()}">
                                                     <label class="kryssrad">
-                                                        <input type="checkbox" name="subregion" th:value="${underregion.namn()}" th:checked="${valdaUnderregioner.contains(underregion.namn())}">
-                                                        <span th:text="${underregion.namn()}"></span>
+                                                        <input type="checkbox" name="subregion" th:value="${subregion.name()}" th:checked="${selectedSubregions.contains(subregion.name())}">
+                                                        <span th:text="${subregion.name()}"></span>
                                                     </label>
                                                 </li>
                                             </ul>
@@ -367,21 +367,21 @@
     </th:block>
 
     <div id="vinlista" th:fragment="lista">
-        <p class="traffrad">Visar <strong th:text="${viner.size()}"></strong> av <span th:text="${antalTotalt}"></span> viner</p>
+        <p class="traffrad">Visar <strong th:text="${wines.size()}"></strong> av <span th:text="${totalCount}"></span> viner</p>
 
         <div class="chips" th:if="${!chips.isEmpty()}">
-            <a th:each="chip : ${chips}" th:href="${chip.taBortUrl()}" class="chip" th:text="|${chip.etikett()} ×|"></a>
+            <a th:each="chip : ${chips}" th:href="${chip.removeUrl()}" class="chip" th:text="|${chip.label()} ×|"></a>
         </div>
 
         <div id="vinlista-tabell" class="vinlista-tabell">
-            <div class="vinkort-bred" th:each="vin : ${viner}">
+            <div class="vinkort-bred" th:each="vin : ${wines}">
                 <span class="flaskor-badge" th:if="${vin.quantity != null}" th:text="${vin.quantity}" title="Antal flaskor"></span>
                 <div class="vk-topp">
                     <div class="vk-bildyta">
-                        <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
+                        <a th:if="${vin.hasImage()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
                             <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}" alt="Etikett">
                         </a>
-                        <div th:unless="${vin.harBild()}" class="vk-bildplatshallare">Ingen bild</div>
+                        <div th:unless="${vin.hasImage()}" class="vk-bildplatshallare">Ingen bild</div>
                     </div>
                     <div class="vk-text">
                         <p th:if="${vin.producer != null}" th:text="${vin.producer}"></p>
@@ -450,10 +450,10 @@
                     <span class="vk-value" th:text="${vin.otherReference}"></span>
                 </div>
 
-                <div class="detalj-atgarder" th:if="${kanRedigera}">
+                <div class="detalj-atgarder" th:if="${canEdit}">
                     <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                     <button type="button"
-                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, sok=${sok}, sortera=${sortera}, riktning=${riktning}, wineType=${valdaVintyper}, country=${valdaLänder}, region=${valdaRegioner}, subregion=${valdaUnderregioner})}"
+                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions})}"
                             hx-target="#vinlista" hx-swap="outerHTML">
                         Ta bort
                     </button>
@@ -462,14 +462,14 @@
         </div>
 
         <div id="vinlista-kort" class="vinlista-kort">
-            <div class="vinkort" th:each="vin : ${viner}">
+            <div class="vinkort" th:each="vin : ${wines}">
                 <span class="flaskor-badge" th:if="${vin.quantity != null}" th:text="${vin.quantity}" title="Antal flaskor"></span>
                 <div class="vinkort-topp">
                     <div class="vinkort-bildyta">
-                        <a th:if="${vin.harBild()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
+                        <a th:if="${vin.hasImage()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
                             <img th:src="@{/wines/{id}/bild(id=${vin.id.value})}" alt="Etikett" class="vinbild-kort">
                         </a>
-                        <span th:unless="${vin.harBild()}" class="vinbild-saknas">Ingen bild</span>
+                        <span th:unless="${vin.hasImage()}" class="vinbild-saknas">Ingen bild</span>
                     </div>
                     <div class="vinkort-text">
                         <p class="vinkort-producent" th:if="${vin.producer != null}" th:text="${vin.producer}"></p>
@@ -493,10 +493,10 @@
                     <dl>
                         <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
                     </dl>
-                    <div class="detalj-atgarder" th:if="${kanRedigera}">
+                    <div class="detalj-atgarder" th:if="${canEdit}">
                         <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                         <button type="button"
-                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, sok=${sok}, sortera=${sortera}, riktning=${riktning}, wineType=${valdaVintyper}, country=${valdaLänder}, region=${valdaRegioner}, subregion=${valdaUnderregioner})}"
+                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions})}"
                                 hx-target="#vinlista" hx-swap="outerHTML">
                             Ta bort
                         </button>

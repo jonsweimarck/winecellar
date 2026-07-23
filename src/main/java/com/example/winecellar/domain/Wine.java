@@ -58,7 +58,7 @@ public record Wine(
         return toBuilder().image(newImage).imageMimeType(newImageMimeType).build();
     }
 
-    public boolean harBild() {
+    public boolean hasImage() {
         return image != null && image.length > 0;
     }
 

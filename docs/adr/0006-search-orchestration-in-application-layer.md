@@ -20,20 +20,24 @@ HTTP, vilket hade suddat ut den gräns projektet redan håller isär.
 ## Decision
 
 `WineController` tolkar bara råa queryparametrar till typade värden
-(`Sorteringsfält`, `SorteringsRiktning`, m.fl.) - `WineService.sök(
-Sökkriterier)` gör själva jobbet: väljer baslista (fritextsökning via
+(`SortField`, `SortDirection`, m.fl.) - `WineService.search(
+SearchCriteria)` gör själva jobbet: väljer baslista (fritextsökning via
 `WineRepository.search(...)` om en sökterm finns, annars `findAll()`),
 filtrerar den mot facetterna, och sorterar sist.
 
-`Sökkriterier` är en `Builder`-baserad record (se
+`SearchCriteria` är en `Builder`-baserad record (se
 [0003](0003-wine-builder-pattern.md) för samma resonemang) med
 defaultvärden, så anropsplatser bara sätter det de faktiskt bryr sig om.
 Facetterna kombineras med OCH sinsemellan (vintyp OCH land OCH region OCH
 underregion, om satta), ELLER inom en facett (t.ex. Rött eller Vitt).
-Land/region/underregion-trädet för filterpanelen (`HärkomstNod`,
-`WineService.härkomstträd()`) härleds fräscht från samtliga viner vid
+Land/region/underregion-trädet för filterpanelen (`OriginNode`,
+`WineService.originTree()`) härleds fräscht från samtliga viner vid
 varje anrop - statiska facetter, alltid obegränsade av det aktiva
 filtret.
+
+(Klassnamnen ovan döptes om från svenska till engelska 2026-07-23,
+WINE-4 - se CLAUDE.md:s "Namngivning" - men den arkitektoniska
+uppdelningen de beskriver är oförändrad.)
 
 ## Consequences
 
@@ -49,6 +53,6 @@ filtret.
   [0007](0007-fulltext-search-tsvector.md)) om användaren inte
   uttryckligen valt en annan sortering - ingen separat
   "Relevans"-sortering är byggd.
-- Chips som visar aktivt filter/sökning (`WineController.Sökvy`) ligger
+- Chips som visar aktivt filter/sökning (`WineController.SearchView`) ligger
   medvetet i webblagret, inte i `WineService` - ren presentationslogik
   utan Gherkin-relevans.
