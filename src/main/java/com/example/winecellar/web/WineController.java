@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.DuplicateCheck;
 import com.example.winecellar.application.OriginNode;
 import com.example.winecellar.application.SearchCriteria;
 import com.example.winecellar.application.SortDirection;
@@ -264,15 +265,57 @@ public class WineController {
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
             @RequestParam(required = false) String location,
-            @RequestParam(value = "bild", required = false) MultipartFile image
+            @RequestParam(value = "bild", required = false) MultipartFile image,
+            @RequestParam(required = false) String confirmAdd,
+            Model model
     ) throws IOException {
-        Wine.Builder wine = applyFormFields(Wine.builder(),
+        Wine.Builder builder = applyFormFields(Wine.builder(),
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                 systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
                 munskankarnaRating, vivinoRating, otherReference, location
         );
-        wineService.save(withImageIfProvided(wine, image).build());
+        Wine candidate = withImageIfProvided(builder, image).build();
+
+        if (!"true".equals(confirmAdd)) {
+            DuplicateCheck duplicateCheck = wineService.checkForDuplicate(candidate);
+            if (duplicateCheck instanceof DuplicateCheck.FullDuplicate full) {
+                return renderDuplicateWarning(model, candidate, full.existing(), true);
+            }
+            if (duplicateCheck instanceof DuplicateCheck.PartialDuplicate partial) {
+                return renderDuplicateWarning(model, candidate, partial.existing(), false);
+            }
+        }
+        wineService.save(candidate);
+        return "redirect:/";
+    }
+
+    /**
+     * Renderar om samma formulär (utan redirect) med en varningsruta i
+     * stället för att spara - WINE-6. `candidate` är det ifyllda, ännu
+     * osparade vinet (utan id), så användaren kan antingen ändra ett fält
+     * och skicka in igen, eller (bara vid en möjlig, inte fullständig,
+     * dubblett) bekräfta att det ska sparas som ett nytt vin ändå via
+     * "confirmAdd"-knappen i vin-formular.html.
+     */
+    private static String renderDuplicateWarning(Model model, Wine candidate, Wine existing, boolean fullDuplicate) {
+        model.addAttribute("wine", candidate);
+        model.addAttribute("ratings", Rating.values());
+        model.addAttribute("duplicateExisting", existing);
+        model.addAttribute("duplicateIsFull", fullDuplicate);
+        return "vin-formular";
+    }
+
+    /**
+     * Ökar antalet på det befintliga vinet med 1 - det ena av de två
+     * valen i dubblettvarningen (WINE-6), inte en återinförd generell
+     * "ändra antal"-rutt (den togs medvetet bort, se CLAUDE.md) eftersom
+     * den här bara någonsin lägger till exakt en flaska, från en specifik
+     * varningsdialog.
+     */
+    @PostMapping("/wines/{id}/dubblett-oka-antal")
+    public String increaseQuantityForDuplicate(@PathVariable Long id) {
+        wineService.increaseQuantity(new WineId(id));
         return "redirect:/";
     }
 

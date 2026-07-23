@@ -62,6 +62,33 @@ public record Wine(
         return image != null && image.length > 0;
     }
 
+    /**
+     * Namn, producent och årgång räknas som vinets identitet i
+     * dubblettvarningens mening (WINE-6) - namn/producent jämförs
+     * skiftlägesokänsligt. Bara de fält som är ifyllda på `this` jämförs
+     * mot `other`: en kandidat med bara namnet ifyllt matchar alltså
+     * `other` så länge namnet stämmer, oavsett vad `other`s producent/
+     * årgång råkar vara. Den asymmetrin (this är filtret, other är alltid
+     * det redan sparade vinet) är det som skiljer en fullständig från en
+     * bara möjlig dubblett - se hasCompleteIdentity().
+     */
+    public boolean matchesIdentityOf(Wine other) {
+        if (name != null && !name.equalsIgnoreCase(other.name)) {
+            return false;
+        }
+        if (producer != null && !producer.equalsIgnoreCase(other.producer)) {
+            return false;
+        }
+        if (vintage != null && !vintage.equals(other.vintage)) {
+            return false;
+        }
+        return true;
+    }
+
+    public boolean hasCompleteIdentity() {
+        return name != null && producer != null && vintage != null;
+    }
+
     public Builder toBuilder() {
         return new Builder()
                 .id(id).name(name).wineType(wineType).producer(producer).country(country)

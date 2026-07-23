@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.DuplicateCheck;
 import com.example.winecellar.application.OriginNode;
 import com.example.winecellar.application.SortDirection;
 import com.example.winecellar.application.SortField;
@@ -819,6 +820,97 @@ class WineControllerTest {
                     .vintage(2018).quantity(3).location("Låda 1")
                     .image(bilddata).imageMimeType("image/jpeg")
                     .build());
+        }
+
+        @Test
+        @DisplayName("ska varna om vinet är en fullständig dubblett och inte spara det")
+        void skaVarnaOmFullständigDubblettOchInteSpara() throws Exception {
+            Wine existing = Wine.builder()
+                    .id(new WineId(1L)).name("Barolo").producer("Pio Cesare").vintage(2018).quantity(3)
+                    .build();
+            when(wineService.checkForDuplicate(any())).thenReturn(new DuplicateCheck.FullDuplicate(existing));
+
+            mockMvc.perform(post("/wines")
+                            .with(httpBasic("admin", "admin"))
+                            .param("name", "Barolo")
+                            .param("producer", "Pio Cesare")
+                            .param("vintage", "2018"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Det här vinet finns redan"),
+                            not(containsString("Lägg till som nytt vin ändå")),
+                            containsString("dubblett-oka-antal")
+                    )));
+
+            verify(wineService, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("ska varna om vinet är en möjlig dubblett, inte spara det, men erbjuda att lägga till ändå")
+        void skaVarnaOmMöjligDubblettOchErbjudaAttLäggaTillÄndå() throws Exception {
+            Wine existing = Wine.builder()
+                    .id(new WineId(1L)).name("Barolo").producer("Pio Cesare").vintage(2018).quantity(3)
+                    .build();
+            when(wineService.checkForDuplicate(any())).thenReturn(new DuplicateCheck.PartialDuplicate(existing));
+
+            mockMvc.perform(post("/wines")
+                            .with(httpBasic("admin", "admin"))
+                            .param("name", "Barolo"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Det finns redan ett vin som liknar det här"),
+                            containsString("name=\"confirmAdd\""),
+                            containsString("dubblett-oka-antal")
+                    )));
+
+            verify(wineService, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("ska spara vinet ändå om confirmAdd är satt, utan att fråga WineService om det är en dubblett")
+        void skaSparaÄndåOmConfirmAddÄrSatt() throws Exception {
+            mockMvc.perform(post("/wines")
+                            .with(httpBasic("admin", "admin"))
+                            .param("name", "Barolo")
+                            .param("confirmAdd", "true"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+
+            verify(wineService, never()).checkForDuplicate(any());
+            verify(wineService).save(Wine.builder().name("Barolo").build());
+        }
+    }
+
+    @Nested
+    @DisplayName("dubblettvarningens \"öka antal\"-val")
+    class DubblettvarningensÖkaAntalVal {
+
+        @Test
+        @DisplayName("ska öka antalet på det befintliga vinet och omdirigera till startsidan")
+        void skaÖkaAntaletOchOmdirigera() throws Exception {
+            mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(httpBasic("admin", "admin")))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+
+            verify(wineService).increaseQuantity(new WineId(1L));
+        }
+
+        @Test
+        @DisplayName("ska nekas utan inloggning och aldrig nå WineService")
+        void skaNekasUtanInloggning() throws Exception {
+            mockMvc.perform(post("/wines/1/dubblett-oka-antal"))
+                    .andExpect(status().isUnauthorized());
+
+            verify(wineService, never()).increaseQuantity(any());
+        }
+
+        @Test
+        @DisplayName("ska nekas för readonly-kontot och aldrig nå WineService")
+        void skaNekasFörReadonlyKontot() throws Exception {
+            mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(httpBasic("readonly", "readonly")))
+                    .andExpect(status().isForbidden());
+
+            verify(wineService, never()).increaseQuantity(any());
         }
     }
 
