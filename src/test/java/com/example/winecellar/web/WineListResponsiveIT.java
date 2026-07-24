@@ -9,7 +9,6 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Response;
-import com.microsoft.playwright.options.HttpCredentials;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -188,12 +187,31 @@ class WineListResponsiveIT {
         return nyKontext(bredd, höjd, mobil, "admin", "admin");
     }
 
+    /**
+     * WINE-12: formulärinloggning med session ersatte HTTP Basic
+     * (`setHttpCredentials`, som Playwright annars hade skött automatiskt
+     * på varje request) - inloggningen görs nu en gång som en riktig
+     * sidnavigering/formulärinskick, varefter sessionscookien (satt på
+     * BrowserContext-nivå av Playwright, inte Page-nivå) följer med alla
+     * senare sidor som öppnas i samma kontext.
+     */
     private BrowserContext nyKontext(int bredd, int höjd, boolean mobil, String användarnamn, String lösenord) {
-        return browser.newContext(new Browser.NewContextOptions()
+        BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(bredd, höjd)
                 .setIsMobile(mobil)
-                .setHasTouch(mobil)
-                .setHttpCredentials(new HttpCredentials(användarnamn, lösenord)));
+                .setHasTouch(mobil));
+        loggaIn(context, användarnamn, lösenord);
+        return context;
+    }
+
+    private void loggaIn(BrowserContext context, String användarnamn, String lösenord) {
+        Page inloggningssida = context.newPage();
+        inloggningssida.navigate("http://localhost:" + port + "/login");
+        inloggningssida.locator("#username").fill(användarnamn);
+        inloggningssida.locator("#password").fill(lösenord);
+        inloggningssida.locator("button[type=submit]").click();
+        inloggningssida.waitForLoadState();
+        inloggningssida.close();
     }
 
     private Page öppnaVinkällaren(BrowserContext context) {

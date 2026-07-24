@@ -60,6 +60,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- Ger sec:*-dialekten och auto-injicerar CSRF-hidden-fältet i varje
+             th:action-formulär - annars måste varje formulär (login.html,
+             vin-formular.html, ...) lägga till fältet manuellt. -->
+        <dependency>
+            <groupId>org.thymeleaf.extras</groupId>
+            <artifactId>thymeleaf-extras-springsecurity6</artifactId>
+        </dependency>
 
         <!-- Persistens -->
         <dependency>

@@ -7,7 +7,6 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.FilePayload;
-import com.microsoft.playwright.options.HttpCredentials;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -152,9 +151,21 @@ class LabelScanFormIT {
         return klass != null && klass.contains("tolkat-falt");
     }
 
+    /**
+     * WINE-12: formulärinloggning med session ersatte HTTP Basic (samma
+     * ändring som WineListResponsiveIT) - se den för det fullständiga
+     * resonemanget.
+     */
     private BrowserContext nyKontext() {
-        return browser.newContext(new Browser.NewContextOptions()
-                .setHttpCredentials(new HttpCredentials("admin", "admin")));
+        BrowserContext context = browser.newContext();
+        Page inloggningssida = context.newPage();
+        inloggningssida.navigate("http://localhost:" + port + "/login");
+        inloggningssida.locator("#username").fill("admin");
+        inloggningssida.locator("#password").fill("admin");
+        inloggningssida.locator("button[type=submit]").click();
+        inloggningssida.waitForLoadState();
+        inloggningssida.close();
+        return context;
     }
 
     private Page öppnaNyttVinFormulär(BrowserContext context) {

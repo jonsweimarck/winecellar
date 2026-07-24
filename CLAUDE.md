@@ -935,6 +935,83 @@ medvetet sist av säkerhetsskäl - annars riskerar man att låsa sig ute
 innan den nya inloggningen är bevisat fungerande) → WINE-17
 (produktionsmigrering, sist).
 
+**WINE-10 byggd (2026-07-24): `User`-entitet + `owner_id`-koppling.** Ny
+`User`/`User.UserId` (`domain/`), tunt precis som `Wine`/`WineId`, en
+`UserRepository`-port och två adaptrar (`JpaUserRepository`/`UserEntity`
+mot en ny `users`-tabell, `InMemoryUserRepository` som testdubblett,
+samma mönster som `WineRepository`). `WineEntity` fick en
+`@ManyToOne owner`-relation mot `owner_id` (nullable, `Hibernate ddl-auto:
+update` skapade både tabellen och FK-constraintet automatiskt - inget
+behövde läggas i `schema.sql`, verifierat manuellt mot en lokal Postgres
+med `\d users`/`\d wines`). Medvetet inget annat kopplat än så här -
+varken `Wine`-domänobjektet eller `WineService`/`WineController` vet
+ännu att ägaren finns; själva scopingen är WINE-13.
+
+**WINE-12 byggd (2026-07-24): formulärinloggning ersätter HTTP Basic,
+med en viktig avvikelse från ursprungsplanen.** `SecurityConfig` bytte
+`.httpBasic(...)` mot `.formLogin(...).loginPage("/login").permitAll()`
++ `.logout(...)`. CSRF slogs på igen (var avstängt sedan ADR 0009, av
+skäl som inte längre gäller när autentiseringen är sessionsbaserad):
+`thymeleaf-extras-springsecurity6` (nytt beroende) injicerar automatiskt
+CSRF-fältet i varje `th:action`-formulär (`login.html`,
+`vin-formular.html`), och `vinkallare.html` fick en
+`htmx:configRequest`-lyssnare som lägger till CSRF-headern på htmx-anrop
+(`hx-delete` på "Ta bort"-knapparna) - läst från två `<meta>`-taggar i
+`<head>`. Ny `LoginController` (`GET /login`) + `login.html` (enkel
+formulärsida, visar felmeddelande vid `?error`, "Du är utloggad" vid
+`?logout`). Utloggning är en liten `<form method="post"
+th:action="@{/logout}">`-knapp bredvid "Lägg till vin".
+- **Fälla i `<head>`:** `document.body.addEventListener(...)` i ett
+  inline-`<script>` i `<head>` kraschar - `document.body` finns inte
+  förrän `<body>` har parsats. Löst med `document.addEventListener(...)`
+  istället (eventet bubblar upp till `document` ändå).
+- **Avsiktlig avvikelse från WINE-12s ursprungliga story-text:**
+  `UserDetailsService` är KVAR som den hårdkodade
+  `InMemoryUserDetailsManager` (admin/readonly), INTE bytt till att läsa
+  från den nya `UserRepository`n. Att byta redan här hade slagit ut
+  admin/readonly-inloggningen direkt (ingen rad i `users`-tabellen ännu,
+  eftersom WINE-11/registrering inte finns) - både lokalt och i
+  PRODUKTIONEN, där admin-kontot faktiskt används för att sköta den
+  riktiga vinsamlingen. Databasbytet hör hemma i WINE-11 istället.
+  Konsekvens: en oautentiserad förfrågan mot en skyddad resurs svarar nu
+  302 till `/login` istället för 401 (`LoginUrlAuthenticationEntryPoint`
+  istället för `BasicAuthenticationEntryPoint`) - alla
+  "utan inloggning"-tester i `WineControllerTest` uppdaterade därefter.
+- **Testfälla, `@MockBean`-läckage:** ett första försök löste
+  CSRF-i-tester generellt via en `@TestConfiguration`
+  (`MockMvcBuilderCustomizer` som satte `defaultRequest(get("/").
+  with(csrf()))`) - fungerade för enskilda nästlade testklasser isolerat,
+  men fick `wineService`/`labelInterpretationService` (`@MockBean`) att
+  INTE nollställas mellan tester när HELA `WineControllerTest`-klassen
+  kördes i ett svep: stubbning/anrop från ett tidigare test läckte in i
+  senare tester (`verify(..., never())` misslyckades med anrop som
+  tillhörde ett helt annat test, och en `checkForDuplicate`-stubbning
+  från ett test påverkade nästa). Orsaken är inte helt klarlagd, men
+  bytt till att lägga `.with(csrf())` explicit på varje POST/DELETE/
+  multipart-anrop istället (fler rader, men bevisat säkert - 72/72
+  gröna) löste det helt. Värt att komma ihåg: undvik
+  `MockMvcBuilderCustomizer`/`defaultRequest`-mönstret för `@WebMvcTest`
+  i det här projektet tills orsaken är förstådd.
+- **`WineControllerTest` fick en ny `InloggningOchUtloggning`-svit** som
+  gör en RIKTIG inloggningsrundtur (`SecurityMockMvcRequestBuilders.
+  formLogin()`, mot den faktiska `UserDetailsService`n/lösenordet, inte
+  `user(...)`) - de tre WINE-12-scenarierna (rätt/fel uppgifter,
+  utloggning avslutar sessionen). Övriga 40+ tester använder
+  `SecurityMockMvcRequestPostProcessors.user(...)` (ren
+  SecurityContext-injicering, ingen riktig autentisering) - medvetet:
+  de bryr sig om `WineController`s rendering/åtkomst, inte om
+  autentiseringsmekaniken, och en riktig inloggningsrundtur i var och en
+  hade varit onödigt dyrt.
+- **`WineListResponsiveIT`/`LabelScanFormIT` (Playwright)** bytte från
+  `Browser.NewContextOptions().setHttpCredentials(...)` till en riktig
+  formulärinloggning (öppna `/login`, fylla i fälten, klicka, stänga
+  sidan) innan varje test - sessionscookien sätts på `BrowserContext`-
+  nivå av Playwright och följer med alla senare sidor i samma kontext.
+  Verifierat: samtliga 45 IT-tester (inklusive de tre etikettskannings-
+  testerna, som initialt fastnade i en 30s timeout eftersom
+  `/wines/nytt` bara omdirigerade till den nu obefintliga
+  Basic-auth-inloggningen) gröna via `mvn verify`.
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),

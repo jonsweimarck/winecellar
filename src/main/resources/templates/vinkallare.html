@@ -3,8 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>Vinkällaren</title>
     <script src="https://unpkg.com/htmx.org@2.0.2"></script>
+    <script>
+        // CSRF slogs på igen i samband med WINE-12 (formulärinloggning med
+        // session, se SecurityConfig) - htmx skickar ingen CSRF-token
+        // automatiskt, till skillnad från vanliga <form>-formulär (som får
+        // fältet auto-injicerat av thymeleaf-extras-springsecurity6).
+        // Behövs bara för de state-ändrande htmx-anropen (hx-delete på
+        // "Ta bort"-knapparna) - ofarligt att lägga till på hx-get också.
+        document.addEventListener('htmx:configRequest', (event) => {
+            const token = document.querySelector('meta[name="_csrf"]').content;
+            const header = document.querySelector('meta[name="_csrf_header"]').content;
+            event.detail.headers[header] = token;
+        });
+    </script>
     <style>
         body { font-family: sans-serif; max-width: 70rem; margin: 3rem auto; }
         label { display: block; margin-top: 0.75rem; }
@@ -257,6 +272,10 @@
     <h1>Vinkällaren</h1>
 
     <a class="knapp" th:if="${canEdit}" href="/wines/nytt">Lägg till vin</a>
+
+    <form method="post" th:action="@{/logout}" style="display: inline">
+        <button type="submit" class="knapp">Logga ut</button>
+    </form>
 
     <form hx-get="/" hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
         <div class="verktygsrad">

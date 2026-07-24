@@ -19,9 +19,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,13 +39,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -55,9 +60,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @TestPropertySource pinnar admin-lösenordet till "admin" oavsett vad som
  * faktiskt är satt i miljön testet körs i. Utan detta läcker Clever Clouds
  * WINECELLAR_ADMIN_PASSWORD (satt för produktionsappen) in i byggsteget och
- * skriver över application.ymls lokala default - alla httpBasic("admin",
- * "admin")-anrop nedan börjar då få 401 mot det riktiga produktionslösenordet,
- * vilket kraschade en hel deploy (se git-historiken/CLAUDE.md).
+ * skriver över application.ymls lokala default, vilket kraschade en hel
+ * deploy tidigare (se git-historiken/CLAUDE.md) - fortfarande relevant för
+ * de nya {@code InloggningOchUtloggning}-testerna nedan, som faktiskt
+ * loggar in via {@code formLogin(...)} mot den riktiga konfigurationen
+ * (inte {@code user(...)}, se nedan).
+ *
+ * De flesta övriga testerna använder däremot bara {@code user(...)} - en
+ * ren SecurityContext-injicering som INTE går via den riktiga
+ * `UserDetailsService`n/lösenordskontrollen (till skillnad från det gamla
+ * `httpBasic(...)`, som faktiskt autentiserade). Medvetet: dessa 40+
+ * tester bryr sig om `WineController`s renderings-/åtkomstlogik, inte om
+ * autentiseringsmekaniken - att låta var och en av dem göra en riktig
+ * inloggningsrundtur hade varit onödigt dyrt och inte testat något nytt.
+ * Den riktiga inloggningsvägen (formLogin mot den faktiska konfigurationen)
+ * testas istället samlat i {@code InloggningOchUtloggning}.
+ *
+ * WINE-12 (formulärinloggning ersätter HTTP Basic) slog på CSRF igen -
+ * varje POST/DELETE/multipart-anrop nedan har därför ett explicit
+ * {@code .with(csrf())} utöver {@code user(...)}/inget alls. Ett försök att
+ * lösa detta en gång för alla via en {@code MockMvcBuilderCustomizer}-bean
+ * (defaultRequest) gav {@code @MockBean}-läckage mellan tester (stubbning
+ * från ett test smittade nästa) - orsaken oklar, men det explicita mönstret
+ * här är beprövat säkert.
  */
 @WebMvcTest(WineController.class)
 @Import(SecurityConfig.class)
@@ -86,13 +111,15 @@ class WineControllerTest {
         @DisplayName("ska GET / nekas")
         void skaGetNekas() throws Exception {
             mockMvc.perform(get("/"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
         }
 
         @Test
         @DisplayName("ska POST /wines nekas och aldrig nå WineService")
         void skaPostWinesNekas() throws Exception {
             mockMvc.perform(post("/wines")
+                            .with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -100,7 +127,8 @@ class WineControllerTest {
                             .param("vintage", "2018")
                             .param("quantity", "3")
                             .param("location", "Låda 1"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
 
             verify(wineService, never()).save(any());
         }
@@ -108,8 +136,9 @@ class WineControllerTest {
         @Test
         @DisplayName("ska DELETE nekas")
         void skaDeleteNekas() throws Exception {
-            mockMvc.perform(delete("/wines/1"))
-                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(delete("/wines/1").with(csrf()))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
 
             verify(wineService, never()).removeWine(new WineId(1L));
         }
@@ -118,20 +147,23 @@ class WineControllerTest {
         @DisplayName("ska bildvisning nekas")
         void skaBildvisningNekas() throws Exception {
             mockMvc.perform(get("/wines/1/bild"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
         }
 
         @Test
         @DisplayName("ska redigeringsformuläret nekas")
         void skaRedigeringsformuläretNekas() throws Exception {
             mockMvc.perform(get("/wines/1/redigera"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
         }
 
         @Test
         @DisplayName("ska sparad redigering nekas")
         void skaSparadRedigeringNekas() throws Exception {
             mockMvc.perform(post("/wines/1/redigera")
+                            .with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -139,7 +171,8 @@ class WineControllerTest {
                             .param("vintage", "2018")
                             .param("quantity", "3")
                             .param("location", "Låda 1"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
 
             verify(wineService, never()).save(any());
         }
@@ -148,7 +181,53 @@ class WineControllerTest {
         @DisplayName("ska formuläret för ett nytt vin nekas")
         void skaFormuläretFörEttNyttVinNekas() throws Exception {
             mockMvc.perform(get("/wines/nytt"))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
+        }
+    }
+
+    /**
+     * WINE-12: den riktiga inloggnings-/utloggningsvägen, mot den faktiska
+     * `UserDetailsService`n/lösenordskontrollen (formLogin, inte
+     * user(...)) - se klasskommentaren för varför bara den här klassen gör
+     * det. Motsvarar de tre Given/När/Så-scenarierna i WINE-12.
+     */
+    @Nested
+    @DisplayName("inloggning och utloggning")
+    class InloggningOchUtloggning {
+
+        @Test
+        @DisplayName("ska logga in med rätt uppgifter och komma till startsidan")
+        void skaLoggaInMedRättaUppgifter() throws Exception {
+            mockMvc.perform(formLogin().user("admin").password("admin"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+        }
+
+        @Test
+        @DisplayName("ska nekas inloggning med fel lösenord och stanna kvar på inloggningssidan")
+        void skaNekasInloggningMedFelLösenord() throws Exception {
+            mockMvc.perform(formLogin().user("admin").password("fel"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/login?error"));
+        }
+
+        @Test
+        @DisplayName("ska avsluta sessionen vid utloggning, så startsidan kräver ny inloggning")
+        void skaAvslutaSessionenVidUtloggning() throws Exception {
+            MvcResult inloggning = mockMvc.perform(formLogin().user("admin").password("admin"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"))
+                    .andReturn();
+            MockHttpSession session = (MockHttpSession) inloggning.getRequest().getSession(false);
+
+            mockMvc.perform(post("/logout").session(session).with(csrf()))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/login?logout"));
+
+            mockMvc.perform(get("/").session(session))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
         }
     }
 
@@ -168,7 +247,7 @@ class WineControllerTest {
         void skaSeListanUtanRedigeringslänkar() throws Exception {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
-            mockMvc.perform(get("/").with(httpBasic("readonly", "readonly")))
+            mockMvc.perform(get("/").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("Barolo"),
@@ -180,7 +259,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska nekas formuläret för ett nytt vin")
         void skaNekasFormuläretFörEttNyttVin() throws Exception {
-            mockMvc.perform(get("/wines/nytt").with(httpBasic("readonly", "readonly")))
+            mockMvc.perform(get("/wines/nytt").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isForbidden());
         }
 
@@ -188,7 +267,7 @@ class WineControllerTest {
         @DisplayName("ska nekas att lägga till ett vin och aldrig nå WineService")
         void skaNekasAttLäggaTillEttVin() throws Exception {
             mockMvc.perform(post("/wines")
-                            .with(httpBasic("readonly", "readonly"))
+                            .with(user("readonly").roles("READONLY")).with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -204,7 +283,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska nekas redigeringsformuläret")
         void skaNekasRedigeringsformuläret() throws Exception {
-            mockMvc.perform(get("/wines/1/redigera").with(httpBasic("readonly", "readonly")))
+            mockMvc.perform(get("/wines/1/redigera").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isForbidden());
         }
 
@@ -212,7 +291,7 @@ class WineControllerTest {
         @DisplayName("ska nekas att spara en redigering och aldrig nå WineService")
         void skaNekasAttSparaEnRedigering() throws Exception {
             mockMvc.perform(post("/wines/1/redigera")
-                            .with(httpBasic("readonly", "readonly"))
+                            .with(user("readonly").roles("READONLY")).with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -228,7 +307,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska nekas att ta bort ett vin och aldrig nå WineService")
         void skaNekasAttTaBortEttVin() throws Exception {
-            mockMvc.perform(delete("/wines/1").with(httpBasic("readonly", "readonly")))
+            mockMvc.perform(delete("/wines/1").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isForbidden());
 
             verify(wineService, never()).removeWine(new WineId(1L));
@@ -241,7 +320,7 @@ class WineControllerTest {
             when(wineService.findById(new WineId(1L)))
                     .thenReturn(Optional.of(BAROLO.withImage(bilddata, "image/jpeg")));
 
-            mockMvc.perform(get("/wines/1/bild").with(httpBasic("readonly", "readonly")))
+            mockMvc.perform(get("/wines/1/bild").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType("image/jpeg"));
         }
@@ -256,7 +335,7 @@ class WineControllerTest {
         void skaListaBefintligaVinerOchLänkaTillNyttVinFormulär() throws Exception {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("href=\"/wines/nytt\""),
@@ -270,7 +349,7 @@ class WineControllerTest {
             Wine minimaltVin = Wine.builder().id(new WineId(1L)).name("Chianti Classico").build();
             when(wineService.search(any())).thenReturn(List.of(minimaltVin));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("Chianti Classico")));
         }
@@ -289,7 +368,7 @@ class WineControllerTest {
                     .build();
             when(wineService.search(any())).thenReturn(List.of(barolo));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             // Översikten - region/underregion/druvor och betyg
@@ -325,7 +404,7 @@ class WineControllerTest {
                     .build();
             when(wineService.search(any())).thenReturn(List.of(barolo));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             not(containsString("Systembolagets beskrivning")),
@@ -343,7 +422,7 @@ class WineControllerTest {
                     .build();
             when(wineService.search(any())).thenReturn(List.of(barolo));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             // Flaskbadge och kortets fältetiketslösa struktur (se vinkallare.html)
@@ -380,7 +459,7 @@ class WineControllerTest {
                     .build();
             when(wineService.search(any())).thenReturn(List.of(barolo));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             // Den gamla <table>-baserade tabellvyn är helt borttagen
@@ -416,7 +495,7 @@ class WineControllerTest {
         void skaRenderaSorteringskontrollerMedAllaFält() throws Exception {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("name=\"sort\""),
@@ -441,7 +520,7 @@ class WineControllerTest {
         void skaAnvändaStandardsortering() throws Exception {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk());
 
             verify(wineService).search(SearchCriteria.builder()
@@ -455,7 +534,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("sort", "OWN_RATING")
                             .param("direction", "DESCENDING"))
                     .andExpect(status().isOk());
@@ -471,7 +550,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .header("HX-Request", "true"))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
@@ -487,7 +566,7 @@ class WineControllerTest {
         void skaRenderaFilterkryssrutorMedAllaVintyper() throws Exception {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("name=\"wineType\" value=\"RED\""),
@@ -508,7 +587,7 @@ class WineControllerTest {
         void skaHaKnappenDöljFilter() throws Exception {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("Dölj filter"),
@@ -528,7 +607,7 @@ class WineControllerTest {
                     ))
             ));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("name=\"country\" value=\"Italien\""),
@@ -553,7 +632,7 @@ class WineControllerTest {
             ));
 
             String html = mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("subregion", "Langhe"))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
@@ -577,7 +656,7 @@ class WineControllerTest {
                     ))
             ));
 
-            String html = mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            String html = mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
 
@@ -590,7 +669,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("wineType", "RED", "WHITE")
                             .param("country", "Italien"))
                     .andExpect(status().isOk());
@@ -608,7 +687,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("wineType", "RED"))
                     .andExpect(status().isOk())
                     .andExpect(content().string(
@@ -622,7 +701,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("search", "barolo"))
                     .andExpect(status().isOk())
                     .andExpect(content().string(
@@ -641,7 +720,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("search", "barolo"))
                     .andExpect(status().isOk())
                     .andExpect(content().string(
@@ -655,7 +734,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
             when(wineService.listWines()).thenReturn(List.of(BAROLO, BAROLO.toBuilder().name("Chablis").build()));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("Visar"),
@@ -669,7 +748,7 @@ class WineControllerTest {
         void skaInteVisaChipsUtanAktivtFilter() throws Exception {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
-            mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(not(containsString("class=\"chip\""))));
         }
@@ -680,7 +759,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             String html = mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("search", "barolo")
                             .param("wineType", "RED")
                             .param("country", "Italien"))
@@ -707,7 +786,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             String html = mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("search", "kraftfullt spanskt"))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
@@ -723,7 +802,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of(BAROLO));
 
             String html = mockMvc.perform(get("/")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("search", "barolo")
                             .param("wineType", "RED")
                             .param("sort", "VINTAGE")
@@ -750,7 +829,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska formuläret vara tomt")
         void skaFormuläretVaraTomt() throws Exception {
-            mockMvc.perform(get("/wines/nytt").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/wines/nytt").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("action=\"/wines\""),
@@ -778,7 +857,7 @@ class WineControllerTest {
 
             mockMvc.perform(multipart("/wines/tolka-etikett")
                             .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
-                            .with(httpBasic("admin", "admin")))
+                            .with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("value=\"Barolo\""),
@@ -800,7 +879,7 @@ class WineControllerTest {
 
             mockMvc.perform(multipart("/wines/tolka-etikett")
                             .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
-                            .with(httpBasic("admin", "admin")))
+                            .with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("Fyllde i: Namn.")));
         }
@@ -812,7 +891,7 @@ class WineControllerTest {
 
             mockMvc.perform(multipart("/wines/tolka-etikett")
                             .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
-                            .with(httpBasic("admin", "admin")))
+                            .with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("Det gick inte att tolka etiketten"),
@@ -824,7 +903,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska rendera statusraden för \"analyserar\" i formuläret för ett nytt vin")
         void skaRenderaStatusradenFörAnalyserar() throws Exception {
-            mockMvc.perform(get("/wines/nytt").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/wines/nytt").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("id=\"etikett-status\"")));
         }
@@ -833,8 +912,10 @@ class WineControllerTest {
         @DisplayName("ska nekas utan inloggning och aldrig nå LabelInterpretationService")
         void skaNekasUtanInloggning() throws Exception {
             mockMvc.perform(multipart("/wines/tolka-etikett")
-                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3})))
-                    .andExpect(status().isUnauthorized());
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
+                            .with(csrf()))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
 
             verify(labelInterpretationService, never()).interpret(any(), any());
         }
@@ -844,7 +925,7 @@ class WineControllerTest {
         void skaNekasFörReadonlyKontot() throws Exception {
             mockMvc.perform(multipart("/wines/tolka-etikett")
                             .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
-                            .with(httpBasic("readonly", "readonly")))
+                            .with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isForbidden());
 
             verify(labelInterpretationService, never()).interpret(any(), any());
@@ -859,7 +940,7 @@ class WineControllerTest {
         @DisplayName("ska vinet skickas till WineService och sidan omdirigera till startsidan")
         void skaSkickasTillServiceOchOmdirigera() throws Exception {
             mockMvc.perform(post("/wines")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -880,7 +961,7 @@ class WineControllerTest {
         @DisplayName("ska gå att lägga till ett vin med bara namnet ifyllt - övriga fält blir null, inte tomma strängar/0")
         void skaGåAttLäggaTillMedBaraNamnet() throws Exception {
             mockMvc.perform(post("/wines")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Chianti Classico"))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
@@ -897,7 +978,7 @@ class WineControllerTest {
 
             mockMvc.perform(multipart("/wines")
                             .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", bilddata))
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -923,7 +1004,7 @@ class WineControllerTest {
             when(wineService.checkForDuplicate(any())).thenReturn(new DuplicateCheck.FullDuplicate(existing));
 
             mockMvc.perform(post("/wines")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
                             .param("producer", "Pio Cesare")
                             .param("vintage", "2018"))
@@ -946,7 +1027,7 @@ class WineControllerTest {
             when(wineService.checkForDuplicate(any())).thenReturn(new DuplicateCheck.PartialDuplicate(existing));
 
             mockMvc.perform(post("/wines")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo"))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
@@ -962,7 +1043,7 @@ class WineControllerTest {
         @DisplayName("ska spara vinet ändå om confirmAdd är satt, utan att fråga WineService om det är en dubblett")
         void skaSparaÄndåOmConfirmAddÄrSatt() throws Exception {
             mockMvc.perform(post("/wines")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
                             .param("confirmAdd", "true"))
                     .andExpect(status().is3xxRedirection())
@@ -980,7 +1061,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska öka antalet på det befintliga vinet och omdirigera till startsidan")
         void skaÖkaAntaletOchOmdirigera() throws Exception {
-            mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(httpBasic("admin", "admin")))
+            mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
@@ -990,8 +1071,9 @@ class WineControllerTest {
         @Test
         @DisplayName("ska nekas utan inloggning och aldrig nå WineService")
         void skaNekasUtanInloggning() throws Exception {
-            mockMvc.perform(post("/wines/1/dubblett-oka-antal"))
-                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(csrf()))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrlPattern("**/login"));
 
             verify(wineService, never()).increaseQuantity(any());
         }
@@ -999,7 +1081,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska nekas för readonly-kontot och aldrig nå WineService")
         void skaNekasFörReadonlyKontot() throws Exception {
-            mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(httpBasic("readonly", "readonly")))
+            mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isForbidden());
 
             verify(wineService, never()).increaseQuantity(any());
@@ -1015,7 +1097,7 @@ class WineControllerTest {
         void skaIdSkickasTillService() throws Exception {
             when(wineService.listWines()).thenReturn(List.of());
 
-            mockMvc.perform(delete("/wines/1").with(httpBasic("admin", "admin")))
+            mockMvc.perform(delete("/wines/1").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk());
 
             verify(wineService).removeWine(new WineId(1L));
@@ -1028,7 +1110,7 @@ class WineControllerTest {
             when(wineService.search(any())).thenReturn(List.of());
 
             mockMvc.perform(delete("/wines/1")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("search", "barolo")
                             .param("wineType", "RED")
                             .param("sort", "VINTAGE")
@@ -1054,7 +1136,7 @@ class WineControllerTest {
             when(wineService.findById(new WineId(1L)))
                     .thenReturn(Optional.of(BAROLO.withImage(bilddata, "image/jpeg")));
 
-            mockMvc.perform(get("/wines/1/bild").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/wines/1/bild").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().contentType("image/jpeg"))
                     .andExpect(content().bytes(bilddata));
@@ -1065,7 +1147,7 @@ class WineControllerTest {
         void skaGe404OmVinetSaknarBild() throws Exception {
             when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
 
-            mockMvc.perform(get("/wines/1/bild").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/wines/1/bild").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isNotFound());
         }
     }
@@ -1079,7 +1161,7 @@ class WineControllerTest {
         void skaFormuläretVaraFörifylltMedVinetsUppgifter() throws Exception {
             when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
 
-            mockMvc.perform(get("/wines/1/redigera").with(httpBasic("admin", "admin")))
+            mockMvc.perform(get("/wines/1/redigera").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("enctype=\"multipart/form-data\""),
@@ -1107,7 +1189,7 @@ class WineControllerTest {
             when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
 
             mockMvc.perform(post("/wines/1/redigera")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -1150,7 +1232,7 @@ class WineControllerTest {
             when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
 
             mockMvc.perform(post("/wines/1/redigera")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -1171,7 +1253,7 @@ class WineControllerTest {
 
             mockMvc.perform(multipart("/wines/1/redigera")
                             .file(new MockMultipartFile("bild", "ny-etikett.jpg", "image/jpeg", nyBilddata))
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
@@ -1192,7 +1274,7 @@ class WineControllerTest {
             when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(vinMedBild));
 
             mockMvc.perform(post("/wines/1/redigera")
-                            .with(httpBasic("admin", "admin"))
+                            .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
