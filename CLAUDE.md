@@ -972,6 +972,30 @@ Hibernate skäl att röra samma tabell - dyker upp överraskande långt efter
 att den bakomliggande `columnDefinition`-ändringen gjordes, inte vid det
 tillfället.
 
+**Andra deploy-fällan, samma rotorsak (2026-07-25): sökningen kraschade
+i produktion efter att schemat väl gick igenom.** `WineJpaRepository.
+search(...)` är en native query med en HÅRDKODAD, explicit kolumnlista
+(medvetet, se klasskommentaren - `search_vector` är en genererad kolumn
+som inte får plockas upp av `SELECT *`) - den listan uppdaterades aldrig
+när `owner_id` (WINE-10) lades till som ett mappat fält på `WineEntity`,
+så Hibernate kraschade vid hydrering: `The column name owner_id was not
+found in this ResultSet`. Fixat genom att lägga till `owner_id` sist i
+kolumnlistan. **Lärdom, dokumenterad direkt i `WineJpaRepository`s
+Javadoc:** den här kolumnlistan måste hållas i synk med VARJE mappat
+fält på `WineEntity`, inte bara de ursprungliga - lätt att missa eftersom
+`WineEntity`-fält annars bara kräver en ny kolumn/getter/setter, inget
+annat ställe att komma ihåg.
+- **Ingen befintlig automatisk test fångade det här** - `soka-viner.
+  feature` kör bara mot `InMemoryWineRepository` (Cucumber-standardmönstret
+  för snabba scenarier), och `vin-persistens.feature` (den enda
+  Testcontainers-baserade Postgres-svit som fanns) testade bara
+  omstart, inte sökning. Täppt igen med ett nytt scenario,
+  `sokning-mot-postgres.feature`, som kör `WineRepository.search(...)`
+  mot en riktig Postgres via samma `PersistenceSteps`-klass (utökad,
+  inte en ny - delar redan Spring-wired `WineService`/`JpaWineRepository`
+  med omstartsscenariot). Verifierat: hade fångat exakt den här buggen
+  om det funnits innan WINE-10 landade.
+
 **WINE-12 byggd (2026-07-24): formulärinloggning ersätter HTTP Basic,
 med en viktig avvikelse från ursprungsplanen.** `SecurityConfig` bytte
 `.httpBasic(...)` mot `.formLogin(...).loginPage("/login").permitAll()`
