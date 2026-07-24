@@ -21,6 +21,9 @@
         .etikettskanning input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
         .etikettvarning { border: 1px solid #d99; background: #fdf2f2; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
         .etikettvarning p { margin: 0; }
+        .etikettstatus { color: #666; font-style: italic; margin: 0.5rem 0 0; }
+        .etikettresultat { border: 1px solid #9c9; background: #f2fdf5; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
+        .etikettresultat p { margin: 0; }
         .tolkat-falt { background: #eef6ff; border-color: #6699cc; }
     </style>
 </head>
@@ -31,7 +34,12 @@
           th:if="${wine.id == null}" class="etikettskanning">
         <label for="etikett-input" class="knapp">Skanna med kameran</label>
         <input type="file" name="bild" accept="image/*" capture="environment" id="etikett-input">
+        <p id="etikett-status" class="etikettstatus"></p>
     </form>
+
+    <div class="etikettresultat" th:if="${interpretedFieldLabels != null}">
+        <p th:text="|Etiketten tolkad. Fyllde i: ${interpretedFieldLabels}.|"></p>
+    </div>
 
     <div class="etikettvarning" th:if="${labelInterpretationFailed}">
         <p>Det gick inte att tolka etiketten. Fotografera om, eller fyll i uppgifterna för hand nedan.</p>
@@ -180,11 +188,19 @@
                 return;
             }
             var MAX_SIDA = 1568;
+            var statusRad = document.getElementById('etikett-status');
 
             etikettInput.addEventListener('change', function () {
                 var vald = etikettInput.files[0];
                 if (!vald) {
                     return;
+                }
+                // Sidan navigerar bort så fort formuläret skickas in (vanlig
+                // sidladdning, inte htmx/fetch) - texten hinner alltså synas
+                // hela väntetiden tills serverns svar (etikettolkningen, som
+                // kan ta några sekunder) kommer tillbaka som en ny sida.
+                if (statusRad) {
+                    statusRad.textContent = 'Analyserar etikett...';
                 }
                 var bild = new Image();
                 var läsare = new FileReader();

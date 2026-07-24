@@ -769,7 +769,7 @@ class WineControllerTest {
     class NärEnEtikettSkannas {
 
         @Test
-        @DisplayName("ska visa ett förifyllt utkast med de tolkade fälten markerade")
+        @DisplayName("ska visa ett förifyllt utkast med de tolkade fälten markerade och ett statusmeddelande om vad som fylldes i")
         void skaVisaEttFörifylltUtkastMedDeTolkadeFältenMarkerade() throws Exception {
             Wine draft = Wine.builder().name("Barolo").producer("Pio Cesare").vintage(2018)
                     .country("Italien").region("Piemonte").build();
@@ -786,8 +786,23 @@ class WineControllerTest {
                             containsString("value=\"2018\""),
                             containsString("value=\"Italien\""),
                             containsString("value=\"Piemonte\""),
-                            containsString("class=\"tolkat-falt\"")
+                            containsString("class=\"tolkat-falt\""),
+                            containsString("Fyllde i: Namn, Producent, Årgång, Land, Region")
                     )));
+        }
+
+        @Test
+        @DisplayName("ska lista bara de faktiskt tolkade fälten i statusmeddelandet, i fast ordning")
+        void skaListaBaraDeFaktisktTolkadeFältenIStatusmeddelandet() throws Exception {
+            Wine draft = Wine.builder().name("Chablis").build();
+            when(labelInterpretationService.interpret(any(), any())).thenReturn(
+                    new LabelInterpretationResult.Interpreted(draft, Set.of("name")));
+
+            mockMvc.perform(multipart("/wines/tolka-etikett")
+                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
+                            .with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Fyllde i: Namn.")));
         }
 
         @Test
@@ -801,8 +816,17 @@ class WineControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("Det gick inte att tolka etiketten"),
-                            not(containsString("class=\"tolkat-falt\""))
+                            not(containsString("class=\"tolkat-falt\"")),
+                            not(containsString("Fyllde i:"))
                     )));
+        }
+
+        @Test
+        @DisplayName("ska rendera statusraden för \"analyserar\" i formuläret för ett nytt vin")
+        void skaRenderaStatusradenFörAnalyserar() throws Exception {
+            mockMvc.perform(get("/wines/nytt").with(httpBasic("admin", "admin")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("id=\"etikett-status\"")));
         }
 
         @Test

@@ -99,6 +99,33 @@ class LabelScanFormIT {
     }
 
     @Test
+    void skaVisaAnalyserarStatusMedanEtikettenBearbetas() {
+        // Konstgjord fördröjning (WINE-8) - annars kan mock-svaret komma
+        // tillbaka och sidan navigera bort SÅ snabbt (en 1x1-testbild, ingen
+        // riktig nätverksfördröjning) att statusraden hinner försvinna innan
+        // assertionen nedan hinner läsa den. "Analyserar etikett..." sätts
+        // synkront direkt när filen väljs (se vin-formular.html), innan
+        // Canvas-nedskalningen eller nätverksanropet ens börjar - fördröjningen
+        // simulerar bara den riktiga LLM-anropstiden så testet får ett
+        // pålitligt fönster att observera statusraden i.
+        when(labelInterpreter.interpret(any(), any())).thenAnswer(invocation -> {
+            Thread.sleep(800);
+            return Optional.of(new InterpretedLabel("Barolo", "Pio Cesare", 2018, "Italien", "Piemonte"));
+        });
+
+        try (BrowserContext context = nyKontext()) {
+            Page page = öppnaNyttVinFormulär(context);
+
+            page.locator("#etikett-input").setInputFiles(
+                    new FilePayload("etikett.png", "image/png", EN_PIXEL_PNG));
+
+            assertThat(page.locator("#etikett-status").textContent()).isEqualTo("Analyserar etikett...");
+
+            page.waitForURL("**/wines/tolka-etikett");
+        }
+    }
+
+    @Test
     void skaSläckaMarkeringenPåEttFältNärDetRedigeras() {
         when(labelInterpreter.interpret(any(), any())).thenReturn(Optional.of(
                 new InterpretedLabel("Barolo", "Pio Cesare", 2018, "Italien", "Piemonte")));

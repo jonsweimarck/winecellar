@@ -261,11 +261,35 @@ public class WineController {
         if (result instanceof LabelInterpretationResult.Interpreted interpreted) {
             model.addAttribute("wine", interpreted.draft());
             model.addAttribute("interpretedFields", interpreted.interpretedFields());
+            model.addAttribute("interpretedFieldLabels", interpretedFieldLabels(interpreted.interpretedFields()));
         } else {
             model.addAttribute("wine", Wine.builder().build());
             model.addAttribute("labelInterpretationFailed", true);
         }
         return "vin-formular";
+    }
+
+    private static final List<String> INTERPRETED_FIELD_ORDER = List.of("name", "producer", "vintage", "country", "region");
+
+    private static final Map<String, String> INTERPRETED_FIELD_LABEL = Map.of(
+            "name", "Namn",
+            "producer", "Producent",
+            "vintage", "Årgång",
+            "country", "Land",
+            "region", "Region"
+    );
+
+    /**
+     * Statusmeddelandet "Fyllde i: ..." (WINE-8) - en fast fältordning
+     * istället för `interpretedFields`s egen iterationsordning (ett
+     * `HashSet`, se LabelInterpretationService), så att meddelandet blir
+     * deterministiskt oavsett vilka fält som råkade tolkas.
+     */
+    private static String interpretedFieldLabels(Set<String> interpretedFields) {
+        return INTERPRETED_FIELD_ORDER.stream()
+                .filter(interpretedFields::contains)
+                .map(INTERPRETED_FIELD_LABEL::get)
+                .collect(Collectors.joining(", "));
     }
 
     @PostMapping("/wines")

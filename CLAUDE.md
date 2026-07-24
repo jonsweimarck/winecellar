@@ -872,6 +872,34 @@ Punkter värda att komma ihåg utöver ADR:n:
   läsa dess bredd/höjd inför nedskalningen, vilket kräver att
   webbläsaren faktiskt kan avkoda testbilden.
 
+**Statusinfo under skanningen (byggt 2026-07-24, WINE-8).** Två separata
+statusmeddelanden, inte ett:
+- **"Analyserar etikett..."** sätts synkront i JS direkt när filen
+  väljs (`vin-formular.html`), INNAN Canvas-nedskalningen eller
+  nätverksanropet ens startar. Fungerar utan htmx/fetch eftersom hela
+  sidan navigerar bort när formuläret skickas in - meddelandet hinner
+  synas hela väntetiden fram till att svaret (den omrenderade sidan)
+  kommer tillbaka, exakt samma mekanism som gör att en vanlig
+  sidladdning fungerar här över huvud taget.
+- **"Fyllde i: ..."** byggs server-side i `WineController.
+  interpretedFieldLabels(...)` från en FAST fältordning
+  (`INTERPRETED_FIELD_ORDER`), inte `interpretedFields`s egen
+  iterationsordning (ett `HashSet`) - annars hade meddelandet blivit
+  icke-deterministiskt mellan körningar.
+- **Testfälla:** `th:text` på ett separat `<span>` inuti `<p>`-taggen
+  (`Fyllde i: <span th:text="...">...</span>.`) bryter sönder texten
+  med en tagg mitt i - `content().string(containsString("Fyllde i:
+  Namn."))`-style MockMvc-assertions matchar då INTE, eftersom de
+  jämför mot den råa HTML-strängen, inte upprenderad DOM-text. Löst med
+  Thymeleafs literalsubstitution (`th:text="|Fyllde i: ${...}.|"`) på
+  hela `<p>`-elementet istället, som ger en sammanhängande textnod.
+- **Playwright-testet för "Analyserar etikett..." kräver en konstgjord
+  fördröjning i den mockade `LabelInterpreter`** (`Thread.sleep(800)`
+  i `thenAnswer(...)`) - annars hinner mock-svaret komma tillbaka och
+  sidan navigera bort innan assertionen läser statusraden, eftersom
+  testbilden är en trivial 1x1-PNG utan någon riktig nätverksfördröjning
+  att luta sig mot.
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),
