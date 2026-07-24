@@ -62,11 +62,11 @@ Egenskap: Fritextsök i vinlistan
 
   Scenario: Sökning ignorerar diakritiska tecken
     Givet att källaren innehåller följande viner:
-      | namn  | druvor   |
-      | Rioja | Albariño |
-      | Barolo | Nebbiolo |
+      | namn         | druvor   |
+      | Meu Albariño | Albariño |
+      | Barolo       | Nebbiolo |
     När jag söker efter "albarino"
-    Så ska vinlistan innehålla "Rioja"
+    Så ska vinlistan innehålla "Meu Albariño"
     Och vinlistan ska inte innehålla "Barolo"
 
   Scenario: Sökning kombineras med filter
