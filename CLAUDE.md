@@ -900,6 +900,41 @@ statusmeddelanden, inte ett:
   testbilden är en trivial 1x1-PNG utan någon riktig nätverksfördröjning
   att luta sig mot.
 
+## Flera användare (multi-user) - påbörjat 2026-07-24
+
+**Beslutet är skrivet ner som [ADR 0013](docs/adr/0013-multi-user-accounts.md)
+INNAN implementationen, ovanligt för det här projektet** (som annars
+skriver ADR:er i samband med att koden landar, se `docs/adr/README.md`s
+egen beskrivning av mönstret) - motiverat av att omställningen är stor
+nog att sträcka sig över flera separata stories (WINE-10 till WINE-17 i
+YouTrack, WINE-projektet). Att fastslå vägvalen skriftligt i förväg
+minskar risken att en session som senare plockar upp en enskild story
+måste återupptäcka avvägningarna ur koden.
+
+Kort sammanfattning av besluten (fullständig motivering i ADR:n): öppen
+självregistrering, formulärbaserad inloggning med session (ersätter HTTP
+Basic från [ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md) helt -
+CSRF slås på igen, htmx-formulären behöver en CSRF-token), varje
+användares vinlista är helt privat (ingen delning, READONLY-rollen
+försvinner), en ny `User`-entitet plus `owner_id`-kolumn på `wines`, och
+befintliga produktionsviner (~30 st) knyts till det första riktiga
+kontot via en engångsmigrering (samma mönster som tidigare
+engångsmigreringar, se `db/migrations/`). Import/export via webben blir
+en separat, senare fas - river upp
+[ADR 0010](docs/adr/0010-excel-tool-standalone-module.md) (POI blir ett
+runtime-beroende i huvudappen); bilder hanteras då via en mappväljare i
+webbläsaren (`webkitdirectory`), inte en lokal serversökväg som dagens
+`Bildmatchare`/`WINECELLAR_LOCAL_IMAGE_FOLDER` förutsätter.
+
+Stories i YouTrack, länkade med "depends on" i den tänkta byggordningen:
+WINE-9 (den här ADR:n) → WINE-10 (datamodell: `User`/`owner_id`) →
+WINE-12 (formulärinloggning) → WINE-11 (registrering) och WINE-13
+(scopead vinlista) → WINE-16/WINE-18 (testinfrastruktur) → WINE-14
+(dataisolering, eget acceptanstest) → WINE-15 (ta bort ADMIN/READONLY,
+medvetet sist av säkerhetsskäl - annars riskerar man att låsa sig ute
+innan den nya inloggningen är bevisat fungerande) → WINE-17
+(produktionsmigrering, sist).
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),

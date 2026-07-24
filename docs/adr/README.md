@@ -35,3 +35,5 @@ Varje post följer samma enkla mall:
 | [0009](0009-whole-app-http-basic-auth.md) | Hela appen bakom HTTP Basic, med ett delat läsbehörighetskonto | Accepted |
 | [0010](0010-excel-tool-standalone-module.md) | Excel-import/export som en fristående Maven-modul | Accepted |
 | [0011](0011-excel-image-roundtrip-dual-mechanism.md) | Excel-bildrundtripp via två oberoende mekanismer | Accepted |
+| [0012](0012-label-scanning-llm-integration.md) | Etikettskanning via Anthropic-API, port/adapter + RestClient | Accepted |
+| [0013](0013-multi-user-accounts.md) | Flera användare med egna, privata vinlistor | Accepted |
