@@ -4,12 +4,14 @@ import com.example.winecellar.application.WineRepository;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 /**
  * Används numera enbart av CRUD-acceptanstesterna (lagga-till-vin.feature m.fl.)
@@ -50,10 +52,14 @@ public class InMemoryWineRepository implements WineRepository {
      * medvetenhet eller rankning som JpaWineRepositorys riktiga
      * tsvector-sökning. Fullt tillräckligt för de acceptanstester som
      * bara bryr sig om VILKA viner som matchar, inte i vilken ordning.
+     * Diakritiska tecken (t.ex. "ñ") normaliseras bort på samma sätt som
+     * JpaWineRepositorys swedish_unaccent-textsökkonfiguration (WINE-7,
+     * se schema.sql) - annars hade "albarino" inte matchat druvan
+     * "Albariño" här, till skillnad från i produktion.
      */
     @Override
     public List<Wine> search(String query) {
-        String normalizedSearchTerm = query.toLowerCase(Locale.ROOT);
+        String normalizedSearchTerm = stripDiacritics(query.toLowerCase(Locale.ROOT));
         return wines.values().stream()
                 .filter(wine -> matches(wine, normalizedSearchTerm))
                 .toList();
@@ -69,6 +75,13 @@ public class InMemoryWineRepository implements WineRepository {
     }
 
     private static boolean contains(String fieldValue, String normalizedSearchTerm) {
-        return fieldValue != null && fieldValue.toLowerCase(Locale.ROOT).contains(normalizedSearchTerm);
+        return fieldValue != null
+                && stripDiacritics(fieldValue.toLowerCase(Locale.ROOT)).contains(normalizedSearchTerm);
+    }
+
+    private static final Pattern COMBINING_MARKS = Pattern.compile("\\p{M}");
+
+    private static String stripDiacritics(String text) {
+        return COMBINING_MARKS.matcher(Normalizer.normalize(text, Normalizer.Form.NFD)).replaceAll("");
     }
 }

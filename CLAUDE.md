@@ -299,6 +299,38 @@ flaggade som gällande.
   försumbar för samlingsstorleken. Kom ihåg det här mönstret för
   framtida ändringar av `search_vector`s uttryck - `ADD COLUMN IF NOT
   EXISTS` fungerar bara för den ALLRA FÖRSTA gången kolumnen skapas.
+- **Sökning ignorerar diakritiska tecken (WINE-7, 2026-07-24)** - en
+  sökning på "albarino" hittar nu druvan "Albariño". Två separata
+  fixar, en per `WineRepository`-adapter (se ADR 0007 för
+  Postgres-sidans fulla motivering):
+  - `JpaWineRepository`: ny textsökkonfiguration `swedish_unaccent` i
+    `schema.sql` (kopia av `'swedish'` med `unaccent`-ordboken kedjad
+    före `swedish_stem`), använd i både `search_vector`s uttryck och
+    `plainto_tsquery(...)`-anropen. **Fälla undviken:** en vanlig
+    `unaccent(text)`-funktion hade INTE fungerat direkt i
+    `GENERATED ALWAYS AS`-uttrycket - Postgres kräver `IMMUTABLE` där,
+    och `unaccent()` är bara `STABLE`. En namngiven textsökkonfiguration
+    (`to_tsvector('swedish_unaccent', ...)`) räknas däremot som
+    `IMMUTABLE` oavsett vilka ordböcker den kedjar internt - samma skäl
+    till att `'swedish'` redan fungerade. Verifierat manuellt mot en
+    fristående Postgres-container (inte bara att `schema.sql` kör utan
+    fel, som `WineListResponsiveIT`/`vin-persistens.feature` redan
+    bekräftar indirekt vid varje testkörning): en rad med
+    `grapes = 'Albariño'` matchades faktiskt av
+    `plainto_tsquery('swedish_unaccent', 'albarino')`, en rad med
+    `grapes = 'Nebbiolo'` gjorde det inte.
+  - `InMemoryWineRepository` (bara testkoden, se CLAUDE.md:s tidigare
+    punkt om varför den beter sig enklare än Postgres-sökningen):
+    normaliserar bort diakritiska tecken med `java.text.Normalizer`
+    (NFD-normalisering + ta bort Unicode-kategorin `\p{M}`, kombinerande
+    tecken) på både sökterm och fältvärden, utöver den befintliga
+    skiftlägesnormaliseringen. Till skillnad från böjningsform-medvetenhet
+    (stemming, se ovan - en genuint Postgres-specifik nyans som aldrig
+    replikerades i den enkla adaptern) är diakritikborttagning billig
+    och exakt att återskapa i Java, så här finns ingen anledning att
+    låta adaptrarna bete sig olika - ett nytt Cucumber-scenario i
+    `soka-viner.feature` (körs mot `InMemoryWineRepository`, inget
+    Docker-krav) verifierar båda hållen.
 - **Chips (byggt 2026-07-22) - vanliga `<a href>`, inte htmx.** En chip
   per aktivt filter-/sökvärde, med en borttagningslänk
   (`WineController.Sökvy.urlUtan(facett, värde)`, `UriComponentsBuilder`)

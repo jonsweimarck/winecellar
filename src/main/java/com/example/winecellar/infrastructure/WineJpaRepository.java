@@ -13,8 +13,9 @@ interface WineJpaRepository extends JpaRepository<WineEntity, Long> {
      * mappat fält på WineEntity - därför en native query med en explicit
      * kolumnlista istället för "SELECT *" (Hibernate kan annars inte
      * mappa den extra, omappade kolumnen till entiteten).
-     * plainto_tsquery('swedish', ...) tolkar sökordet med samma
-     * konfiguration som kolumnen genererades med (böjningsform-medveten),
+     * plainto_tsquery('swedish_unaccent', ...) tolkar sökordet med samma
+     * konfiguration som kolumnen genererades med (böjningsform-medveten
+     * OCH okänslig för diakritiska tecken, se schema.sql/WINE-7),
      * ts_rank sorterar bästa träff först.
      */
     @Query(value = """
@@ -23,8 +24,8 @@ interface WineJpaRepository extends JpaRepository<WineEntity, Long> {
                    systembolaget_product_number, systembolaget_description, munskankarna_review,
                    munskankarna_rating, vivino_rating, other_reference, location, image, image_mime_type
             FROM wines
-            WHERE search_vector @@ plainto_tsquery('swedish', :query)
-            ORDER BY ts_rank(search_vector, plainto_tsquery('swedish', :query)) DESC
+            WHERE search_vector @@ plainto_tsquery('swedish_unaccent', :query)
+            ORDER BY ts_rank(search_vector, plainto_tsquery('swedish_unaccent', :query)) DESC
             """, nativeQuery = true)
     List<WineEntity> search(@Param("query") String query);
 }

@@ -24,7 +24,14 @@ räknar om kolumnen automatiskt vid varje `INSERT`/`UPDATE`. Namn,
 producent och druvor viktas högre (`'A'`) än de längre fritextfälten
 (`'B'`), så en träff i namnet/druvorna rankas högre än en träff djupt i
 en tasting note. `'swedish'`-textsökningskonfigurationen ger
-böjningsform-medvetenhet (stemming).
+böjningsform-medvetenhet (stemming). **Uppdaterad till en egen
+`'swedish_unaccent'`-konfiguration (WINE-7, 2026-07-24)** - en kopia av
+`'swedish'` med `unaccent`-ordboken kedjad före `swedish_stem`, så att
+en sökning på "albarino" även hittar druvan "Albariño". Se `schema.sql`
+för varför en vanlig `unaccent(text)`-funktion inte kan användas direkt
+i den genererade kolumnens uttryck (kräver `IMMUTABLE`, `unaccent()` är
+bara `STABLE`) - en namngiven textsökkonfiguration kringgår det kravet,
+precis som `'swedish'` redan gjorde.
 
 `schema.sql` kompletterar `ddl-auto: update`, som inte kan skapa en
 `GENERATED ALWAYS AS`-kolumn eller ett index. Migreringen körs
