@@ -972,6 +972,33 @@ Hibernate skäl att röra samma tabell - dyker upp överraskande långt efter
 att den bakomliggande `columnDefinition`-ändringen gjordes, inte vid det
 tillfället.
 
+**Uppföljning (2026-07-25): den första migreringen var inte tillräcklig -
+samma "cannot alter type"-fel kom tillbaka på en senare deploy, trots att
+en deploy däremellan hade lyckats starta.** Grundorsaken var mer
+lömsk än först trott: Hibernates schemamigrering kör flera ALTER-satser
+i samma transaktion, i en ordning som styrs av `HashMap`-iteration (se
+`SchemaManagementToolCoordinator.process`) - inte garanterat stabil
+mellan körningar. Om `grapes`-breddningen misslyckas (blockerad av
+`search_vector`, som schema.sql annars hade återskapat EFTER Hibernate)
+kan Postgres transaktionsavbrott antingen tystas bort av Hibernates
+icke-fatala DDL-felhantering (appen startar ändå, breddningen uteblir
+tyst) eller få en SENARE sats i SAMMA transaktion att också fejla på
+ett sätt som väl kraschar hela starten - vilket av de två beror på
+slumpmässig satsordning. Med andra ord: den "lyckade" deployen (WINE-12)
+hade sannolikt bara tur, `grapes` blev troligen aldrig faktiskt breddad
+till `text` då heller. Löst genom att göra breddningen SJÄLV, direkt i
+SQL (`db/migrations/2026-07-25-widen-text-columns-directly.sql`) - drop
+search_vector, `ALTER COLUMN ... TYPE text` på alla fyra
+`columnDefinition = "text"`-kolumnerna (grapes/tasting_notes/
+systembolaget_description/munskankarna_review, ofarligt no-op om redan
+text), utan att förlita sig på att Hibernate lyckas med det vid nästa
+uppstart. Efter det har Hibernates `ddl-auto: update` inget kvar att
+göra för de här kolumnerna alls - dess förväntade typ matchar redan
+verkligheten, så konflikten kan inte uppstå igen. **Lärdom:** lita inte
+på att en enskild lyckad deploy bevisar att en `ddl-auto: update`-driven
+ALTER faktiskt gick igenom - transaktionsbeteendet vid ett DDL-fel kan
+dölja att den tysta uteblev.
+
 **Andra deploy-fällan, samma rotorsak (2026-07-25): sökningen kraschade
 i produktion efter att schemat väl gick igenom.** `WineJpaRepository.
 search(...)` är en native query med en HÅRDKODAD, explicit kolumnlista
