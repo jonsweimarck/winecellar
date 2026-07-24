@@ -947,6 +947,31 @@ med `\d users`/`\d wines`). Medvetet inget annat kopplat än så här -
 varken `Wine`-domänobjektet eller `WineService`/`WineController` vet
 ännu att ägaren finns; själva scopingen är WINE-13.
 
+**Deploy-fälla upptäckt 2026-07-24/25, kopplad till WINE-10:s
+`owner_id`-kolumn.** Produktionsdeployen kraschade med
+`org.postgresql.util.PSQLException: cannot alter type of a column used
+by a generated column` (`grapes`, blockerad av `search_vector`). Orsak:
+`WineEntity.grapes`/`tastingNotes`/`systembolagetDescription`/
+`munskankarnaReview` har haft `@Column(columnDefinition = "text")` ett
+tag, men Hibernates `ddl-auto: update` hade aldrig tidigare haft ett
+skäl att röra `wines`-tabellen och därför aldrig försökt bredda dem från
+`varchar(255)` till `text` förrän `owner_id`-kolumnen gav den ett skäl
+att göra en fullständig kolumngenomgång av tabellen - Postgres tillåter
+inte den breddningen så länge `search_vector` refererar till kolumnen,
+och `ddl-auto: update` kan inte lätta på det (samma sorts begränsning
+som oid→bytea-migreringen redan stötte på). Löst med en engångsmigrering
+(`db/migrations/2026-07-25-drop-search-vector-before-column-widen.sql`)
+som bara droppar `search_vector` - `schema.sql` återskapar den
+automatiskt vid nästa lyckade appstart, eftersom den ändå körs (drop +
+återskapa) vid VARJE uppstart. Kördes manuellt mot produktionsdatabasen
+via en engångs-`docker run postgres:16 psql ...`-container (användaren
+saknade DBeaver/psql lokalt) - ingen lokal installation behövdes eftersom
+Docker redan fanns på maskinen. **Lärdom:** `ddl-auto: update` kan dölja
+den här sortens konflikt i flera deployer på rad om inget annat ger
+Hibernate skäl att röra samma tabell - dyker upp överraskande långt efter
+att den bakomliggande `columnDefinition`-ändringen gjordes, inte vid det
+tillfället.
+
 **WINE-12 byggd (2026-07-24): formulärinloggning ersätter HTTP Basic,
 med en viktig avvikelse från ursprungsplanen.** `SecurityConfig` bytte
 `.httpBasic(...)` mot `.formLogin(...).loginPage("/login").permitAll()`

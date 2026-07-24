@@ -1,0 +1,25 @@
+-- Engångsmigrering: låser upp en Hibernate-krasch vid deploy av WINE-10
+-- (owner_id-kolumnen på wines). Så fort Hibernates ddl-auto: update har
+-- ETT skäl att röra wines-tabellen (den nya owner_id-kolumnen/FK:en)
+-- passar den samtidigt på att bredda grapes/tasting_notes/
+-- systembolaget_description/munskankarna_review från varchar(255) till
+-- text (matchar @Column(columnDefinition = "text") i WineEntity, som
+-- redan fanns sedan tidigare men aldrig behövt en ALTER förrän nu) -
+-- Postgres vägrar det så länge search_vector (den genererade
+-- sökkolumnen) refererar till kolumnerna, se
+-- CLAUDE.md/docs/adr/0007-fulltext-search-tsvector.md.
+--
+-- Droppar bara search_vector - schema.sql återskapar den automatiskt
+-- (med rätt definition, inklusive swedish_unaccent-konfigurationen och
+-- GIN-indexet) vid nästa lyckade appstart, som redan körs EFTER
+-- Hibernates ddl-auto: update (spring.jpa.defer-datasource-
+-- initialization: true). Ingen data går förlorad - search_vector är en
+-- härledd/genererad kolumn, inget att bevara.
+--
+-- Körs EN gång, manuellt, mot produktionsdatabasen - se
+-- db/migrations/2026-07-17-image-oid-to-bytea.sql för samma mönster.
+-- Sökningen är tillfälligt bruten mellan den här körningen och nästa
+-- lyckade deploy (den körande gamla appversionen frågar fortfarande mot
+-- search_vector) - kör helst strax innan en ny deploy triggas.
+
+ALTER TABLE wines DROP COLUMN IF EXISTS search_vector;
