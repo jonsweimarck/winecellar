@@ -267,12 +267,12 @@ class WineControllerTest {
         @Test
         @DisplayName("ska rendera ett vin som bara har namnet ifyllt utan att krascha (typ/årgång/antal/land/producent/plats null)")
         void skaRenderaEttVinMedBaraNamnetIfylltUtanAttKrascha() throws Exception {
-            Wine minimaltVin = Wine.builder().id(new WineId(1L)).name("Anteckning om ett vin").build();
+            Wine minimaltVin = Wine.builder().id(new WineId(1L)).name("Chianti Classico").build();
             when(wineService.search(any())).thenReturn(List.of(minimaltVin));
 
             mockMvc.perform(get("/").with(httpBasic("admin", "admin")))
                     .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("Anteckning om ett vin")));
+                    .andExpect(content().string(containsString("Chianti Classico")));
         }
 
         @Test
@@ -881,12 +881,12 @@ class WineControllerTest {
         void skaGåAttLäggaTillMedBaraNamnet() throws Exception {
             mockMvc.perform(post("/wines")
                             .with(httpBasic("admin", "admin"))
-                            .param("name", "Anteckning om ett vin"))
+                            .param("name", "Chianti Classico"))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
             verify(wineService).save(Wine.builder()
-                    .name("Anteckning om ett vin")
+                    .name("Chianti Classico")
                     .build());
         }
 

@@ -18,6 +18,6 @@ Egenskap: Lägga till vin
 
   Scenario: Registrera ett vin med bara namnet ifyllt, för att fylla i resten senare
     Givet att källaren är tom
-    När jag lägger till ett vin med bara namnet "Anteckning om ett vin"
+    När jag lägger till ett vin med bara namnet "Chianti Classico"
     Så ska källaren innehålla 1 vin
-    Och vinet "Anteckning om ett vin" ska sakna övriga uppgifter
+    Och vinet "Chianti Classico" ska sakna övriga uppgifter
