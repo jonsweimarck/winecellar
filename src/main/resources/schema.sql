@@ -31,10 +31,33 @@
 
 ALTER TABLE wines DROP COLUMN IF EXISTS search_vector;
 
+-- WINE-7: sökning ska ignorera diakritiska tecken ("albarino" ska matcha
+-- druvan "Albariño"). En vanlig unaccent(text)-funktion går INTE att
+-- använda direkt i uttrycket nedan - GENERATED ALWAYS AS kräver ett
+-- IMMUTABLE uttryck, men unaccent() är bara STABLE (dess dictionary
+-- skulle i teorin kunna bytas ut). Lösningen är att kedja unaccent som
+-- en textsökordbok FÖRE swedish_stem i en egen textsökkonfiguration,
+-- exakt samma mönster som Postgres egen dokumentation rekommenderar för
+-- accent-okänslig fulltextsökning - to_tsvector(regconfig, text) räknas
+-- som IMMUTABLE oavsett vilka ordböcker konfigurationen kedjar internt,
+-- så det finns ingen konflikt med GENERATED-kravet (samma anledning som
+-- att den befintliga 'swedish'-konfigurationen redan fungerar här).
+CREATE EXTENSION IF NOT EXISTS unaccent;
+
+-- DROP/CREATE varje gång, inte CREATE ... IF NOT EXISTS - Postgres stöder
+-- inte IF NOT EXISTS för CREATE TEXT SEARCH CONFIGURATION, och samma
+-- "konvergera mot filens definition varje appstart"-princip som resten
+-- av den här filen redan följer för search_vector-kolumnen.
+DROP TEXT SEARCH CONFIGURATION IF EXISTS swedish_unaccent CASCADE;
+CREATE TEXT SEARCH CONFIGURATION swedish_unaccent (COPY = swedish);
+ALTER TEXT SEARCH CONFIGURATION swedish_unaccent
+    ALTER MAPPING FOR hword, hword_part, word
+    WITH unaccent, swedish_stem;
+
 ALTER TABLE wines ADD COLUMN search_vector tsvector
     GENERATED ALWAYS AS (
-        setweight(to_tsvector('swedish', coalesce(name, '') || ' ' || coalesce(producer, '') || ' ' || coalesce(grapes, '')), 'A') ||
-        setweight(to_tsvector('swedish', coalesce(tasting_notes, '') || ' ' || coalesce(systembolaget_description, '') || ' ' || coalesce(munskankarna_review, '')), 'B')
+        setweight(to_tsvector('swedish_unaccent', coalesce(name, '') || ' ' || coalesce(producer, '') || ' ' || coalesce(grapes, '')), 'A') ||
+        setweight(to_tsvector('swedish_unaccent', coalesce(tasting_notes, '') || ' ' || coalesce(systembolaget_description, '') || ' ' || coalesce(munskankarna_review, '')), 'B')
     ) STORED;
 
 CREATE INDEX IF NOT EXISTS wines_search_vector_idx ON wines USING GIN (search_vector);

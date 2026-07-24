@@ -60,6 +60,15 @@ Egenskap: Fritextsök i vinlistan
     Så ska vinlistan innehålla "Barolo"
     Och vinlistan ska inte innehålla "Chablis"
 
+  Scenario: Sökning ignorerar diakritiska tecken
+    Givet att källaren innehåller följande viner:
+      | namn  | druvor   |
+      | Rioja | Albariño |
+      | Barolo | Nebbiolo |
+    När jag söker efter "albarino"
+    Så ska vinlistan innehålla "Rioja"
+    Och vinlistan ska inte innehålla "Barolo"
+
   Scenario: Sökning kombineras med filter
     Givet att källaren innehåller följande viner:
       | namn      | vintyp | producent  |
