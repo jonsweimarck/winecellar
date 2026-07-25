@@ -2,6 +2,7 @@ package com.example.winecellar.web;
 
 import com.example.winecellar.application.InterpretedLabel;
 import com.example.winecellar.application.LabelInterpreter;
+import com.example.winecellar.application.RegistrationService;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
@@ -9,7 +10,9 @@ import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.FilePayload;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -55,6 +58,12 @@ class LabelScanFormIT {
     @MockBean
     private LabelInterpreter labelInterpreter;
 
+    @Autowired
+    private RegistrationService registrationService;
+
+    private static final String TESTKONTO_ANVÄNDARNAMN = "labelScanFormTest";
+    private static final String TESTKONTO_LÖSENORD = "testlösenord123";
+
     private static Playwright playwright;
     private static Browser browser;
 
@@ -68,6 +77,16 @@ class LabelScanFormIT {
     static void stängBrowser() {
         browser.close();
         playwright.close();
+    }
+
+    /**
+     * WINE-15: inget hårdkodat konto kvar att logga in som - registrerar
+     * ett riktigt testkonto istället. Idempotent (ignorerar bara
+     * UsernameTaken-resultatet vid senare anrop i samma testklassomgång).
+     */
+    @BeforeEach
+    void säkerställTestkonto() {
+        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
     }
 
     // En riktig, avkodningsbar 1x1-PNG (samma testbild som
@@ -160,8 +179,8 @@ class LabelScanFormIT {
         BrowserContext context = browser.newContext();
         Page inloggningssida = context.newPage();
         inloggningssida.navigate("http://localhost:" + port + "/login");
-        inloggningssida.locator("#username").fill("admin");
-        inloggningssida.locator("#password").fill("admin");
+        inloggningssida.locator("#username").fill(TESTKONTO_ANVÄNDARNAMN);
+        inloggningssida.locator("#password").fill(TESTKONTO_LÖSENORD);
         inloggningssida.locator("button[type=submit]").click();
         inloggningssida.waitForLoadState();
         inloggningssida.close();

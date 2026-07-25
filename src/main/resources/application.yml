@@ -48,10 +48,6 @@ server:
   port: 8080
 
 winecellar:
-  admin:
-    # Byt ut i produktion via miljövariabeln - "admin" är bara en bekväm
-    # standard för lokal utveckling.
-    password: ${WINECELLAR_ADMIN_PASSWORD:admin}
   anthropic:
     # Tom standard lokalt - etikettskanning (WINE-5) fungerar inte utan en
     # riktig nyckel, men appen ska ändå starta (AnthropicLabelInterpreter

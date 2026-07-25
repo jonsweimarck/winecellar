@@ -96,3 +96,18 @@ CREATE INDEX IF NOT EXISTS wines_search_vector_idx ON wines USING GIN (search_ve
 -- - att köra den mot en redan nullable kolumn är ett ofarligt no-op).
 ALTER TABLE wines ALTER COLUMN vintage DROP NOT NULL;;
 ALTER TABLE wines ALTER COLUMN quantity DROP NOT NULL;;
+
+-- WINE-15: owner_id är obligatoriskt sedan admin-kontot (den enda
+-- kodvägen som kunde skapa ett ägarlöst vin, se WineController/
+-- SecurityConfig) togs bort - varje inloggad användare är numera ett
+-- riktigt konto i users-tabellen. Satt direkt i SQL, INTE via
+-- @JoinColumn(nullable = false) i WineEntity (Hibernates ddl-auto:
+-- update har visat sig opålitligt för den här sortens ALTER hela dagen,
+-- se CLAUDE.md om search_vector-sagan) - Hibernate lättar aldrig på en
+-- begränsning den inte känner till från annoteringarna (samma princip
+-- som vintage/quantity ovan, fast i motsatt riktning), så den här raden
+-- är konfliktfri med ddl-auto: update. Idempotent - SET NOT NULL på en
+-- redan NOT NULL-kolumn är ett ofarligt no-op. Kräver att WINE-17s
+-- migrering redan körts (alla rader har en ägare) - annars skulle den
+-- här satsen misslyckas mot kvarvarande NULL-rader.
+ALTER TABLE wines ALTER COLUMN owner_id SET NOT NULL;;

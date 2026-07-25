@@ -10,9 +10,12 @@ import com.example.winecellar.application.SearchCriteria;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Rating;
+import com.example.winecellar.domain.User;
+import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 import com.example.winecellar.domain.WineType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,11 +25,12 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -59,24 +63,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * och åtkomstskyddet - inte affärslogiken, som redan täcks av
  * acceptanstesterna i features/.
  *
- * @TestPropertySource pinnar admin-lösenordet till "admin" oavsett vad som
- * faktiskt är satt i miljön testet körs i. Utan detta läcker Clever Clouds
- * WINECELLAR_ADMIN_PASSWORD (satt för produktionsappen) in i byggsteget och
- * skriver över application.ymls lokala default, vilket kraschade en hel
- * deploy tidigare (se git-historiken/CLAUDE.md) - fortfarande relevant för
- * de nya {@code InloggningOchUtloggning}-testerna nedan, som faktiskt
- * loggar in via {@code formLogin(...)} mot den riktiga konfigurationen
- * (inte {@code user(...)}, se nedan).
- *
- * De flesta övriga testerna använder däremot bara {@code user(...)} - en
- * ren SecurityContext-injicering som INTE går via den riktiga
- * `UserDetailsService`n/lösenordskontrollen (till skillnad från det gamla
- * `httpBasic(...)`, som faktiskt autentiserade). Medvetet: dessa 40+
- * tester bryr sig om `WineController`s renderings-/åtkomstlogik, inte om
+ * De flesta testerna använder bara {@code user(...)} - en ren
+ * SecurityContext-injicering som INTE går via den riktiga
+ * `UserDetailsService`n/lösenordskontrollen. Medvetet: dessa 40+ tester
+ * bryr sig om `WineController`s renderings-/åtkomstlogik, inte om
  * autentiseringsmekaniken - att låta var och en av dem göra en riktig
  * inloggningsrundtur hade varit onödigt dyrt och inte testat något nytt.
- * Den riktiga inloggningsvägen (formLogin mot den faktiska konfigurationen)
- * testas istället samlat i {@code InloggningOchUtloggning}.
+ * Den riktiga inloggningsvägen (formLogin mot den faktiska konfigurationen,
+ * inklusive `SecurityConfig`s riktiga `UserDetailsService`) testas istället
+ * samlat i {@code InloggningOchUtloggning}, mot ett `User`
+ * (`userRepository`-mocken) stubbat med ett riktigt hashat testlösenord -
+ * sedan WINE-15 (admin/readonly borttagna) finns inget hårdkodat konto
+ * kvar att logga in som.
  *
  * WINE-12 (formulärinloggning ersätter HTTP Basic) slog på CSRF igen -
  * varje POST/DELETE/multipart-anrop nedan har därför ett explicit
@@ -88,7 +86,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(WineController.class)
 @Import(SecurityConfig.class)
-@TestPropertySource(properties = "winecellar.admin.password=admin")
 class WineControllerTest {
 
     @Autowired
@@ -197,15 +194,31 @@ class WineControllerTest {
      * `UserDetailsService`n/lösenordskontrollen (formLogin, inte
      * user(...)) - se klasskommentaren för varför bara den här klassen gör
      * det. Motsvarar de tre Given/När/Så-scenarierna i WINE-12.
+     *
+     * Sedan WINE-15 (admin/readonly borttagna) finns inget hårdkodat
+     * konto att logga in som - `userRepository`-mocken stubbas här med
+     * ett `User` vars lösenord faktiskt är hashat med den riktiga
+     * `PasswordEncoder`-beanen, så `SecurityConfig`s `UserDetailsService`
+     * (som frågar samma mock) kan autentisera det på riktigt.
      */
     @Nested
     @DisplayName("inloggning och utloggning")
     class InloggningOchUtloggning {
 
+        @Autowired
+        private PasswordEncoder passwordEncoder;
+
+        @BeforeEach
+        void stubbaTestanvändare() {
+            User testAnvändare = new User(
+                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now());
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
+        }
+
         @Test
         @DisplayName("ska logga in med rätt uppgifter och komma till startsidan")
         void skaLoggaInMedRättaUppgifter() throws Exception {
-            mockMvc.perform(formLogin().user("admin").password("admin"))
+            mockMvc.perform(formLogin().user("testperson").password("hemligt123"))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
         }
@@ -213,7 +226,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska nekas inloggning med fel lösenord och stanna kvar på inloggningssidan")
         void skaNekasInloggningMedFelLösenord() throws Exception {
-            mockMvc.perform(formLogin().user("admin").password("fel"))
+            mockMvc.perform(formLogin().user("testperson").password("fel"))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/login?error"));
         }
@@ -221,7 +234,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska avsluta sessionen vid utloggning, så startsidan kräver ny inloggning")
         void skaAvslutaSessionenVidUtloggning() throws Exception {
-            MvcResult inloggning = mockMvc.perform(formLogin().user("admin").password("admin"))
+            MvcResult inloggning = mockMvc.perform(formLogin().user("testperson").password("hemligt123"))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"))
                     .andReturn();
@@ -234,101 +247,6 @@ class WineControllerTest {
             mockMvc.perform(get("/").session(session))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrlPattern("**/login"));
-        }
-    }
-
-    /**
-     * readonly/readonly (se SecurityConfig) - får se listan och bilder men
-     * inte lägga till, redigera eller ta bort. Nekas både POST/DELETE-
-     * routerna och GET-routerna för formulären (/wines/nytt,
-     * /wines/{id}/redigera) - annars går det att komma åt formulärsidan
-     * genom att bara gissa på URL:en, även om länken är dold i UI:t.
-     */
-    @Nested
-    @DisplayName("readonly-kontot")
-    class ReadonlyKontot {
-
-        @Test
-        @DisplayName("ska se listan utan länkar/knappar för lägg till, redigera eller ta bort")
-        void skaSeListanUtanRedigeringslänkar() throws Exception {
-            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
-
-            mockMvc.perform(get("/").with(user("readonly").roles("READONLY")).with(csrf()))
-                    .andExpect(status().isOk())
-                    .andExpect(content().string(allOf(
-                            containsString("Barolo"),
-                            not(containsString("href=\"/wines/nytt\"")),
-                            not(containsString("class=\"detalj-atgarder\""))
-                    )));
-        }
-
-        @Test
-        @DisplayName("ska nekas formuläret för ett nytt vin")
-        void skaNekasFormuläretFörEttNyttVin() throws Exception {
-            mockMvc.perform(get("/wines/nytt").with(user("readonly").roles("READONLY")).with(csrf()))
-                    .andExpect(status().isForbidden());
-        }
-
-        @Test
-        @DisplayName("ska nekas att lägga till ett vin och aldrig nå WineService")
-        void skaNekasAttLäggaTillEttVin() throws Exception {
-            mockMvc.perform(post("/wines")
-                            .with(user("readonly").roles("READONLY")).with(csrf())
-                            .param("name", "Barolo")
-                            .param("wineType", "RED")
-                            .param("producer", "Pio Cesare")
-                            .param("country", "Italien")
-                            .param("vintage", "2018")
-                            .param("quantity", "3")
-                            .param("location", "Låda 1"))
-                    .andExpect(status().isForbidden());
-
-            verify(wineService, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("ska nekas redigeringsformuläret")
-        void skaNekasRedigeringsformuläret() throws Exception {
-            mockMvc.perform(get("/wines/1/redigera").with(user("readonly").roles("READONLY")).with(csrf()))
-                    .andExpect(status().isForbidden());
-        }
-
-        @Test
-        @DisplayName("ska nekas att spara en redigering och aldrig nå WineService")
-        void skaNekasAttSparaEnRedigering() throws Exception {
-            mockMvc.perform(post("/wines/1/redigera")
-                            .with(user("readonly").roles("READONLY")).with(csrf())
-                            .param("name", "Barolo")
-                            .param("wineType", "RED")
-                            .param("producer", "Pio Cesare")
-                            .param("country", "Italien")
-                            .param("vintage", "2018")
-                            .param("quantity", "3")
-                            .param("location", "Låda 1"))
-                    .andExpect(status().isForbidden());
-
-            verify(wineService, never()).save(any());
-        }
-
-        @Test
-        @DisplayName("ska nekas att ta bort ett vin och aldrig nå WineService")
-        void skaNekasAttTaBortEttVin() throws Exception {
-            mockMvc.perform(delete("/wines/1").with(user("readonly").roles("READONLY")).with(csrf()))
-                    .andExpect(status().isForbidden());
-
-            verify(wineService, never()).removeWine(any(), any());
-        }
-
-        @Test
-        @DisplayName("ska ändå få se en bild")
-        void skaFåSeEnBild() throws Exception {
-            byte[] bilddata = new byte[]{1, 2, 3};
-            when(wineService.findById(eq(new WineId(1L)), any()))
-                    .thenReturn(Optional.of(BAROLO.withImage(bilddata, "image/jpeg")));
-
-            mockMvc.perform(get("/wines/1/bild").with(user("readonly").roles("READONLY")).with(csrf()))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType("image/jpeg"));
         }
     }
 
@@ -925,17 +843,6 @@ class WineControllerTest {
 
             verify(labelInterpretationService, never()).interpret(any(), any());
         }
-
-        @Test
-        @DisplayName("ska nekas för readonly-kontot och aldrig nå LabelInterpretationService")
-        void skaNekasFörReadonlyKontot() throws Exception {
-            mockMvc.perform(multipart("/wines/tolka-etikett")
-                            .file(new MockMultipartFile("bild", "etikett.jpg", "image/jpeg", new byte[]{1, 2, 3}))
-                            .with(user("readonly").roles("READONLY")).with(csrf()))
-                    .andExpect(status().isForbidden());
-
-            verify(labelInterpretationService, never()).interpret(any(), any());
-        }
     }
 
     @Nested
@@ -1080,15 +987,6 @@ class WineControllerTest {
             mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(csrf()))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrlPattern("**/login"));
-
-            verify(wineService, never()).increaseQuantity(any(), any());
-        }
-
-        @Test
-        @DisplayName("ska nekas för readonly-kontot och aldrig nå WineService")
-        void skaNekasFörReadonlyKontot() throws Exception {
-            mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(user("readonly").roles("READONLY")).with(csrf()))
-                    .andExpect(status().isForbidden());
 
             verify(wineService, never()).increaseQuantity(any(), any());
         }

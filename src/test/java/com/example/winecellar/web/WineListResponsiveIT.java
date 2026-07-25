@@ -1,6 +1,9 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
+import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
 import com.microsoft.playwright.Browser;
@@ -8,7 +11,6 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.Response;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -52,6 +54,17 @@ class WineListResponsiveIT {
     @Autowired
     private WineService wineService;
 
+    @Autowired
+    private RegistrationService registrationService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    private static final String TESTKONTO_ANVÄNDARNAMN = "wineListResponsiveTest";
+    private static final String TESTKONTO_LÖSENORD = "testlösenord123";
+
+    private UserId testkontoId;
+
     private static Playwright playwright;
     private static Browser browser;
 
@@ -67,9 +80,25 @@ class WineListResponsiveIT {
         playwright.close();
     }
 
+    /**
+     * WINE-15: inget hårdkodat konto kvar att logga in som (admin/readonly
+     * borttagna) - registrerar ett riktigt testkonto istället, och sparar
+     * dess UserId (behövs för att läggTillEttVin() ska kunna sätta rätt
+     * ägare - annars vore vinet osynligt för det inloggade testkontot
+     * sedan WINE-13s scoping). Idempotent (register(...) ignorerar bara
+     * UsernameTaken-resultatet) eftersom detta körs i @BeforeEach, en
+     * gång per test, mot samma delade Testcontainers-databas. Slås ihop
+     * med läggTillEttVin() i EN @BeforeEach-metod, inte två separata -
+     * JUnit 5 garanterar ingen körordning mellan flera @BeforeEach på
+     * samma klass, och testkontoId måste vara satt INNAN vinet sparas.
+     */
     @BeforeEach
-    void läggTillEttVin() {
+    void säkerställTestkontoOchLäggTillEttVin() {
+        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testkontoId = userRepository.findByUsername(TESTKONTO_ANVÄNDARNAMN).orElseThrow().id();
+
         wineService.save(Wine.builder()
+                .owner(testkontoId)
                 .name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
                 .vintage(2018).quantity(3).location("Låda 1")
                 .build());
@@ -126,6 +155,7 @@ class WineListResponsiveIT {
     @Test
     void skaVisaAllaFältDirektPåDesktopUtanAttFällaUtNågot() {
         wineService.save(Wine.builder()
+                .owner(testkontoId)
                 .name("Chablis").wineType(WineType.WHITE).producer("Domaine X").country("Frankrike")
                 .vintage(2020).quantity(2).location("Låda 3")
                 .tastingNotes("Mineralisk och frisk")
@@ -157,58 +187,33 @@ class WineListResponsiveIT {
         }
     }
 
-    @Test
-    void skaDöljaLäggTillRedigeraOchTaBortFörReadonlyKontot() {
-        try (BrowserContext context = nyKontext(1280, 800, false, "readonly", "readonly")) {
-            Page page = öppnaVinkällaren(context);
-
-            assertThat(page.locator("text=Lägg till vin").isVisible()).isFalse();
-
-            Locator tabell = page.locator("#vinlista-tabell");
-            assertThat(tabell.locator("text=Redigera").isVisible()).isFalse();
-            assertThat(tabell.locator("text=Ta bort").isVisible()).isFalse();
-        }
-    }
-
-    @Test
-    void skaNekaÅtkomstTillFormulärenFörReadonlyKontot() {
-        try (BrowserContext context = nyKontext(1280, 800, false, "readonly", "readonly")) {
-            Page page = context.newPage();
-
-            Response nyttVin = page.navigate("http://localhost:" + port + "/wines/nytt");
-            assertThat(nyttVin.status()).isEqualTo(403);
-
-            Response redigera = page.navigate("http://localhost:" + port + "/wines/1/redigera");
-            assertThat(redigera.status()).isEqualTo(403);
-        }
-    }
-
-    private BrowserContext nyKontext(int bredd, int höjd, boolean mobil) {
-        return nyKontext(bredd, höjd, mobil, "admin", "admin");
-    }
-
     /**
      * WINE-12: formulärinloggning med session ersatte HTTP Basic
      * (`setHttpCredentials`, som Playwright annars hade skött automatiskt
      * på varje request) - inloggningen görs nu en gång som en riktig
      * sidnavigering/formulärinskick, varefter sessionscookien (satt på
      * BrowserContext-nivå av Playwright, inte Page-nivå) följer med alla
-     * senare sidor som öppnas i samma kontext.
+     * senare sidor som öppnas i samma kontext. Loggar alltid in som
+     * `TESTKONTO_ANVÄNDARNAMN` sedan WINE-15 (admin/readonly borttagna,
+     * och testerna i den här klassen bryr sig bara om CSS-/
+     * responsivitetsbeteende, inte om VEM som är inloggad - riktig
+     * multi-user-testning finns i MultiUserSteps/WineControllerTest
+     * istället).
      */
-    private BrowserContext nyKontext(int bredd, int höjd, boolean mobil, String användarnamn, String lösenord) {
+    private BrowserContext nyKontext(int bredd, int höjd, boolean mobil) {
         BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(bredd, höjd)
                 .setIsMobile(mobil)
                 .setHasTouch(mobil));
-        loggaIn(context, användarnamn, lösenord);
+        loggaIn(context);
         return context;
     }
 
-    private void loggaIn(BrowserContext context, String användarnamn, String lösenord) {
+    private void loggaIn(BrowserContext context) {
         Page inloggningssida = context.newPage();
         inloggningssida.navigate("http://localhost:" + port + "/login");
-        inloggningssida.locator("#username").fill(användarnamn);
-        inloggningssida.locator("#password").fill(lösenord);
+        inloggningssida.locator("#username").fill(TESTKONTO_ANVÄNDARNAMN);
+        inloggningssida.locator("#password").fill(TESTKONTO_LÖSENORD);
         inloggningssida.locator("button[type=submit]").click();
         inloggningssida.waitForLoadState();
         inloggningssida.close();

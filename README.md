@@ -47,6 +47,7 @@ Tabell `wines`:
 | Kolumn | Typ | Kommentar |
 |---|---|---|
 | id | `bigserial` PK | |
+| owner_id | `bigint` FK → `users.id`, **NOT NULL** | Se "Flera användare" nedan |
 | wine_type | `text` + `CHECK`, nullable | Enum: RED, WHITE, ROSE, SPARKLING, FORTIFIED |
 | country | `text`, nullable | |
 | region | `text`, nullable | |
@@ -70,7 +71,7 @@ Tabell `wines`:
 | vivino_rating | `numeric(2,1)`, nullable | |
 | other_reference | `text`, nullable | |
 | location | `text`, nullable | Fritext (Låda 1, Öppen, etc.) |
-| search_vector | `tsvector`, genererad | Se "Filtrering, sökning och sortering" |
+| search_vector | `tsvector`, triggerunderhållen | Se "Filtrering, sökning och sortering" |
 | created_at, updated_at | `timestamptz` | Inte byggda ännu |
 
 Namngivningsprincip: engelska för kolumner/tabeller, men svenska
@@ -86,6 +87,13 @@ innan matchning.
 Se [ADR 0004](docs/adr/0004-images-in-bytea.md) för varför bilder
 lagras i `bytea` och [ADR 0005](docs/adr/0005-only-name-required.md)
 för varför bara `name` är obligatoriskt.
+
+### Flera användare
+
+Tabell `users` (`id`, `username` unik, `hashed_password`, `created_at`)
+- varje `wines`-rad har exakt en ägare (`owner_id`), och en inloggad
+användare ser och kan bara ändra sin egen lista. Se
+[ADR 0013](docs/adr/0013-multi-user-accounts.md).
 
 ## Vinlistan
 
@@ -130,15 +138,17 @@ inte i controllern - se
 
 ## Säkerhet
 
-Hela appen kräver HTTP Basic-inloggning - se
-[ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md). Två konton:
+Hela appen kräver inloggning - formulärbaserad, med session, se
+[ADR 0013](docs/adr/0013-multi-user-accounts.md) (ersätter den
+ursprungliga HTTP Basic-modellen i
+[ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md)). Vem som helst
+kan registrera ett eget konto på `/registrera` - varje konto får en
+helt privat, egen vinlista, ingen delning och ingen rollindelning
+(de tidigare hårdkodade `admin`/`readonly`-kontona och
+`WINECELLAR_ADMIN_PASSWORD` är borttagna).
 
-- `admin` - full åtkomst, lösenord via `WINECELLAR_ADMIN_PASSWORD`
-  (miljövariabel i produktion, `admin` som lokal default).
-- `readonly`/`readonly` - får se listan och bilder, nekas allt annat.
-
-CSRF är avstängt globalt (htmx-formulären skickar ingen CSRF-token,
-autentiseringen är stateless Basic-auth per anrop).
+CSRF är påslaget (htmx-formulären skickar token via en
+`htmx:configRequest`-lyssnare, se `vinkallare.html`).
 
 Etikettskanningen (se Vinlistan ovan) kräver `WINECELLAR_ANTHROPIC_API_KEY`
 - utan den startar appen ändå (tom lokal default), men skanningsanropet

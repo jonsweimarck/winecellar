@@ -1331,6 +1331,115 @@ produktionen: Testus ser nu alla tidigare ägarlösa viner.
   se WINE-13) skulle en NOT NULL-begränsning blockera det, och admin
   var fortfarande aktivt i produktion vid det här laget.
 
+**WINE-15 byggd (2026-07-25): ADMIN/READONLY och de hårdkodade kontona
+borttagna - sista storyn i Fas 1.** `SecurityConfig` skriven om i
+grunden: `UserDetailsService` läser numera bara från `UserRepository`
+(databasen), `authorizeHttpRequests` är bara `.requestMatchers(
+"/registrera").permitAll()` + `.anyRequest().authenticated()` - ingen
+`hasRole`/`hasAnyRole` kvar någonstans. `WINECELLAR_ADMIN_PASSWORD`
+borttagen ur `application.yml`. `WineController.hasAdminRole(...)` och
+modellattributet `canEdit` borttagna helt (var bara ett UI-lager för
+att dölja adminfunktioner för READONLY, se ADR 0009) -
+`vinkallare.html`s `th:if="${canEdit}"`-vakter runt "Lägg till vin" och
+`.detalj-atgarder` togs bort i samma veva, eftersom alla inloggade
+användare nu har samma rättigheter till sin egen data.
+[ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md) markerad
+Superseded av [ADR 0013](docs/adr/0013-multi-user-accounts.md), enligt
+den senares egen instruktion om att göra det först när WINE-15 landar.
+
+- **`owner_id` gjord `NOT NULL` i `schema.sql`** (`ALTER TABLE wines
+  ALTER COLUMN owner_id SET NOT NULL`), inte via
+  `@JoinColumn(nullable = false)` i `WineEntity` - samma
+  "Hibernates `ddl-auto: update` är opålitligt för ALTER av befintliga
+  kolumner"-lärdom som redan dokumenterats för `search_vector`-sagan
+  ovan, fast i motsatt riktning (skärpa en begränsning istället för att
+  lätta på en). Satsen är idempotent (`SET NOT NULL` på en redan
+  `NOT NULL`-kolumn är ett ofarligt no-op) och förutsätter att WINE-17s
+  migrering redan körts - annars skulle den misslyckas mot kvarvarande
+  `NULL`-rader.
+- **Städpassning av gamla Javadoc-kommentarer som fortfarande nämnde
+  admin/readonly i presens** (`WineController.currentOwner(...)`,
+  `AnthropicLabelInterpreter`, `WineRepository`, `WineJpaRepository`,
+  `Wine.owner`) - alla omskrivna till dåtid, ingen kodändring. Värt att
+  komma ihåg för framtida liknande borttagningar: en `grep` efter det
+  borttagna begreppets namn hittar även "det här fanns till FÖR"-typen
+  av kommentarer som blir vilseledande i presens även om de aldrig var
+  fel när de skrevs.
+- **Testsviten krävde en större omskrivning eftersom den bara kunde
+  logga in som de nu borttagna kontona.** `WineControllerTest`s hela
+  `ReadonlyKontot`-testklass (7 test) och alla `skaNekasFörReadonlyKontot`-
+  enskilda tester togs bort - rolldistinktionen finns inte längre att
+  testa. `InloggningOchUtloggning` bytte från riktig `formLogin()`-inloggning
+  mot det hårdkodade `admin`-kontot till en `@BeforeEach` som stubbar
+  `userRepository.findByUsername(...)` med ett `PasswordEncoder`-hashat
+  testkonto - motiverat av att `@WebMvcTest` redan mockar bort hela
+  persistenslagret, så ett riktigt registrerat konto vore fel abstraktionsnivå
+  där. `WineListResponsiveIT`/`LabelScanFormIT` (båda riktiga
+  `@SpringBootTest`+Testcontainers, alltså en riktig databas) fick istället
+  registrera ett riktigt konto via `RegistrationService` i `@BeforeEach` och
+  logga in som det - motsatt val av samma skäl, omvänt.
+- **Ny testfälla, hittad av `mvn verify` (inte manuellt): `WineListResponsiveIT`
+  hade tidigare TVÅ separata `@BeforeEach`-metoder (en för kontot, en för att
+  lägga till ett testvin) - slogs ihop till EN, eftersom JUnit 5 inte
+  garanterar körordning mellan flera `@BeforeEach` på samma klass, och
+  vinets `.owner(testkontoId)` kräver att kontot redan är skapat.**
+- **Den allvarligaste fällan: en klassöverskridande `@Before`-hook-krock i
+  Cucumber, som bara `mvn verify` (inte kompilering, inte manuell
+  verifiering) avslöjade - i tre separata omgångar.** `PersistenceSteps`
+  (kör mot en riktig Postgres via Testcontainers, se ovan i det här
+  avsnittet) sparar viner via `wineService.save(...)`, vilket nu kräver en
+  riktig ägare eftersom `owner_id` är `NOT NULL`. Men `RegistrationSteps`
+  har en egen `@Before`-hook som gör `userRepository.deleteAll()` - och
+  Cucumber-JVM kör **alla** `@Before`-hooks från **alla** laddade
+  stegklasser för **varje** scenario, inte bara från klasser vars steg
+  faktiskt förekommer i scenariot (en ny variant av fällan CLAUDE.md redan
+  varnar för under "Kända fällor", fast mellan klasser istället för inom
+  en). Tre omgångar krävdes för att hitta rätt ordning:
+  1. Första försöket: `PersistenceSteps` fick registrera ett testkonto
+     direkt i sin befintliga `@Before`, utan explicit ordning mot
+     `RegistrationSteps`. Kraschade med en FK-överträdelse mot `users`
+     ("Key (owner_id)=(40) is not present in table users") - `Registration
+     Steps.reset()` råkade köras EFTER `PersistenceSteps` inom samma
+     scenario och tog bort kontot precis efter att det pekats ut.
+  2. Andra försöket: gav `PersistenceSteps` `@Before(order = 1)` och
+     `RegistrationSteps` `@Before(order = 0)`, för att tvinga users-
+     raderingen att ske FÖRE kontoregistreringen. Kraschade istället med
+     en ANNAN FK-överträdelse, på `users` från `wines`-sidan ("update or
+     delete on table users violates foreign key constraint ... still
+     referenced from table wines") - `RegistrationSteps.reset()`
+     (`order = 0`) körde nu FÖRE `PersistenceSteps` hann radera
+     FÖREGÅENDE scenarios viner (som låg i samma metod, `order = 1`),
+     så users-raderingen stötte på kvarvarande viner som fortfarande
+     pekade på de kontona.
+  3. **Lösningen:** dela upp `PersistenceSteps`s enda `@Before`-metod i
+     TVÅ - `raderaAllaViner()` (`order = -1`, radera viner FÖRST) och
+     `registreraTestkonto()` (`order = 1`, registrera kontot SIST) - med
+     `RegistrationSteps.reset()` (`order = 0`, radera users) i mitten.
+     Den tredelade ordningen (viner → users → nytt testkonto) är den enda
+     som är FK-säker i båda riktningarna: viner måste bort innan deras
+     ägare får raderas, och det nya testkontot måste skapas efter att
+     users-tabellen redan är tömd. **Lärdom:** när två stegklassers
+     globala `@Before`-hooks rör samma tabeller i motsatta riktningar
+     (en skapar det den andra raderar), räcker det inte att bara
+     tvinga EN inbördes ordning mellan de två metoderna - en delad
+     resurs som både måste tömmas OCH fyllas på i rätt ordning kan kräva
+     att en av metoderna delas upp så att delarna interfolieras med den
+     andra klassens hook.
+- **Verifierat lokalt end-to-end mot en riktig, färsk lokal Postgres
+  (docker-compose, inte bara Testcontainers) innan push:** `admin`/`admin`
+  och `readonly`/`readonly` ger båda `/login?error` (kontona finns inte
+  längre), ett nytt konto kan registreras och loggas in automatiskt,
+  ett vin kan läggas till/redigeras/tas bort/sökas fram, en uppladdad
+  bild hämtas tillbaka byte-identisk med korrekt `Content-Type`, och ett
+  andra registrerat konto varken ser det första kontots vin i listan
+  eller kommer åt det via direkt URL (404). `mvn verify` grön i sin
+  helhet efter hook-ordningsfixen ovan (samtliga enhetstester,
+  acceptanstester och Playwright-IT-tester, inklusive
+  `WineListResponsiveIT`/`LabelScanFormIT`s omskrivna inloggning).
+
+Detta avslutar Fas 1 (WINE-9 till WINE-18) - appen stödjer nu flera
+oberoende användare, var och en med sin egen, helt privata vinsamling.
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),

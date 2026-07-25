@@ -29,7 +29,13 @@ public class RegistrationSteps {
 
     private RegistrationResult senasteResultat;
 
-    @Before
+    /**
+     * `order = 0` - mittersta steget av en tredelad, klassöverskridande
+     * städordning; se {@code PersistenceSteps.raderaAllaViner()}s Javadoc
+     * för den fullständiga motiveringen (varför viner måste raderas
+     * FÖRE users, och users FÖRE ett nytt testkonto registreras).
+     */
+    @Before(order = 0)
     public void reset() {
         userRepository.deleteAll();
     }

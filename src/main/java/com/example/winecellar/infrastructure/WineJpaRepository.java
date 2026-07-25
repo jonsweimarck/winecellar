@@ -31,8 +31,9 @@ interface WineJpaRepository extends JpaRepository<WineEntity, Long> {
      * fälla återkommer för varje framtida nytt mappat fält på WineEntity.
      *
      * `:ownerId IS NULL OR owner_id = :ownerId` (WINE-13) - ett null
-     * ownerId betyder oscopeat (de hårdkodade admin/readonly-kontona, se
-     * WineRepository), inte "matcha bara ägarlösa viner".
+     * ownerId betyder oscopeat, inte "matcha bara ägarlösa viner". Se
+     * WineRepository för null-konventionens (numera historiska)
+     * bakgrund i de borttagna admin/readonly-kontona.
      */
     @Query(value = """
             SELECT id, name, wine_type, producer, country, region, subregion, grapes, vintage,

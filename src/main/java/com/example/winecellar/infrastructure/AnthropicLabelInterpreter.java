@@ -18,7 +18,8 @@ import java.util.Optional;
  * officiella Anthropic Java-SDK:n, för att slippa en ny beroende i den
  * deployade jaren för den här enda anropstypen (se docs/adr/0012-
  * label-scanning-llm-integration.md). API-nyckel/modell kommer från
- * miljövariabler, samma mönster som WINECELLAR_ADMIN_PASSWORD.
+ * miljövariabler, samma konfigurationsmönster som resten av appen
+ * använder för hemligheter.
  */
 @Component
 public class AnthropicLabelInterpreter implements LabelInterpreter {

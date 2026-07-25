@@ -2,6 +2,12 @@
 
 ## Status
 
+Superseded av [0013](0013-multi-user-accounts.md) (2026-07-25, WINE-15) -
+HTTP Basic och de hårdkodade admin/readonly-kontona är borttagna till
+förmån för formulärbaserad inloggning med riktiga, självregistrerade
+konton. Kvar nedan som historik för varför den ursprungliga modellen såg
+ut som den gjorde.
+
 Accepted (2026-07-12, readonly-kontot tillagt 2026-07-19)
 
 ## Context

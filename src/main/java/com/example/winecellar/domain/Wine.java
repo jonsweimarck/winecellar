@@ -28,11 +28,13 @@ import java.time.LocalDate;
 public record Wine(
         WineId id,
         /**
-         * WINE-13: vinets ägare. Nullable - viner sparade innan WINE-10
-         * (och viner sparade av de hårdkodade admin/readonly-kontona, som
-         * medvetet förblir oscopeade tills WINE-15, se CLAUDE.md) har
-         * `null` här. `WineService`/`WineRepository` tolkar `null` som
-         * "oscopeat", inte som "ägs av ingen".
+         * WINE-13: vinets ägare. Java-typen är fortfarande nullable
+         * (`WineService`/`WineRepository` tolkar `null` som "oscopeat",
+         * inte som "ägs av ingen") - men sedan WINE-15/WINE-17 har alla
+         * rader i databasen faktiskt en ägare (`owner_id` är `NOT NULL`
+         * i schema.sql), eftersom de enda kontona som tidigare kunde
+         * lämna ett vin utan ägare (de hårdkodade admin/readonly-kontona)
+         * är borttagna. Se CLAUDE.md.
          */
         UserId owner,
         String name,

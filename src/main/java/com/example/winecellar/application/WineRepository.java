@@ -10,9 +10,12 @@ import java.util.Optional;
 /**
  * WINE-13: alla läsmetoder tar ett `owner`-argument, nullable - `null`
  * betyder "oscopeat" (returnera/matcha oavsett ägare), inte "matcha bara
- * viner utan ägare". De hårdkodade admin/readonly-kontona (se
- * SecurityConfig) har inget UserId och förblir därför medvetet oscopeade
- * fram till WINE-15 - se WineController.currentOwner(...).
+ * viner utan ägare". Ursprungligen till för de hårdkodade admin/readonly-
+ * kontona (som saknade UserId och medvetet var oscopeade under
+ * övergången till WINE-15, se WineController.currentOwner(...)) - de är
+ * borttagna sedan WINE-15, men själva null-konventionen behölls (kostar
+ * inget, och en framtida "adminvy över alla användare" skulle kunna
+ * återanvända den).
  */
 public interface WineRepository {
 

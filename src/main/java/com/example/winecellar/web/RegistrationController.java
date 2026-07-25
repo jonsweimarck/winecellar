@@ -5,7 +5,6 @@ import com.example.winecellar.application.RegistrationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -67,17 +66,12 @@ public class RegistrationController {
      * mekanism SecurityContextHolderFilter/SecurityContextRepository
      * annars sköter automatiskt vid en vanlig formLogin-rundtur.
      *
-     * ROLE_ADMIN är medvetet hårdkodat, inte hämtat från någonstans -
-     * WINE-15 tar bort rollbegreppet helt när ADMIN/READONLY-kontona
-     * försvinner. Fram tills dess behöver en nyregistrerad användare
-     * ADMIN för att alls kunna använda appen (SecurityConfigs
-     * route-regler kräver fortfarande den rollen) - även om scopingen
-     * till den egna listan inte är på plats förrän WINE-13, så alla
-     * användare delar i praktiken samma vinlista under tiden.
+     * Inga authorities behövs (WINE-15 tog bort hela rollbegreppet -
+     * `SecurityConfig` kräver bara `authenticated()`, ingen route bryr
+     * sig om roller längre).
      */
     private void loggaInAutomatiskt(String username, HttpServletRequest request, HttpServletResponse response) {
-        var authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
-        var authentication = new UsernamePasswordAuthenticationToken(username, null, authorities);
+        var authentication = new UsernamePasswordAuthenticationToken(username, null, List.of());
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);

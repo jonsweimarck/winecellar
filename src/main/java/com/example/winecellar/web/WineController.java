@@ -57,12 +57,13 @@ public class WineController {
     }
 
     /**
-     * WINE-13: null betyder oscopeat, inte "ägs av ingen" - de hårdkodade
-     * admin/readonly-kontona (se SecurityConfig) har inget UserId
-     * eftersom de inte finns i users-tabellen, och förblir MEDVETET
-     * oscopeade (ser alla viner, som innan WINE-13) fram till WINE-15.
-     * Bara riktigt registrerade konton (WINE-11) får ett UserId härifrån
-     * och därmed riktig scoping.
+     * WINE-13: null betyder oscopeat, inte "ägs av ingen" - ursprungligen
+     * till för de hårdkodade admin/readonly-kontona (som inte fanns i
+     * users-tabellen och medvetet var oscopeade under övergången). Sedan
+     * WINE-15 (admin/readonly borttagna) hittar `userRepository` alltid
+     * en träff för en riktigt inloggad `Authentication` - `.orElse(null)`
+     * är kvar som ett ofarligt, numera i praktiken oanvänt skyddsnät,
+     * inte för att någon oscopead inloggning fortfarande kan förekomma.
      */
     private UserId currentOwner(Authentication authentication) {
         return userRepository.findByUsername(authentication.getName())
@@ -129,7 +130,6 @@ public class WineController {
         model.addAttribute("expandedCountries", expanded.countries());
         model.addAttribute("expandedRegions", expanded.regions());
         model.addAttribute("chips", buildChips(searchView));
-        model.addAttribute("canEdit", hasAdminRole(authentication));
     }
 
     private static Set<String> emptyIfNull(Set<String> value) {
@@ -472,17 +472,6 @@ public class WineController {
         );
         wineService.save(withImageIfProvided(wine, image).build());
         return "redirect:/";
-    }
-
-    /**
-     * Styr om "Lägg till vin"/Redigera/Ta bort visas i vinkallare.html.
-     * Bara ett extra UI-lager - den faktiska åtkomstkontrollen sker i
-     * SecurityConfig, som nekar READONLY-kontot dessa routes oavsett vad
-     * som visas i gränssnittet.
-     */
-    private static boolean hasAdminRole(Authentication authentication) {
-        return authentication.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
     }
 
     /**

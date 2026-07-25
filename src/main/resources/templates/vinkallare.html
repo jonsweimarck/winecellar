@@ -271,7 +271,7 @@
 <body>
     <h1>Vinkällaren</h1>
 
-    <a class="knapp" th:if="${canEdit}" href="/wines/nytt">Lägg till vin</a>
+    <a class="knapp" href="/wines/nytt">Lägg till vin</a>
 
     <form method="post" th:action="@{/logout}" style="display: inline">
         <button type="submit" class="knapp">Logga ut</button>
@@ -469,7 +469,7 @@
                     <span class="vk-value" th:text="${vin.otherReference}"></span>
                 </div>
 
-                <div class="detalj-atgarder" th:if="${canEdit}">
+                <div class="detalj-atgarder">
                     <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                     <button type="button"
                             th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions})}"
@@ -512,7 +512,7 @@
                     <dl>
                         <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
                     </dl>
-                    <div class="detalj-atgarder" th:if="${canEdit}">
+                    <div class="detalj-atgarder">
                         <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                         <button type="button"
                                 th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions})}"
