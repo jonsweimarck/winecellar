@@ -1023,6 +1023,62 @@ annat ställe att komma ihåg.
   med omstartsscenariot). Verifierat: hade fångat exakt den här buggen
   om det funnits innan WINE-10 landade.
 
+**Tredje deploy-fällan, samma symptom igen (2026-07-25) - den slutgiltiga,
+strukturella lösningen.** Trots två raka manuella migreringar (droppa
+search_vector; direkt bredda grapes/tasting_notes/
+systembolaget_description/munskankarna_review till text) kom exakt
+samma `cannot alter type of a column used by a generated column`-fel
+tillbaka på nästa deploy (WINE-11, som inte ens rörde `WineEntity`).
+Grundorsaken till VARFÖR Hibernates `ddl-auto: update` upprepat vill
+röra de här kolumnerna kunde aldrig fastställas med säkerhet (troligen
+en intern detalj i hur `AbstractSchemaMigrator` beslutar att göra en
+fullständig kolumngenomgång av en tabell så fort NÅGOT annat skäl finns
+att röra den, inte konsekvent kopplat till om typen faktiskt matchar) -
+istället för att fortsätta jaga symptomet togs beslutet att ta bort
+själva MÖJLIGHETEN att krascha.
+- **Lösning: `search_vector` underhålls nu via en TRIGGER
+  (`wines_update_search_vector()` + `wines_search_vector_trigger`),
+  inte `GENERATED ALWAYS AS ... STORED`.** En vanlig `tsvector`-kolumn
+  har ingen Postgres-begränsning mot att ALTER:a kolumner den beror på -
+  grapes m.fl. kan Hibernate göra vad den vill med framöver, oavsett
+  varför, utan att någonsin kunna blockeras igen. `schema.sql` skrevs om
+  i sin helhet (samma DROP+återskapa-princip som förut, nu för
+  funktion/trigger/kolumn istället för en genererad kolumn).
+- **Ny fälla upptäckt under lokal verifiering innan produktion
+  rördes igen:** Spring Boots `ScriptUtils` (kör `schema.sql` via
+  `spring.sql.init.mode: always`) delar upp filen i separata JDBC-anrop
+  genom enkel strängsökning efter `;` - den förstår inte PL/pgSQL:s
+  `$$...$$`-citerade funktionskroppar och kapade
+  `CREATE FUNCTION ... AS $$ BEGIN ... RETURN NEW; END; $$` mitt i vid
+  det första `;` inuti funktionen (`Unterminated dollar quote`).
+  Löst med `spring.sql.init.separator: ";;"` i `application.yml` - varje
+  toppnivåsats i `schema.sql` avslutas nu med `;;` istället för `;`,
+  medan de vanliga enstaka `;`-tecknen inuti funktionskroppen lämnas
+  orörda och tolkas korrekt av Postgres självt (som förstår
+  dollar-citering, till skillnad från Spring Boots enkla
+  strängbaserade uppdelning).
+- **Verifierat lokalt på det mest realistiska sättet möjligt innan
+  produktionen rördes en tredje gång:** en lokal databas fick manuellt
+  återskapa exakt produktionens trasiga tillstånd (grapes m.fl. som
+  `varchar(255)`, `search_vector` som `GENERATED ALWAYS AS`), appen
+  startades om mot det - startade rent, och `\d wines` efteråt visade
+  att Hibernate den gången inte ens försökte röra `grapes` (ingen rad i
+  loggen), vilket bekräftar att beteendet verkligen är opålitligt/
+  svårförutsägbart snarare än en konsekvent bugg att fixa vid källan.
+  Kolumnerna förblev `varchar(255)` - medvetet accepterat, inte ett
+  problem i praktiken (`to_tsvector` fungerar identiskt på `varchar`
+  och `text`, och 255 tecken har varit produktionens verklighet hela
+  tiden fram tills det här). Sökning och registrering testade
+  end-to-end via curl mot den återhämtade lokala appen innan push.
+  `db/migrations/2026-07-25-search-vector-trigger-instead-of-generated.sql`
+  kördes sedan mot produktionsdatabasen FÖRE deployen, av samma
+  kapplöpningsskäl som de två tidigare migreringarna (Hibernate hinner
+  annars krascha innan `schema.sql` får chansen att köras).
+  **Lärdom om testmetodik:** de två tidigare migreringarna verifierades
+  bara genom att pusha och se om produktionen råkade fungera - den
+  här gången återskapades det FAKTISKA trasiga tillståndet lokalt
+  först, vilket är vad som borde ha gjorts från början.
+
 **WINE-12 byggd (2026-07-24): formulärinloggning ersätter HTTP Basic,
 med en viktig avvikelse från ursprungsplanen.** `SecurityConfig` bytte
 `.httpBasic(...)` mot `.formLogin(...).loginPage("/login").permitAll()`

@@ -28,6 +28,16 @@ spring:
       # måste sättas explicit till "always" för att köras mot vår riktiga
       # Postgres också. Se schema.sql för vad som faktiskt körs.
       mode: always
+      # Spring delar upp schema.sql i separata JDBC-anrop genom att söka
+      # efter den här strängen - standardvärdet "; " funkar inte här sedan
+      # 2026-07-25, då search_vector-triggerns PL/pgSQL-funktionskropp
+      # (CREATE FUNCTION ... AS $$ ... $$) fick ett vanligt "return new;"
+      # med ett eget ";" inuti, vilket den enkla uppdelningen inte förstår
+      # (den är ingen riktig SQL-parser, bara en strängsökning) - filen
+      # kraschade mitt i funktionsdefinitionen. ";;" som separator löser
+      # det: varje toppnivåsats i schema.sql avslutas nu med ";;" istället
+      # för ";", medan enstaka ";" inuti funktionskroppen lämnas orörda.
+      separator: ";;"
   servlet:
     multipart:
       # Vinetiketter, inte godtyckliga filer - 5 MB är gott och väl för ett foto.
