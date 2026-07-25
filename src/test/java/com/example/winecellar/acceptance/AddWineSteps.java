@@ -35,7 +35,7 @@ public class AddWineSteps {
 
     @Givet("att källaren är tom")
     public void attKällarenÄrTom() {
-        assertThat(wineService.listWines()).isEmpty();
+        assertThat(wineService.listWines(null)).isEmpty();
     }
 
     @När("jag lägger till ett vin med följande uppgifter:")
@@ -60,7 +60,7 @@ public class AddWineSteps {
 
     @Så("ska källaren innehålla {int} vin")
     public void skaKällarenInnehålla(int count) {
-        assertThat(wineService.listWines()).hasSize(count);
+        assertThat(wineService.listWines(null)).hasSize(count);
     }
 
     @Och("vinet {string} ska visas med {int} flaskor i {string}")

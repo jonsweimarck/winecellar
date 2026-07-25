@@ -7,8 +7,10 @@ import com.example.winecellar.application.OriginNode;
 import com.example.winecellar.application.SearchCriteria;
 import com.example.winecellar.application.SortDirection;
 import com.example.winecellar.application.SortField;
+import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Rating;
+import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 import com.example.winecellar.domain.WineType;
@@ -44,10 +46,28 @@ public class WineController {
 
     private final WineService wineService;
     private final LabelInterpretationService labelInterpretationService;
+    private final UserRepository userRepository;
 
-    public WineController(WineService wineService, LabelInterpretationService labelInterpretationService) {
+    public WineController(
+            WineService wineService, LabelInterpretationService labelInterpretationService,
+            UserRepository userRepository) {
         this.wineService = wineService;
         this.labelInterpretationService = labelInterpretationService;
+        this.userRepository = userRepository;
+    }
+
+    /**
+     * WINE-13: null betyder oscopeat, inte "ägs av ingen" - de hårdkodade
+     * admin/readonly-kontona (se SecurityConfig) har inget UserId
+     * eftersom de inte finns i users-tabellen, och förblir MEDVETET
+     * oscopeade (ser alla viner, som innan WINE-13) fram till WINE-15.
+     * Bara riktigt registrerade konton (WINE-11) får ett UserId härifrån
+     * och därmed riktig scoping.
+     */
+    private UserId currentOwner(Authentication authentication) {
+        return userRepository.findByUsername(authentication.getName())
+                .map(user -> user.id())
+                .orElse(null);
     }
 
     @GetMapping("/")
@@ -80,6 +100,7 @@ public class WineController {
         Set<String> selectedCountries = emptyIfNull(country);
         Set<String> selectedRegions = emptyIfNull(region);
         Set<String> selectedSubregions = emptyIfNull(subregion);
+        UserId owner = currentOwner(authentication);
 
         SearchCriteria criteria = SearchCriteria.builder()
                 .searchTerm(search)
@@ -89,13 +110,13 @@ public class WineController {
                 .regions(selectedRegions)
                 .subregions(selectedSubregions)
                 .build();
-        List<Wine> result = wineService.search(criteria);
-        List<OriginNode> originTree = wineService.originTree();
+        List<Wine> result = wineService.search(criteria, owner);
+        List<OriginNode> originTree = wineService.originTree(owner);
         ExpandedNodes expanded = calculateExpandedNodes(originTree, selectedRegions, selectedSubregions);
         SearchView searchView = new SearchView(search, sort, direction, selectedWineTypes, selectedCountries, selectedRegions, selectedSubregions);
 
         model.addAttribute("wines", result);
-        model.addAttribute("totalCount", wineService.listWines().size());
+        model.addAttribute("totalCount", wineService.listWines(owner).size());
         model.addAttribute("search", search == null ? "" : search);
         model.addAttribute("sortFields", SortField.values());
         model.addAttribute("sort", sort);
@@ -317,18 +338,19 @@ public class WineController {
             @RequestParam(required = false) String location,
             @RequestParam(value = "bild", required = false) MultipartFile image,
             @RequestParam(required = false) String confirmAdd,
-            Model model
+            Model model, Authentication authentication
     ) throws IOException {
+        UserId owner = currentOwner(authentication);
         Wine.Builder builder = applyFormFields(Wine.builder(),
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                 systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
                 munskankarnaRating, vivinoRating, otherReference, location
         );
-        Wine candidate = withImageIfProvided(builder, image).build();
+        Wine candidate = withImageIfProvided(builder, image).owner(owner).build();
 
         if (!"true".equals(confirmAdd)) {
-            DuplicateCheck duplicateCheck = wineService.checkForDuplicate(candidate);
+            DuplicateCheck duplicateCheck = wineService.checkForDuplicate(candidate, owner);
             if (duplicateCheck instanceof DuplicateCheck.FullDuplicate full) {
                 return renderDuplicateWarning(model, candidate, full.existing(), true);
             }
@@ -364,8 +386,8 @@ public class WineController {
      * varningsdialog.
      */
     @PostMapping("/wines/{id}/dubblett-oka-antal")
-    public String increaseQuantityForDuplicate(@PathVariable Long id) {
-        wineService.increaseQuantity(new WineId(id));
+    public String increaseQuantityForDuplicate(@PathVariable Long id, Authentication authentication) {
+        wineService.increaseQuantity(new WineId(id), currentOwner(authentication));
         return "redirect:/";
     }
 
@@ -388,15 +410,15 @@ public class WineController {
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
             Model model, Authentication authentication) {
-        wineService.removeWine(new WineId(id));
+        wineService.removeWine(new WineId(id), currentOwner(authentication));
         populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, authentication);
         return "vinkallare :: lista";
     }
 
     @GetMapping("/wines/{id}/bild")
     @ResponseBody
-    public ResponseEntity<byte[]> showImage(@PathVariable Long id) {
-        Wine wine = wineService.findById(new WineId(id))
+    public ResponseEntity<byte[]> showImage(@PathVariable Long id, Authentication authentication) {
+        Wine wine = wineService.findById(new WineId(id), currentOwner(authentication))
                 .filter(Wine::hasImage)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         return ResponseEntity.ok()
@@ -405,9 +427,9 @@ public class WineController {
     }
 
     @GetMapping("/wines/{id}/redigera")
-    public String editForm(@PathVariable Long id, Model model) {
-        Wine wine = wineService.findById(new WineId(id))
-                .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
+    public String editForm(@PathVariable Long id, Model model, Authentication authentication) {
+        Wine wine = wineService.findById(new WineId(id), currentOwner(authentication))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         model.addAttribute("wine", wine);
         model.addAttribute("ratings", Rating.values());
         return "vin-formular";
@@ -437,10 +459,11 @@ public class WineController {
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
             @RequestParam(required = false) String location,
-            @RequestParam(value = "bild", required = false) MultipartFile image
+            @RequestParam(value = "bild", required = false) MultipartFile image,
+            Authentication authentication
     ) throws IOException {
-        Wine existing = wineService.findById(new WineId(id))
-                .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
+        Wine existing = wineService.findById(new WineId(id), currentOwner(authentication))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Wine.Builder wine = applyFormFields(existing.toBuilder(),
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,

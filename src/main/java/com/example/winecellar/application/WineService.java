@@ -1,5 +1,6 @@
 package com.example.winecellar.application;
 
+import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 import org.springframework.stereotype.Service;
@@ -22,12 +23,18 @@ public class WineService {
         this.wineRepository = wineRepository;
     }
 
+    /**
+     * Tar INTE emot owner - anropande kod (WineController) ansvarar för
+     * att redan ha satt rätt ägare på `wine` innan save: `.owner(...)`
+     * för ett nytt vin, eller oförändrat (via `existing.toBuilder()`)
+     * för en redigering. Se WINE-13/CLAUDE.md.
+     */
     public Wine save(Wine wine) {
         return wineRepository.save(wine);
     }
 
-    public List<Wine> listWines() {
-        return wineRepository.findAll();
+    public List<Wine> listWines(UserId owner) {
+        return wineRepository.findAllByOwner(owner);
     }
 
     /**
@@ -41,10 +48,10 @@ public class WineService {
      * "Filtrering, sökning och sortering" för den medvetna avvägningen
      * (ingen separat "Relevans"-sortering byggd ännu).
      */
-    public List<Wine> search(SearchCriteria criteria) {
+    public List<Wine> search(SearchCriteria criteria, UserId owner) {
         List<Wine> baseList = criteria.searchTerm() == null || criteria.searchTerm().isBlank()
-                ? wineRepository.findAll()
-                : wineRepository.search(criteria.searchTerm());
+                ? wineRepository.findAllByOwner(owner)
+                : wineRepository.searchByOwner(criteria.searchTerm(), owner);
         List<Wine> result = baseList.stream()
                 .filter(wine -> criteria.wineTypes().isEmpty() || criteria.wineTypes().contains(wine.wineType()))
                 .filter(wine -> criteria.countries().isEmpty() || criteria.countries().contains(wine.country()))
@@ -67,9 +74,9 @@ public class WineService {
      * - TreeMap tillåter inte en null-nyckel, och ett vin utan land kan
      * ändå inte placeras i något land-/regiongren i trädet.
      */
-    public List<OriginNode> originTree() {
+    public List<OriginNode> originTree(UserId owner) {
         Map<String, Map<String, Set<String>>> byCountryAndRegion = new TreeMap<>();
-        for (Wine wine : wineRepository.findAll()) {
+        for (Wine wine : wineRepository.findAllByOwner(owner)) {
             if (wine.country() == null) {
                 continue;
             }
@@ -98,12 +105,19 @@ public class WineService {
         return tree;
     }
 
-    public Optional<Wine> findById(WineId id) {
-        return wineRepository.findById(id);
+    public Optional<Wine> findById(WineId id, UserId owner) {
+        return wineRepository.findByIdAndOwner(id, owner);
     }
 
-    public void removeWine(WineId id) {
-        wineRepository.deleteById(id);
+    /**
+     * No-op (inte ett fel) om vinet inte finns eller inte tillhör
+     * `owner` - samma "bete sig som att vinet inte fanns"-princip som
+     * WINE-14 kräver för dataisolering, utan att controllern behöver
+     * skilja på "fanns inte" och "fanns men var inte din".
+     */
+    public void removeWine(WineId id, UserId owner) {
+        wineRepository.findByIdAndOwner(id, owner)
+                .ifPresent(wine -> wineRepository.deleteById(id));
     }
 
     /**
@@ -112,8 +126,8 @@ public class WineService {
      * genomsökning av samtliga viner, precis som findAll()/originTree()
      * redan gör - samlingens storlek gör det inte värt en särskild fråga.
      */
-    public DuplicateCheck checkForDuplicate(Wine candidate) {
-        for (Wine existing : wineRepository.findAll()) {
+    public DuplicateCheck checkForDuplicate(Wine candidate, UserId owner) {
+        for (Wine existing : wineRepository.findAllByOwner(owner)) {
             if (candidate.matchesIdentityOf(existing)) {
                 return candidate.hasCompleteIdentity()
                         ? new DuplicateCheck.FullDuplicate(existing)
@@ -128,8 +142,8 @@ public class WineService {
      * dubblettvarningens "öka antal istället"-val (WINE-6). Null-antal
      * (aldrig satt) behandlas som 0.
      */
-    public Wine increaseQuantity(WineId id) {
-        Wine existing = wineRepository.findById(id)
+    public Wine increaseQuantity(WineId id, UserId owner) {
+        Wine existing = wineRepository.findByIdAndOwner(id, owner)
                 .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
         int currentQuantity = existing.quantity() == null ? 0 : existing.quantity();
         return wineRepository.save(existing.withQuantity(currentQuantity + 1));

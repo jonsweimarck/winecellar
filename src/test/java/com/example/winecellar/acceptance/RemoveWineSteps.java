@@ -26,11 +26,11 @@ public class RemoveWineSteps {
 
     @När("jag tar bort vinet {string}")
     public void jagTarBortVinet(String name) {
-        wineService.removeWine(StepSupport.findWine(wineService, name).id());
+        wineService.removeWine(StepSupport.findWine(wineService, name).id(), null);
     }
 
     @Så("ska källaren inte längre innehålla {string}")
     public void skaKällarenInteLängreInnehålla(String name) {
-        assertThat(wineService.listWines()).extracting(Wine::name).doesNotContain(name);
+        assertThat(wineService.listWines(null)).extracting(Wine::name).doesNotContain(name);
     }
 }

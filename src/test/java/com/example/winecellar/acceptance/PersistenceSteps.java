@@ -57,12 +57,12 @@ public class PersistenceSteps {
 
     @När("jag söker efter {string} mot databasen")
     public void jagSökerEfterMotDatabasen(String sökord) {
-        sökresultat = wineRepository.search(sökord);
+        sökresultat = wineRepository.searchByOwner(sökord, null);
     }
 
     @Så("ska vinet {string} fortfarande finnas i källaren")
     public void skaVinetFortfarandeFinnasIKällaren(String name) {
-        assertThat(wineService.listWines()).anySatisfy(wine -> assertThat(wine.name()).isEqualTo(name));
+        assertThat(wineService.listWines(null)).anySatisfy(wine -> assertThat(wine.name()).isEqualTo(name));
     }
 
     @Så("ska vinet {string} finnas i sökresultatet")

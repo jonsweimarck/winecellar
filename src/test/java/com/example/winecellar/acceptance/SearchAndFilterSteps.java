@@ -89,12 +89,12 @@ public class SearchAndFilterSteps {
         result = wineService.search(SearchCriteria.builder()
                 .sortField(SortField.fromLabel(fieldLabel))
                 .sortDirection(direction)
-                .build());
+                .build(), null);
     }
 
     @När("jag visar vinlistan utan filter")
     public void jagVisarVinlistanUtanFilter() {
-        result = wineService.search(SearchCriteria.builder().build());
+        result = wineService.search(SearchCriteria.builder().build(), null);
     }
 
     @När("jag filtrerar vinlistan på:")
@@ -115,12 +115,12 @@ public class SearchAndFilterSteps {
         if (criteriaRow.containsKey("underregion")) {
             builder.subregions(new HashSet<>(commaList(criteriaRow.get("underregion"))));
         }
-        result = wineService.search(builder.build());
+        result = wineService.search(builder.build(), null);
     }
 
     @När("jag söker efter {string}")
     public void jagSökerEfter(String searchTerm) {
-        result = wineService.search(SearchCriteria.builder().searchTerm(searchTerm).build());
+        result = wineService.search(SearchCriteria.builder().searchTerm(searchTerm).build(), null);
     }
 
     @När("jag söker efter {string} och filtrerar vinlistan på:")
@@ -132,7 +132,7 @@ public class SearchAndFilterSteps {
                     .map(SearchAndFilterSteps::wineTypeFromSwedish)
                     .collect(Collectors.toSet()));
         }
-        result = wineService.search(builder.build());
+        result = wineService.search(builder.build(), null);
     }
 
     @Så("visas vinerna i ordningen {string}")

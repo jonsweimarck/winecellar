@@ -77,7 +77,7 @@ class WineListResponsiveIT {
 
     @AfterEach
     void tömKällaren() {
-        wineService.listWines().forEach(vin -> wineService.removeWine(vin.id()));
+        wineService.listWines(null).forEach(vin -> wineService.removeWine(vin.id(), null));
     }
 
     @Test

@@ -1197,6 +1197,86 @@ th:action="@{/logout}">`-knapp bredvid "Lägg till vin".
   stunden.
 - Verifierat: `mvn verify` grön (77 enhetstester, 48 acceptans-/UI-tester).
 
+**WINE-13 byggd (2026-07-25): vinlistan scopeas per användare.** Den mest
+genomgripande storyn i Fas 1. `Wine` fick ett nytt fält, `owner`
+(`User.UserId`, nullable), som en vanlig record-komponent - inte ett
+separat parameter som måste skickas med vid varje anrop. Det betyder att
+en redigering (`existing.toBuilder()...`) automatiskt bär vidare rätt
+ägare utan att `WineController` behöver göra något extra, medan en
+NY vinpost får ägaren explicit stämplad
+(`.owner(currentOwner(authentication))`) i `addWine`. `WineService.
+save(Wine)` fick medvetet INGET owner-argument - all ägarlogik sitter i
+anropande kod (`WineController`), inte i tjänsten.
+- **Alla läsande metoder scopeas, med `null` som "oscopeat" (inte "ägs av
+  ingen")**: `WineRepository.findAllByOwner/findByIdAndOwner/
+  searchByOwner`, motsvarande `WineService`-metoder, och båda adaptrarna
+  (`JpaWineRepository`/`WineJpaRepository` med härledda
+  `findByOwnerId`/`findByIdAndOwnerId`-frågor plus `:ownerId IS NULL OR
+  owner_id = :ownerId` i native-sökqueryn; `InMemoryWineRepository` med
+  samma null-betyder-oscopeat-logik i Java). `deleteById` scopeas INTE
+  på repository-nivå - `WineService.removeWine` verifierar ägarskap via
+  `findByIdAndOwner` FÖRST och anropar bara `deleteById` om det matchar
+  (no-op annars, inte ett fel - samma "bete sig som att vinet inte
+  fanns"-princip som gäller överallt).
+- **Beslut, avstämt med användaren innan kodning: admin/readonly förblir
+  HELT oscopeade (ser alla viner, som innan WINE-13) fram till WINE-15.**
+  `WineController.currentOwner(authentication)` slår upp `Authentication.
+  getName()` i `UserRepository` - hittas inget (de hårdkodade
+  admin/readonly-kontona finns inte i `users`-tabellen) blir owner
+  `null`, vilket ovanstående null-betyder-oscopeat-logik tolkar som "visa
+  allt". Bara riktigt registrerade konton (WINE-11) får en verklig,
+  privat lista. Motiverat av produktionsrisk - att kräva ett `UserId`
+  för admin hade antingen låst ute den riktiga produktionsanvändaren
+  (tom lista tills WINE-17s migrering körts) eller krävt att en
+  `users`-rad skapades åt admin i förväg, bägge större ingrepp än
+  motiverat just nu.
+- **`editForm`/`saveEdit`/`showImage`/`increaseQuantityForDuplicate` fick
+  alla ett nytt `Authentication`-parameter** (saknades helt innan) för
+  att kunna scopea. Samtidigt byttes `orElseThrow(() -> new
+  IllegalArgumentException(...))` mot `orElseThrow(() -> new
+  ResponseStatusException(HttpStatus.NOT_FOUND))` i `editForm`/
+  `saveEdit` - fixar en redan existerande, oberoende bugg (ett okänt
+  vin-id gav 500, inte 404) som blev akut relevant nu eftersom en
+  ägarmiss ska bete sig identiskt med "vinet finns inte" (WINE-14).
+  `showImage` hade redan rätt mönster (`ResponseStatusException` för
+  saknad bild) sedan tidigare.
+- **Två separata testfällor hittade under verifiering, ingen av dem i
+  produktion tack vare lokal end-to-end-testning innan push:**
+  1. `WineControllerTest`s globala sök-/ersätt-fix
+     (`findById(new WineId(1L))` → `findById(new WineId(1L), any())`)
+     blandade en rå parameter med en Mockito-matcher i samma anrop -
+     `InvalidUseOfMatchersException` ("2 matchers expected, 1
+     recorded"). Mockito kräver att ANTINGEN alla argument är matchare
+     ELLER inga är det. Fixat med `eq(new WineId(1L))` istället för det
+     råa värdet.
+  2. **Allvarligare, hade nästan missats:** `WineEntity.owner` var
+     `@ManyToOne(fetch = FetchType.LAZY)` (satt i WINE-10). `open-in-
+     view: false` stänger Hibernate-sessionen så fort ett
+     repository-anrop returnerar, och `JpaWineRepository.toDomain(...)`
+     läser `entity.getOwner().getId()` EFTER det - `org.hibernate.
+     LazyInitializationException: could not initialize proxy ... no
+     Session`, kraschade varenda sida som listade viner. Upptäcktes
+     INTE av `mvn verify` (Testcontainers-scenarierna sparar bara ett
+     vin i taget utan att läsa tillbaka via en lista i samma
+     session-brytning som exponerade buggen) - bara av en manuell,
+     verklig flerkonto-rundtur lokalt (registrera två användare, lägg
+     till var sitt vin, hämta listan via en separat `curl`-förfrågan).
+     Fixat genom att byta till `FetchType.EAGER` - `UserEntity` är litet
+     (fyra fält) och samlingen för liten för att en extra join per vin
+     ska vara en verklig kostnad. **Lärdom:** `mvn verify`s
+     Testcontainers-scenarier bevisar att en enskild sparning/hämtning
+     fungerar, inte att en hel lista av flera repository-anrop i
+     följd (som en riktig sidladdning gör) fungerar utanför en enda
+     transaktion - bara en riktig HTTP-rundtur mot en riktig,
+     körande app avslöjade det här.
+- **Verifierat manuellt, end-to-end, mot en riktig lokal Postgres innan
+  push:** två konton (alice, bob) registrerade, ett vin vardera,
+  bekräftat att var och en bara ser sitt eget i listan, att den andras
+  vin ger 404 på både redigeringssida och bildlänk, att ett
+  borttagningsförsök mot någon annans vin är ofarligt (200, men vinet
+  finns kvar), och att admin (inloggad separat) ser båda vinerna.
+  `mvn verify` grön (77 enhetstester, 48 acceptans-/UI-tester).
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),

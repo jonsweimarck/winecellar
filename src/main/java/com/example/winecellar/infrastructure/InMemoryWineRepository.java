@@ -1,6 +1,7 @@
 package com.example.winecellar.infrastructure;
 
 import com.example.winecellar.application.WineRepository;
+import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 
@@ -32,14 +33,22 @@ public class InMemoryWineRepository implements WineRepository {
         return toStore;
     }
 
+    /** null owner = oscopeat (matcha oavsett ägare) - se WineRepository. */
     @Override
-    public List<Wine> findAll() {
-        return List.copyOf(wines.values());
+    public List<Wine> findAllByOwner(UserId owner) {
+        return wines.values().stream()
+                .filter(wine -> ownedBy(wine, owner))
+                .toList();
     }
 
     @Override
-    public Optional<Wine> findById(WineId id) {
-        return Optional.ofNullable(wines.get(id.value()));
+    public Optional<Wine> findByIdAndOwner(WineId id, UserId owner) {
+        return Optional.ofNullable(wines.get(id.value()))
+                .filter(wine -> ownedBy(wine, owner));
+    }
+
+    private static boolean ownedBy(Wine wine, UserId owner) {
+        return owner == null || owner.equals(wine.owner());
     }
 
     @Override
@@ -58,9 +67,10 @@ public class InMemoryWineRepository implements WineRepository {
      * "Albariño" här, till skillnad från i produktion.
      */
     @Override
-    public List<Wine> search(String query) {
+    public List<Wine> searchByOwner(String query, UserId owner) {
         String normalizedSearchTerm = stripDiacritics(query.toLowerCase(Locale.ROOT));
         return wines.values().stream()
+                .filter(wine -> ownedBy(wine, owner))
                 .filter(wine -> matches(wine, normalizedSearchTerm))
                 .toList();
     }

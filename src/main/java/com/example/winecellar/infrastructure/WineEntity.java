@@ -101,13 +101,20 @@ public class WineEntity {
     private String imageMimeType;
 
     /**
-     * WINE-10: lägger bara till kolumnen/FK-constraintet (nullable tills
-     * WINE-17s produktionsmigrering är klar). Wine-domänobjektet och
-     * JpaWineRepositorys mappning känner ännu inte till ägaren - den
-     * faktiska scopingen (sätta ägare vid skapande, filtrera på den vid
-     * läsning) byggs i WINE-13, inte här.
+     * WINE-10: lägger till kolumnen/FK-constraintet. WINE-13 kopplade på
+     * den faktiska scopingen (sätta ägare vid skapande, filtrera på den
+     * vid läsning).
+     *
+     * EAGER, inte LAZY (upptäckt under WINE-13:s verifiering): `open-in-
+     * view: false` stänger Hibernate-sessionen så fort ett repository-
+     * anrop returnerar, och `JpaWineRepository.toDomain(...)` läser
+     * `owner.getId()` EFTER det - en lat proxy kastar då
+     * `LazyInitializationException: no Session`. `UserEntity` är liten
+     * (fyra fält, inga blobbar) och samlingen är för liten för att en
+     * extra join/rad per vin ska vara en verklig kostnad, så EAGER är
+     * den enkla, riskfria fixen - ingen schemaändring, ren Java-kod.
      */
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "owner_id")
     private UserEntity owner;
 

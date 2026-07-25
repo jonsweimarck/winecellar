@@ -45,7 +45,7 @@ public class DuplicateWarningSteps {
     }
 
     private void attempt(Wine candidate) {
-        lastCheck = wineService.checkForDuplicate(candidate);
+        lastCheck = wineService.checkForDuplicate(candidate, null);
         if (lastCheck instanceof DuplicateCheck.NoDuplicate) {
             wineService.save(candidate);
             pendingCandidate = null;
@@ -82,7 +82,7 @@ public class DuplicateWarningSteps {
     }
 
     private void increaseQuantityOfMatch() {
-        wineService.increaseQuantity(existingFromLastCheck().id());
+        wineService.increaseQuantity(existingFromLastCheck().id(), null);
         pendingCandidate = null;
     }
 
@@ -109,11 +109,11 @@ public class DuplicateWarningSteps {
 
     @Så("källaren ska innehålla totalt {int} vin")
     public void skaKällarenInnehållaTotaltVin(int count) {
-        assertThat(wineService.listWines()).hasSize(count);
+        assertThat(wineService.listWines(null)).hasSize(count);
     }
 
     @Så("källaren ska innehålla totalt {int} viner")
     public void skaKällarenInnehållaTotaltViner(int count) {
-        assertThat(wineService.listWines()).hasSize(count);
+        assertThat(wineService.listWines(null)).hasSize(count);
     }
 }

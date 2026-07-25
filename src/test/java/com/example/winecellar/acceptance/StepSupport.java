@@ -27,7 +27,7 @@ final class StepSupport {
     }
 
     static Wine findWine(WineService wineService, String name) {
-        return wineService.listWines().stream()
+        return wineService.listWines(null).stream()
                 .filter(wine -> wine.name().equals(name))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Inget vin med namnet " + name + " hittades"));

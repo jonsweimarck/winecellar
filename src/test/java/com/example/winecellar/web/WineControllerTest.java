@@ -37,6 +37,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -145,7 +146,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrlPattern("**/login"));
 
-            verify(wineService, never()).removeWine(new WineId(1L));
+            verify(wineService, never()).removeWine(any(), any());
         }
 
         @Test
@@ -250,7 +251,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska se listan utan länkar/knappar för lägg till, redigera eller ta bort")
         void skaSeListanUtanRedigeringslänkar() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isOk())
@@ -315,14 +316,14 @@ class WineControllerTest {
             mockMvc.perform(delete("/wines/1").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isForbidden());
 
-            verify(wineService, never()).removeWine(new WineId(1L));
+            verify(wineService, never()).removeWine(any(), any());
         }
 
         @Test
         @DisplayName("ska ändå få se en bild")
         void skaFåSeEnBild() throws Exception {
             byte[] bilddata = new byte[]{1, 2, 3};
-            when(wineService.findById(new WineId(1L)))
+            when(wineService.findById(eq(new WineId(1L)), any()))
                     .thenReturn(Optional.of(BAROLO.withImage(bilddata, "image/jpeg")));
 
             mockMvc.perform(get("/wines/1/bild").with(user("readonly").roles("READONLY")).with(csrf()))
@@ -338,7 +339,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska lista befintliga viner och länka till formuläret för ett nytt vin")
         void skaListaBefintligaVinerOchLänkaTillNyttVinFormulär() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -352,7 +353,7 @@ class WineControllerTest {
         @DisplayName("ska rendera ett vin som bara har namnet ifyllt utan att krascha (typ/årgång/antal/land/producent/plats null)")
         void skaRenderaEttVinMedBaraNamnetIfylltUtanAttKrascha() throws Exception {
             Wine minimaltVin = Wine.builder().id(new WineId(1L)).name("Chianti Classico").build();
-            when(wineService.search(any())).thenReturn(List.of(minimaltVin));
+            when(wineService.search(any(), any())).thenReturn(List.of(minimaltVin));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -371,7 +372,7 @@ class WineControllerTest {
                     .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
                     .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
                     .build();
-            when(wineService.search(any())).thenReturn(List.of(barolo));
+            when(wineService.search(any(), any())).thenReturn(List.of(barolo));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -407,7 +408,7 @@ class WineControllerTest {
             Wine barolo = BAROLO.toBuilder()
                     .systembolagetProductNumber("12345")
                     .build();
-            when(wineService.search(any())).thenReturn(List.of(barolo));
+            when(wineService.search(any(), any())).thenReturn(List.of(barolo));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -425,7 +426,7 @@ class WineControllerTest {
                     .tastingNotes("Kraftfullt")
                     .ownRating(Rating.R16)
                     .build();
-            when(wineService.search(any())).thenReturn(List.of(barolo));
+            when(wineService.search(any(), any())).thenReturn(List.of(barolo));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -462,7 +463,7 @@ class WineControllerTest {
                     .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
                     .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
                     .build();
-            when(wineService.search(any())).thenReturn(List.of(barolo));
+            when(wineService.search(any(), any())).thenReturn(List.of(barolo));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -498,7 +499,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska rendera sorteringskontroller med alla sorterbara fält")
         void skaRenderaSorteringskontrollerMedAllaFält() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -523,20 +524,20 @@ class WineControllerTest {
         @Test
         @DisplayName("ska sortera på namn, stigande, som standard när inget valts")
         void skaAnvändaStandardsortering() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk());
 
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
-                    .build());
+                    .build(), null);
         }
 
         @Test
         @DisplayName("ska skicka valt sorteringsfält och riktning vidare till WineService")
         void skaSkickaValdSorteringTillWineService() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -546,13 +547,13 @@ class WineControllerTest {
 
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.OWN_RATING).sortDirection(SortDirection.DESCENDING)
-                    .build());
+                    .build(), null);
         }
 
         @Test
         @DisplayName("ska returnera bara listfragmentet, inte hela sidan, vid en htmx-förfrågan")
         void skaReturneraBaraListfragmentetVidHtmxFörfrågan() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -569,7 +570,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska rendera kryssrutor för alla vintyper")
         void skaRenderaFilterkryssrutorMedAllaVintyper() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -590,7 +591,7 @@ class WineControllerTest {
         @Test
         @DisplayName("filterpanelens knapp ska heta \"Dölj filter\", inte \"Använd filter\" - checkrutorna applicerar redan filtret vid ändring")
         void skaHaKnappenDöljFilter() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -603,8 +604,8 @@ class WineControllerTest {
         @Test
         @DisplayName("ska rendera härkomstträdet som nästlade kryssrutor för land/region/underregion")
         void skaRenderaHärkomstträdetSomNästladeKryssrutor() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
-            when(wineService.originTree()).thenReturn(List.of(
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.originTree(any())).thenReturn(List.of(
                     new OriginNode("Italien", List.of(
                             new OriginNode("Piemonte", List.of(
                                     new OriginNode("Langhe", List.of())
@@ -624,8 +625,8 @@ class WineControllerTest {
         @Test
         @DisplayName("ska fälla ut land- och regionnivån automatiskt runt en vald underregion")
         void skaFällaUtTrädetAutomatisktRuntEnValdUnderregion() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
-            when(wineService.originTree()).thenReturn(List.of(
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.originTree(any())).thenReturn(List.of(
                     new OriginNode("Italien", List.of(
                             new OriginNode("Piemonte", List.of(
                                     new OriginNode("Langhe", List.of())
@@ -652,8 +653,8 @@ class WineControllerTest {
         @Test
         @DisplayName("ska hålla trädet hopfällt när inget filter är valt")
         void skaHållaTrädetHopfälltUtanValtFilter() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
-            when(wineService.originTree()).thenReturn(List.of(
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.originTree(any())).thenReturn(List.of(
                     new OriginNode("Italien", List.of(
                             new OriginNode("Piemonte", List.of(
                                     new OriginNode("Langhe", List.of())
@@ -671,7 +672,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska skicka valda filter vidare till WineService")
         void skaSkickaValdaFilterTillWineService() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -683,13 +684,13 @@ class WineControllerTest {
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .wineTypes(Set.of(WineType.RED, WineType.WHITE))
                     .countries(Set.of("Italien"))
-                    .build());
+                    .build(), null);
         }
 
         @Test
         @DisplayName("ska förhandskryssa redan valda filter vid sidladdning")
         void skaFörhandskryssaRedanValdaFilter() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -703,7 +704,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska rendera sökfältet och skicka sökordet vidare till WineService")
         void skaSkickaSökordetTillWineService() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -716,13 +717,13 @@ class WineControllerTest {
             verify(wineService).search(SearchCriteria.builder()
                     .searchTerm("barolo")
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
-                    .build());
+                    .build(), null);
         }
 
         @Test
         @DisplayName("ska förhandsifylla sökfältet med det aktiva sökordet")
         void skaFörhandsifyllaSökfältet() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -736,8 +737,8 @@ class WineControllerTest {
         @Test
         @DisplayName("ska visa antal träffar av totalt antal viner")
         void skaVisaAntalTräffar() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
-            when(wineService.listWines()).thenReturn(List.of(BAROLO, BAROLO.toBuilder().name("Chablis").build()));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.listWines(any())).thenReturn(List.of(BAROLO, BAROLO.toBuilder().name("Chablis").build()));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -751,7 +752,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska inte visa några chips utan aktivt filter eller sökning")
         void skaInteVisaChipsUtanAktivtFilter() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -761,7 +762,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska visa en chip per aktivt filter-/sökvärde, vars borttagningslänk behåller övriga värden")
         void skaVisaChipsMedBorttagningslänkar() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             String html = mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -788,7 +789,7 @@ class WineControllerTest {
         @Test
         @DisplayName("sökchippet ska visa flera sökord ihopfogade med + istället för som en citerad fras, eftersom sökningen faktiskt är OCH mellan orden")
         void skaVisaFleraSökordMedPlusIChippet() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             String html = mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -804,7 +805,7 @@ class WineControllerTest {
         @Test
         @DisplayName("\"Ta bort\"-länken ska skicka med aktivt filter, sökning och sortering")
         void skaSkickaMedAktivtTillståndITaBortLänken() throws Exception {
-            when(wineService.search(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             String html = mockMvc.perform(get("/")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -1006,7 +1007,7 @@ class WineControllerTest {
             Wine existing = Wine.builder()
                     .id(new WineId(1L)).name("Barolo").producer("Pio Cesare").vintage(2018).quantity(3)
                     .build();
-            when(wineService.checkForDuplicate(any())).thenReturn(new DuplicateCheck.FullDuplicate(existing));
+            when(wineService.checkForDuplicate(any(), any())).thenReturn(new DuplicateCheck.FullDuplicate(existing));
 
             mockMvc.perform(post("/wines")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -1029,7 +1030,7 @@ class WineControllerTest {
             Wine existing = Wine.builder()
                     .id(new WineId(1L)).name("Barolo").producer("Pio Cesare").vintage(2018).quantity(3)
                     .build();
-            when(wineService.checkForDuplicate(any())).thenReturn(new DuplicateCheck.PartialDuplicate(existing));
+            when(wineService.checkForDuplicate(any(), any())).thenReturn(new DuplicateCheck.PartialDuplicate(existing));
 
             mockMvc.perform(post("/wines")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -1054,7 +1055,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService, never()).checkForDuplicate(any());
+            verify(wineService, never()).checkForDuplicate(any(), any());
             verify(wineService).save(Wine.builder().name("Barolo").build());
         }
     }
@@ -1070,7 +1071,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).increaseQuantity(new WineId(1L));
+            verify(wineService).increaseQuantity(new WineId(1L), null);
         }
 
         @Test
@@ -1080,7 +1081,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrlPattern("**/login"));
 
-            verify(wineService, never()).increaseQuantity(any());
+            verify(wineService, never()).increaseQuantity(any(), any());
         }
 
         @Test
@@ -1089,7 +1090,7 @@ class WineControllerTest {
             mockMvc.perform(post("/wines/1/dubblett-oka-antal").with(user("readonly").roles("READONLY")).with(csrf()))
                     .andExpect(status().isForbidden());
 
-            verify(wineService, never()).increaseQuantity(any());
+            verify(wineService, never()).increaseQuantity(any(), any());
         }
     }
 
@@ -1100,19 +1101,19 @@ class WineControllerTest {
         @Test
         @DisplayName("ska id skickas till WineService")
         void skaIdSkickasTillService() throws Exception {
-            when(wineService.listWines()).thenReturn(List.of());
+            when(wineService.listWines(any())).thenReturn(List.of());
 
             mockMvc.perform(delete("/wines/1").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk());
 
-            verify(wineService).removeWine(new WineId(1L));
+            verify(wineService).removeWine(new WineId(1L), null);
         }
 
         @Test
         @DisplayName("ska behålla aktivt filter, sökning och sortering efter en borttagning")
         void skaBehållaAktivtFilterEfterBorttagning() throws Exception {
-            when(wineService.listWines()).thenReturn(List.of());
-            when(wineService.search(any())).thenReturn(List.of());
+            when(wineService.listWines(any())).thenReturn(List.of());
+            when(wineService.search(any(), any())).thenReturn(List.of());
 
             mockMvc.perform(delete("/wines/1")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -1126,7 +1127,7 @@ class WineControllerTest {
                     .searchTerm("barolo")
                     .sortField(SortField.VINTAGE).sortDirection(SortDirection.DESCENDING)
                     .wineTypes(Set.of(WineType.RED))
-                    .build());
+                    .build(), null);
         }
     }
 
@@ -1138,7 +1139,7 @@ class WineControllerTest {
         @DisplayName("ska bilden serveras med rätt Content-Type")
         void skaBildenSererasMedRättContentType() throws Exception {
             byte[] bilddata = new byte[]{1, 2, 3};
-            when(wineService.findById(new WineId(1L)))
+            when(wineService.findById(eq(new WineId(1L)), any()))
                     .thenReturn(Optional.of(BAROLO.withImage(bilddata, "image/jpeg")));
 
             mockMvc.perform(get("/wines/1/bild").with(user("admin").roles("ADMIN")).with(csrf()))
@@ -1150,7 +1151,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska ge 404 om vinet saknar bild")
         void skaGe404OmVinetSaknarBild() throws Exception {
-            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(BAROLO));
 
             mockMvc.perform(get("/wines/1/bild").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isNotFound());
@@ -1164,7 +1165,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska formuläret vara förifyllt med vinets uppgifter")
         void skaFormuläretVaraFörifylltMedVinetsUppgifter() throws Exception {
-            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(BAROLO));
 
             mockMvc.perform(get("/wines/1/redigera").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
@@ -1191,7 +1192,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska alla fält skickas till WineService och sidan omdirigera till startsidan")
         void skaAllaFältSkickasTillServiceOchOmdirigera() throws Exception {
-            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(BAROLO));
 
             mockMvc.perform(post("/wines/1/redigera")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -1234,7 +1235,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska lämna valfria fält som null när de inte fylls i")
         void skaLämnaValfriaFältSomNullNärDeInteFyllsI() throws Exception {
-            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(BAROLO));
 
             mockMvc.perform(post("/wines/1/redigera")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -1253,7 +1254,7 @@ class WineControllerTest {
         @Test
         @DisplayName("ska ersätta bilden om en ny fil väljs")
         void skaErsättaBildenOmEnNyFilVäljs() throws Exception {
-            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(BAROLO));
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(BAROLO));
             byte[] nyBilddata = new byte[]{4, 5, 6};
 
             mockMvc.perform(multipart("/wines/1/redigera")
@@ -1276,7 +1277,7 @@ class WineControllerTest {
         void skaBehållaBefintligBildOmIngenNyFilVäljs() throws Exception {
             byte[] befintligBilddata = new byte[]{1, 2, 3};
             Wine vinMedBild = BAROLO.withImage(befintligBilddata, "image/jpeg");
-            when(wineService.findById(new WineId(1L))).thenReturn(Optional.of(vinMedBild));
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(vinMedBild));
 
             mockMvc.perform(post("/wines/1/redigera")
                             .with(user("admin").roles("ADMIN")).with(csrf())

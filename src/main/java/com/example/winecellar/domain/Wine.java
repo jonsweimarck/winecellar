@@ -1,5 +1,7 @@
 package com.example.winecellar.domain;
 
+import com.example.winecellar.domain.User.UserId;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -25,6 +27,14 @@ import java.time.LocalDate;
  */
 public record Wine(
         WineId id,
+        /**
+         * WINE-13: vinets ägare. Nullable - viner sparade innan WINE-10
+         * (och viner sparade av de hårdkodade admin/readonly-kontona, som
+         * medvetet förblir oscopeade tills WINE-15, se CLAUDE.md) har
+         * `null` här. `WineService`/`WineRepository` tolkar `null` som
+         * "oscopeat", inte som "ägs av ingen".
+         */
+        UserId owner,
         String name,
         WineType wineType,
         String producer,
@@ -91,7 +101,7 @@ public record Wine(
 
     public Builder toBuilder() {
         return new Builder()
-                .id(id).name(name).wineType(wineType).producer(producer).country(country)
+                .id(id).owner(owner).name(name).wineType(wineType).producer(producer).country(country)
                 .region(region).subregion(subregion).grapes(grapes)
                 .vintage(vintage).purchaseDate(purchaseDate).price(price).quantity(quantity)
                 .purchaseReason(purchaseReason).tastingNotes(tastingNotes).ownRating(ownRating)
@@ -117,6 +127,7 @@ public record Wine(
      */
     public static final class Builder {
         private WineId id;
+        private UserId owner;
         private String name;
         private WineType wineType;
         private String producer;
@@ -143,6 +154,11 @@ public record Wine(
 
         public Builder id(WineId id) {
             this.id = id;
+            return this;
+        }
+
+        public Builder owner(UserId owner) {
+            this.owner = owner;
             return this;
         }
 
@@ -262,7 +278,7 @@ public record Wine(
         }
 
         public Wine build() {
-            return new Wine(id, name, wineType, producer, country, region, subregion, grapes,
+            return new Wine(id, owner, name, wineType, producer, country, region, subregion, grapes,
                     vintage, purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                     systembolagetProductNumber, systembolagetDescription, munskankarnaReview, munskankarnaRating,
                     vivinoRating, otherReference, location, image, imageMimeType);
