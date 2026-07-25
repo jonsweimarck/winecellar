@@ -1277,6 +1277,38 @@ anropande kod (`WineController`), inte i tjänsten.
   finns kvar), och att admin (inloggad separat) ser båda vinerna.
   `mvn verify` grön (77 enhetstester, 48 acceptans-/UI-tester).
 
+**WINE-18 (2026-07-25): uppfylld utan kod.** WINE-13:s null-betyder-
+oscopeat-design gjorde att alla befintliga Cucumber-stegklasser förblev
+opåverkade (de skickar redan `null` till de nya owner-parametrarna) -
+inget behövde ändras för att hålla dem gröna. Markerad klar direkt, se
+YouTrack-kommentaren.
+
+**WINE-14 byggd (2026-07-25): dataisolering, ett eget automatiskt test
+för det som redan verifierats manuellt under WINE-13.** Splittat över
+två testlager, medvetet - samma princip som resten av projektet (se
+README:s Arbetsprocess):
+- **Listans osynlighet** (`flera-anvandare.feature`, ny `MultiUserSteps`
+  - egen stegklass, inte återanvänd `WineService`-instans från någon
+  annan stegklass, se "Kända fällor" om varför delade Gherkin-steg måste
+  ligga i samma klass). Första stegklassen som modellerar FLERA
+  inloggade användare samtidigt - en `Map<String, UserId>` håller reda
+  på vilket konto varje Gherkin-användarnamn ("alice", "bob") faktiskt
+  fick, skapat lat första gången namnet nämns i scenariot, via en egen
+  `InMemoryUserRepository`.
+- **Direkt URL-åtkomst** (ny `DataiseleringMellanAnvändare`-svit i
+  `WineControllerTest`, webblagret) - "kan inte komma åt ett annat vin
+  via URL" är i grunden ett HTTP-koncept (statuskod), inte något
+  applikationslagret har ett naturligt sätt att uttrycka. `WineService`
+  är redan stubbad i den testklassen, så det som simuleras är "findById
+  returnerar tomt" (exakt vad WineService faktiskt gör för ett vin som
+  ägs av någon annan) - inte en riktig andra användare på HTTP-nivå.
+  Täcker redigeringssida (GET), spara redigering (POST) och bildvisning
+  (GET), alla → 404.
+- Ingen ny produktionskod - bara tester, byggda ovanpå det som WINE-13
+  redan implementerade och som redan verifierats manuellt (två riktiga
+  konton mot en riktig Postgres, se WINE-13-loggen ovan). Verifierat:
+  `mvn verify` grön (80 enhetstester, 49 acceptans-/UI-tester).
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),

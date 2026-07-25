@@ -1293,4 +1293,51 @@ class WineControllerTest {
             verify(wineService).save(vinMedBild);
         }
     }
+
+    /**
+     * WINE-14: den delen av dataisoleringen som hör till webblagret -
+     * "nekas åtkomst som om vinet inte fanns" via direkt URL. `WineService`
+     * är redan stubbad, så det som simuleras är "det här vinet finns inte
+     * FÖR DEN INLOGGADE ANVÄNDAREN" (findById/findByIdAndOwner returnerar
+     * tomt) - exakt vad WineService faktiskt returnerar när ett vin ägs av
+     * någon annan (se WineService/WineRepository). Själva listans
+     * osynlighet (den andra halvan av WINE-14) testas i
+     * flera-anvandare.feature (Cucumber, applikationslagret) istället,
+     * där ägarlogiken faktiskt körs på riktigt.
+     */
+    @Nested
+    @DisplayName("dataisolering mellan användare")
+    class DataiseleringMellanAnvändare {
+
+        @Test
+        @DisplayName("ska neka redigeringssidan för ett vin som tillhör en annan användare")
+        void skaNekaRedigeringssidanFörAnnanAnvändaresVin() throws Exception {
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.empty());
+
+            mockMvc.perform(get("/wines/1/redigera").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("ska inte spara en redigering för ett vin som tillhör en annan användare")
+        void skaInteSparaRedigeringFörAnnanAnvändaresVin() throws Exception {
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.empty());
+
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "Barolo"))
+                    .andExpect(status().isNotFound());
+
+            verify(wineService, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("ska neka bildvisning för ett vin som tillhör en annan användare")
+        void skaNekaBildvisningFörAnnanAnvändaresVin() throws Exception {
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.empty());
+
+            mockMvc.perform(get("/wines/1/bild").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+    }
 }
