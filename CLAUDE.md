@@ -1309,6 +1309,28 @@ README:s Arbetsprocess):
   konton mot en riktig Postgres, se WINE-13-loggen ovan). Verifierat:
   `mvn verify` grön (80 enhetstester, 49 acceptans-/UI-tester).
 
+**WINE-17 körd (2026-07-25): befintliga produktionsviner (~30 st) knutna
+till kontot "Testus".** `db/migrations/2026-07-25-assign-existing-wines-
+to-testus.sql` - en `DO $$ ... $$`-sats som slår upp `Testus`s `UserId`
+och sätter `owner_id` på alla rader där det fortfarande var `NULL`,
+med en explicit `RAISE EXCEPTION` om användarnamnet inte skulle hittas
+(hellre ett högljutt fel än att tyst göra ingenting). Bekräftat i
+produktionen: Testus ser nu alla tidigare ägarlösa viner.
+- **Backupförsöket innan migreringen misslyckades, medvetet övergivet
+  av användaren.** `pg_dump` gav `permission denied for table
+  pg_database` mot `postgres:16`-avbildens klient (en collation-
+  versionskontroll Clever Clouds databasanvändare inte har rättighet
+  till), och ett försök med en äldre klient (`postgres:14`) gav istället
+  `server version mismatch` (produktionsservern kör Postgres 15.4).
+  `psql` (använt för själva migreringen) drabbas INTE av samma problem -
+  bara `pg_dump`s extra katalogfrågor. Löst genom att användaren
+  medvetet valde att köra migreringen utan backup.
+- **Deltillägget "gör owner_id NOT NULL" flyttat till WINE-15, inte
+  gjort här.** Kan inte göras förrän admin/readonly är borttagna - så
+  länge admin kan lägga till viner (medvetet oscopeat, `owner=null`,
+  se WINE-13) skulle en NOT NULL-begränsning blockera det, och admin
+  var fortfarande aktivt i produktion vid det här laget.
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),
