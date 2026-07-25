@@ -7,6 +7,7 @@ import com.example.winecellar.application.OriginNode;
 import com.example.winecellar.application.SortDirection;
 import com.example.winecellar.application.SortField;
 import com.example.winecellar.application.SearchCriteria;
+import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
@@ -97,6 +98,10 @@ class WineControllerTest {
 
     @MockBean
     private LabelInterpretationService labelInterpretationService;
+
+    /** SecurityConfigs userDetailsService-bean beror på UserRepository sedan WINE-11. */
+    @MockBean
+    private UserRepository userRepository;
 
     private static final Wine BAROLO = Wine.builder()
             .id(new WineId(1L)).name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")

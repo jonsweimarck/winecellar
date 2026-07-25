@@ -3,33 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Logga in - Vinkällaren</title>
+    <title>Registrera konto - Vinkällaren</title>
     <style>
         body { font-family: sans-serif; max-width: 24rem; margin: 6rem auto; padding: 0 1rem; }
         label { display: block; margin-top: 0.75rem; }
         input { width: 100%; padding: 0.4rem; box-sizing: border-box; }
         button { margin-top: 1.25rem; padding: 0.5rem 1rem; }
         .fel { color: #a4262c; margin-top: 1rem; }
-        .info { color: #333; margin-top: 1rem; }
         .lank { margin-top: 1.5rem; }
     </style>
 </head>
 <body>
-    <h1>Logga in</h1>
+    <h1>Registrera konto</h1>
 
-    <p class="fel" th:if="${param.error}">Fel användarnamn eller lösenord.</p>
-    <p class="info" th:if="${param.logout}">Du är utloggad.</p>
+    <p class="fel" th:if="${error}" th:text="${error}"></p>
 
-    <form method="post" th:action="@{/login}">
+    <form method="post" th:action="@{/registrera}">
         <label for="username">Användarnamn</label>
-        <input type="text" id="username" name="username" autofocus="autofocus">
+        <input type="text" id="username" name="username" th:value="${username}" autofocus="autofocus">
 
         <label for="password">Lösenord</label>
         <input type="password" id="password" name="password">
 
-        <button type="submit">Logga in</button>
+        <label for="confirmPassword">Bekräfta lösenord</label>
+        <input type="password" id="confirmPassword" name="confirmPassword">
+
+        <button type="submit">Registrera</button>
     </form>
 
-    <p class="lank"><a th:href="@{/registrera}">Inget konto än? Registrera dig</a></p>
+    <p class="lank"><a th:href="@{/login}">Har du redan ett konto? Logga in</a></p>
 </body>
 </html>

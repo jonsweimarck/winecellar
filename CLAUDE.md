@@ -1088,6 +1088,59 @@ th:action="@{/logout}">`-knapp bredvid "Lägg till vin".
   `/wines/nytt` bara omdirigerade till den nu obefintliga
   Basic-auth-inloggningen) gröna via `mvn verify`.
 
+**WINE-11 byggd (2026-07-25): öppen självregistrering.** Ny
+`GET/POST /registrera` (`RegistrationController` + `registrera.html`),
+`RegistrationService` (`application/`, sparar via den redan byggda
+`UserRepository`n från WINE-10) och `RegistrationResult`
+(`Registered`/`UsernameTaken`, samma sealed interface-mönster som
+`DuplicateCheck`/`LabelInterpretationResult`). Länk till/från
+`login.html`.
+- **`SecurityConfig.userDetailsService` slår nu ihop två källor** - de
+  gamla hårdkodade `admin`/`readonly`-kontona (kollas först) och
+  `UserRepository`n (kollas bara om användarnamnet inte matchar någon av
+  de hårdkodade, via `UsernameNotFoundException`-fallback). Detta var
+  den medvetna avvikelsen från WINE-12 (se ovan) som nu löses här -
+  admin/readonly fortsätter fungera oförändrat, samtidigt som
+  nyregistrerade användare kan logga in. Databasen är fortfarande INTE
+  den enda sanningskällan - det blir den först i WINE-15, när
+  admin/readonly-kontona tas bort.
+- **Nyregistrerade användare får `ROLE_ADMIN` hårdkodat**
+  (`RegistrationController.loggaInAutomatiskt`), en medveten temporär
+  förenkling - `SecurityConfig`s route-regler kräver fortfarande den
+  rollen för det mesta, och riktig scoping till den egna listan finns
+  inte förrän WINE-13. Praktisk konsekvens just nu: alla inloggade
+  användare (admin, readonly delvis, och alla nyregistrerade) delar i
+  praktiken samma enda vinlista - "min vinlista är tom direkt efter
+  registrering" (ett av WINE-11s ursprungliga Gherkin-scenarier) stämmer
+  alltså INTE ännu i verkligheten, och testades medvetet inte som om det
+  gjorde det. Försvinner när WINE-13 landar.
+- **Auto-inloggning direkt efter registrering** byggs manuellt
+  (`UsernamePasswordAuthenticationToken`s 3-argumentskonstruktor +
+  `HttpSessionSecurityContextRepository.saveContext(...)`) - samma
+  mekanism `SecurityContextHolderFilter` annars sköter automatiskt vid
+  en vanlig formLogin-rundtur, men här behövs den manuellt eftersom
+  registreringen inte går via `/login`.
+- **Testuppdelning:** `registrera-konto.feature` (Cucumber, ny
+  `RegistrationSteps`-klass, samma Spring+Testcontainers-mönster som
+  `PersistenceSteps`) täcker bara `RegistrationService`s kärnlogik
+  (kontoskapande, unikhetskontroll) - sessionen/auto-inloggningen är ett
+  webblagerskoncept och testas istället i det nya
+  `RegistrationControllerTest` (`@WebMvcTest`, verifierar att
+  `SPRING_SECURITY_CONTEXT`-attributet faktiskt sätts i sessionen efter
+  en lyckad POST). "Jag är inloggad"/"min vinlista är tom" ur de
+  ursprungliga YouTrack-scenarierna splittades alltså medvetet över två
+  testlager istället för att tvinga fram ett enda HTTP-baserat
+  Cucumber-scenario.
+- **Fälla:** `WineControllerTest` slutade kunna bygga sin
+  `ApplicationContext` (alla test i klassen fick fel, inte bara ett)
+  efter `userDetailsService`-beanens nya `UserRepository`-beroende -
+  fixat med ett nytt `@MockBean UserRepository` i den klassen. Värt att
+  komma ihåg: varje ny bean-parameter på en `@Bean`-metod i
+  `SecurityConfig` måste speglas i ALLA `@WebMvcTest`-klasser som
+  `@Import(SecurityConfig.class)`, inte bara den man råkar ändra i
+  stunden.
+- Verifierat: `mvn verify` grön (77 enhetstester, 48 acceptans-/UI-tester).
+
 ## Excel-import
 
 `tools/import-excel/` är ett **fristående** engångsprogram (Apache POI),

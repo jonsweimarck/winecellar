@@ -31,6 +31,11 @@ public class JpaUserRepository implements UserRepository {
         return jpaRepository.findByUsername(username).map(JpaUserRepository::toDomain);
     }
 
+    /** Används av acceptanstesterna för att nollställa tillstånd mellan scenarier. */
+    public void deleteAll() {
+        jpaRepository.deleteAll();
+    }
+
     private static UserEntity toEntity(User user) {
         UserEntity entity = new UserEntity();
         entity.setId(user.id() != null ? user.id().value() : null);

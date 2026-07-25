@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -7,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
@@ -26,22 +28,25 @@ import org.springframework.security.web.SecurityFilterChain;
  * `thymeleaf-extras-springsecurity6` injicerar automatiskt CSRF-fältet i
  * varje `th:action`-formulär (login.html, vin-formular.html).
  *
- * **`UserDetailsService` är fortfarande den gamla hårdkodade
- * `InMemoryUserDetailsManager`-varianten (admin/readonly), INTE ännu
- * databasbackad via den nya `UserRepository`en (WINE-10).** Medveten
- * avvikelse från WINE-12s ursprungliga story-text: att redan här byta till
- * ett databasbackat `UserDetailsService` hade gjort att admin/readonly
- * slutade fungera direkt (ingen rad i `users`-tabellen ännu, eftersom
- * registrering inte finns förrän WINE-11) - både lokalt och i PRODUKTION,
- * där det riktiga admin-kontot faktiskt används. Databasbytet hör hemma i
- * WINE-11, som är den story som faktiskt skapar användare att logga in
- * som. Två roller lever kvar oförändrade tills WINE-15: ADMIN
- * (fullständig åtkomst) och READONLY (bara läsning - kontot
- * `readonly`/`readonly`, se README:s "Säkerhet"). READONLY nekas inte
- * bara POST/DELETE utan även GET-routerna för att lägga till/redigera
- * (`/wines/nytt`, `/wines/{id}/redigera`) - annars går det att gissa sig
- * till formulärsidan även om länkarna är dolda i UI:t (se vinkallare.html/
- * WineController, som döljer länkarna som ett extra lager, inte det enda).
+ * **`UserDetailsService` slår ihop två källor (WINE-11, se ADR 0013).**
+ * De gamla hårdkodade `admin`/`readonly`-kontona (`InMemoryUserDetailsManager`,
+ * kollas först) och nyregistrerade användare (`UserRepository`en från
+ * WINE-10, kollas bara om användarnamnet inte matchar någon av de
+ * hårdkodade). Medvetet inte helt ersatt av databasen än - admin/readonly
+ * måste fortsätta fungera fram till WINE-15 (som tar bort dem, medvetet
+ * sist av säkerhetsskäl, se CLAUDE.md), annars låser man ute produktionens
+ * riktiga admin-konto innan det finns något annat sätt in. Två roller
+ * lever kvar oförändrade tills WINE-15: ADMIN (fullständig åtkomst) och
+ * READONLY (bara läsning - kontot `readonly`/`readonly`, se README:s
+ * "Säkerhet"). READONLY nekas inte bara POST/DELETE utan även GET-routerna
+ * för att lägga till/redigera (`/wines/nytt`, `/wines/{id}/redigera`) -
+ * annars går det att gissa sig till formulärsidan även om länkarna är
+ * dolda i UI:t (se vinkallare.html/WineController, som döljer länkarna
+ * som ett extra lager, inte det enda). **Nyregistrerade användare får
+ * ROLE_ADMIN** (satt i `RegistrationController`, inte här) - en medveten,
+ * temporär förenkling: riktig scoping till den egna listan kommer först i
+ * WINE-13, så alla inloggade användare delar i praktiken samma vinlista
+ * fram tills dess.
  */
 @Configuration
 public class SecurityConfig {
@@ -54,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/wines/nytt", "/wines/*/redigera").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/wines", "/wines/*/redigera", "/wines/*/dubblett-oka-antal", "/wines/tolka-etikett").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/wines/*").hasRole("ADMIN")
+                        .requestMatchers("/registrera").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login")
@@ -71,6 +77,7 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(
+            UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             @Value("${winecellar.admin.password}") String adminPassword) {
         var admin = User.withUsername("admin")
@@ -84,6 +91,19 @@ public class SecurityConfig {
                 .password(passwordEncoder.encode("readonly"))
                 .roles("READONLY")
                 .build();
-        return new InMemoryUserDetailsManager(admin, readonly);
+        UserDetailsService legacyAccounts = new InMemoryUserDetailsManager(admin, readonly);
+
+        return username -> {
+            try {
+                return legacyAccounts.loadUserByUsername(username);
+            } catch (UsernameNotFoundException legacyMiss) {
+                return userRepository.findByUsername(username)
+                        .map(user -> User.withUsername(user.username())
+                                .password(user.hashedPassword())
+                                .roles("ADMIN")
+                                .build())
+                        .orElseThrow(() -> new UsernameNotFoundException(username));
+            }
+        };
     }
 }
