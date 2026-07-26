@@ -1,4 +1,4 @@
-package com.example.winecellar.importexcel;
+package com.example.winecellar.infrastructure.excel;
 
 import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;

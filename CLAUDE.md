@@ -1652,6 +1652,474 @@ Clever Cloud-konsolen istället för `localhost`. Ingen dedupliceringslogik
 i verktyget - kör inte en gång till mot samma databas, det skulle skapa
 dubbletter.
 
+## Fas 2 (import/export via webben) - påbörjad 2026-07-25
+
+**Beslutet är skrivet ner som [ADR 0014](docs/adr/0014-web-based-excel-import-export.md)
+innan implementationen, samma mönster som Fas 1:s [ADR 0013](docs/adr/0013-multi-user-accounts.md)**
+- avstämt med användaren i en diskussion (retirera CLI-verktyget helt,
+återanvänd WINE-6:s dubblettidentitet, torrkörning/förhandsgranskning
+före commit, EN gemensam dubblettstrategi per import, bildnamngivning
+`<producent>_<namn>_<årgång>` med fallback, export som xlsx+zip).
+Stories WINE-19 (ADR) till WINE-26 i YouTrack, länkade med "depends on"
+i den tänkta byggordningen: WINE-19 → WINE-20 (flytta parser/writer in
+i huvudappen, ta bort CLI-modulen) → WINE-21 (bildnamngivning) →
+WINE-22 (webbexport xlsx)/WINE-24 (webbimport torrkörning) →
+WINE-23 (bildexport zip)/WINE-25 (webbimport commit) → WINE-26
+(acceptanstest/Playwright).
+
+**WINE-20 byggd (2026-07-25): `tools/import-excel/` (hela modulen,
+inklusive `pom.xml`, `ImportExcel`, `ExportExcel`, `DatabaseConnection`)
+är borttagen.** `WineRowParser`, `WineRowWriter`, `ImageMatcher` (och
+deras enhetstester) flyttades **oförändrade i beteende** till
+`infrastructure/excel/` i huvudappen - bara paketnamnet ändrades, plus
+att klasserna (och de metoder/konstruktörer/nästlade typer som andra
+lager behöver anropa: `parse`, `write`, `ImageMatcher`-konstruktorn,
+`findImage`, samt de nästlade `RowMissingRequiredFieldsException`/
+`Image`) gick från paketprivata till `public` - annars vore flytten
+meningslös, koden hade fortfarande bara varit anropbar inom sitt eget
+paket. De paketprivata `COL_*`-konstanterna (`WineRowParser`) och
+`EXTENSION_BY_MIME` (`ImageMatcher`) lämnades paketprivata - `WineRowWriter`
+ligger kvar i SAMMA paket (`infrastructure.excel`), så deras delade
+källa-till-sanning-mönster är opåverkat.
+- **`ImageMatcher`s matchning är fortfarande namn-bara** i den här
+  storyn - bytet till `<producent>_<namn>_<årgång>` med fallback är
+  medvetet WINE-21:s jobb, inte en del av flytten (ren refaktorering,
+  ingen beteendeändring).
+- **`DatabaseConnection`, `ImportExcel`, `ExportExcel` flyttades INTE**
+  - de var CLI-specifika (rå JDBC förbi `WineService`, kommandoradsargument,
+  `System.out`-varningar) och ersätts av riktiga webbcontrollerroutes i
+  WINE-22 till WINE-25, som skriver via `WineService.save(...)` istället
+  för direkt SQL (ägarskopning + dubblettkontroll "gratis").
+- **Apache POI (`poi-ooxml`) lades till som ett vanligt beroende i
+  rotens `pom.xml`** (samma version, 5.2.5, som den gamla modulen
+  använde) - första gången POI blir ett riktigt runtime-beroende av den
+  deployade jaren, en medveten avvikelse från [ADR 0010](docs/adr/0010-excel-tool-standalone-module.md)s
+  ursprungliga motivering (se ADR 0014).
+- **`<classifier>exec</classifier>` togs bort från
+  `spring-boot-maven-plugin`-konfigurationen i rotens `pom.xml`.** Den
+  fanns bara för att `tools/import-excel` skulle kunna bero på
+  huvudartefakten som ett vanligt Maven-bibliotek (en Boot-fatjar
+  fungerar inte som beroende) - med modulen borttagen finns inget kvar
+  som behöver den vanliga, platta jaren. Verifierat efteråt: `mvn package`
+  producerar återigen en enda `winecellar-0.1.0-SNAPSHOT.jar` (ingen
+  `-exec`-suffix), och `unzip -l` bekräftar att den fortfarande är en
+  riktig Spring Boot-fatjar (`BOOT-INF/`-struktur) - att bara ta bort
+  `<classifier>` hade i teorin kunnat få `repackage` att sluta binda
+  till `package`-fasen om plugin-blocket av någon anledning behövt mer
+  konfiguration för att aktiveras, så det kändes värt att verifiera
+  konkret istället för att lita på minnet av hur Spring Boots
+  Maven-plugin fungerar.
+- **`ADR 0010` markerad Superseded av `ADR 0014`** i den här storyn
+  (inte i WINE-19/ADR-storyn) - i linje med ADR 0014:s egen instruktion
+  om att göra det först när `tools/import-excel` faktiskt tas bort.
+- README.md:s "Import och export av Excel-data"-avsnitt krympt till
+  bara kolumnlayout-tabellen (fortfarande relevant domänkunskap) + en
+  kort not om att CLI-kommandona är borttagna och webbfunktionen byggs
+  i WINE-20 till WINE-26 - de gamla PowerShell/Bash-kommandoexemplen
+  (miljövariabler, `-Dexec.args`-citattecken-fällan) är borttagna i sin
+  helhet, de gäller inte länge.
+- Verifierat: `mvn verify` grön (alla enhetstester inklusive de flyttade
+  `WineRowParserTest`/`WineRowWriterTest`/`ImageMatcherTest`, samtliga
+  acceptans-/UI-tester oförändrade), plus en manuell `mvn package`-
+  kontroll av jar-strukturen enligt ovan.
+
+**WINE-21 byggd (2026-07-25): bildnamngivning `<producent>_<namn>_<årgång>`
+med fallback.** `ImageMatcher.findImage(...)` bytte signatur från
+`findImage(String wineName)` till `findImage(String producer, String
+name, Integer vintage)` - försöker i första hand slå upp den
+fullständiga identitetsstammen (samma tre fält som dubblettvarningens
+identitet, WINE-6) om BÅDE `producer` och `vintage` är satta, och faller
+ALLTID tillbaka till namn-bara uppslagning om det första försöket inte
+gav träff - oavsett anledning (fältet saknades på raden, eller filen i
+mappen råkade följa den äldre namn-bara konventionen). Den bredare
+fallback-logiken (försök alltid, inte bara när fält saknas) är
+medvetet mer tillåtande än vad storyn ursprungligen efterfrågade, men
+kostar inget extra att implementera och gör övergången mjukare för
+bildmappar som ännu inte döpts om.
+- **Ingen ändring av `fileByWineName`-uppslagstabellen eller
+  tvetydighetsvarningen** - båda konventionerna är bara strängar i
+  samma karta (nyckel = filnamnsstam), så samma varning vid krockande
+  stammar gäller identiskt för `"Barolo.jpg"`/`"Barolo.png"` som för
+  `"Pio_Cesare_Barolo_2018.jpg"`/`"Pio_Cesare_Barolo_2018.png"`.
+- **`identityFileNameStem(producer, name, vintage)`** är en ny `public
+  static`-metod på `ImageMatcher`, tänkt att återanvändas av WINE-23
+  (bildexport, ska namnge utskrivna filer med exakt samma konvention).
+  Ingen egen klass extraherad för det ännu - bara en enda verklig
+  anropsplats (uppslagningen här) finns just nu, samma "vänta med
+  abstraktion till ett andra verkligt behov"-princip som redan följs på
+  andra ställen i projektet (t.ex. `Databaskoppling`, se Excel-import-
+  historiken ovan).
+- **Mellanslag i producent/namn ersätts med understreck** i den
+  beräknade stammen (`Pio Cesare` → `Pio_Cesare`) - upptäckt under
+  testskrivningen, inte bestämt i förväg: ett första testfall skrev
+  filen som `Pio_Cesare_Barolo_2018.jpg` men `identityFileNameStem`
+  hade då byggt `"Pio Cesare_Barolo_2018"` (bokstavligt mellanslag kvar)
+  och testet gav `NullPointerException` på ett `null`-svar. Löst genom
+  att lägga till en `withoutSpaces(...)`-hjälpare - i övrigt ingen
+  normalisering (skiftläge/diakritiska tecken orörda), samma "exakt
+  matchning, ingen gissning"-princip som redan gällde namn-bara
+  matchningen.
+- **`WineRowWriter` rördes INTE** i den här storyn, till skillnad från
+  vad storyns ursprungliga beskrivning antog. Vid närmare granskning
+  visade det sig att `WineRowWriter` bara skriver ANKRADE xlsx-bilder
+  (`Picture`-objekt i "Bild"-kolumnen) - den skrev aldrig separata
+  bildfiler till en mapp, det gjorde den nu borttagna CLI-klassen
+  `ExportExcel.skrivBildfiler(...)` (se WINE-20), som inte flyttades in
+  i huvudappen. Det finns alltså ännu ingen "skrivare" att uppdatera för
+  filnamnskonventionen - `identityFileNameStem(...)` väntar på att
+  WINE-23 bygger den funktionaliteten från grunden.
+- **`ImageMatcherTest`** fick tre nya testfall (fullständig identitet
+  matchar entydigt mellan två samnamniga viner, fallback när
+  producent/årgång saknas, fallback när identitetsstammen inte ger
+  träff men namnstammen gör det) plus ett för `identityFileNameStem`
+  självt - övriga befintliga tester uppdaterade bara sitt anrop till
+  den nya tre-parameters-signaturen (`findImage(null, "Barolo", null)`
+  istället för `findImage("Barolo")`), ingen ändrad förväntan.
+- Verifierat: `mvn verify` grön.
+
+**WINE-22 byggd (2026-07-25): webbaserad export av vinlistan (xlsx).**
+Ny `GET /export/xlsx` (`ExportController`, skyddad som alla andra
+routes) - skriver bara den inloggade användarens egna viner
+(`WineService.listWines(owner)`), sorterade på namn (samma ordning som
+den gamla CLI-exporten hade, `ORDER BY name` - inte ett krav från
+storyn, men en billig, trogen detalj att behålla), via `WineRowWriter`.
+- **`CurrentUser` extraherad ur `WineController.currentOwner(...)`** -
+  andra verkliga anropsplatsen (nu `ExportController`) gjorde det värt
+  det, samma "vänta med abstraktion till ett andra behov"-princip som
+  redan följs i projektet. `WineController.currentOwner(...)` är kvar
+  som en tunn delegerande wrapper, oförändrat för alla dess befintliga
+  anropsplatser.
+- **`WineRowWriter` fick `SHEET_NAME`/`writeHeaderRow(Sheet)`** - flyttat
+  hit från den borttagna CLI-klassen `ExportExcel` (samma flikamn "Vin",
+  samma rubrikradstexter) eftersom rubrikraden hör till samma delade
+  kolumnlayout som resten av klassen redan äger.
+- **`ExportControllerTest`** (`@WebMvcTest`) skiljer sig från
+  `WineControllerTest`s mönster på en viktig punkt: eftersom svaret är
+  binärt (xlsx), räcker inte `content().string(...)`-matchning för att
+  verifiera "rätt viner, rätt fältvärden" - testet öppnar de faktiska
+  svarsbytes:en med POI:s `WorkbookFactory` och läser tillbaka celler,
+  precis som `WineRowWriterTest` redan gör för enskilda rader. En egen
+  `Dataisolering`-liknande verifiering (`verify(wineService).
+  listWines(eq(ownerId))`) täcker att bara den inloggade användarens
+  egna viner efterfrågas.
+- **Länk i UI:t:** en enkel `<a href="/export/xlsx">Exportera till
+  Excel</a>` bredvid "Lägg till vin" i `vinkallare.html` - ingen egen
+  "Importera/exportera"-sida ännu, eftersom import (WINE-24/WINE-25)
+  inte finns än; en sådan sida är en naturlig omstrukturering när
+  importformuläret byggs, inte något att bygga i förväg här.
+- Verifierat manuellt mot en riktig lokal Postgres (docker-compose):
+  registrerade ett testkonto, lade till ett vin, hämtade `/export/xlsx`
+  - `Content-Disposition`/`Content-Type` korrekta, filen är en giltig
+  OOXML-zip (`PK\x03\x04`-magibytes). `mvn verify` grön.
+
+**WINE-23 byggd (2026-07-25): bildexport som zip-nedladdning.** Ny
+`GET /export/bilder.zip` (samma `ExportController` som WINE-22, inte en
+egen klass - båda hör till samma "export"-koncept) - en fil per vin med
+sparad bild hos den inloggade användaren, byggd i farten med
+`java.util.zip.ZipOutputStream` (ingen mellanlagring på disk).
+- **`ImageMatcher.EXTENSION_BY_MIME` breddad från paketsynlig till
+  `public`** - samma "andra verkliga anropsplatsen motiverar bredare
+  synlighet"-princip som redan följts några gånger i den här fasen
+  (klasserna själva i WINE-20, `identityFileNameStem` i WINE-21).
+- **Ny `ImageMatcher.fileNameStem(producer, name, vintage)`** - skrivsidans
+  motsvarighet till läsningens `findImage`-fallback, men enklare: skrivsidan
+  producerar exakt EN fil per vin och måste därför committa till EN
+  bestämd stam (fullständig identitet om både producer och vintage är
+  satta, annars bara namnet) - till skillnad från läsningen, som kan
+  acceptera ATT BÅDA konventionerna ligger på disk och därför försöker
+  båda i tur och ordning.
+- **En namnkrock hittad under designarbetet, inte i en bugrapport:**
+  två viner med exakt samma namn och utan fullständig identitet (t.ex.
+  bägge saknar årgång) skulle råka få samma beräknade filnamnsstam.
+  `ZipOutputStream.putNextEntry(...)` tillåter INTE två poster med
+  samma namn - ett andra `putNextEntry`-anrop med samma namn kastar
+  `ZipException` och hade kraschat hela nedladdningen för en användare
+  vars datamängd råkade innehålla den kombinationen. Löst genom att
+  hoppa över (inte skriva) en krockande bilds post nummer två och
+  framåt - ett `Set<String>` håller reda på redan använda postnamn.
+  Ingen varning visas för användaren (till skillnad från `ImageMatcher`s
+  konsol-varningar vid import/CLI-körning) - det finns ingen naturlig
+  "konsol" att skriva till för en webbnedladdning, och det ansågs för
+  litet ett scope att bygga en flash-meddelande-mekanism för i den här
+  storyn.
+- **`ExportControllerTest`** fick motsvarande zip-tester: rätt
+  `Content-Type`/`Content-Disposition`, zip-innehållet öppnas med
+  `java.util.zip.ZipInputStream` och verifieras innehålla EXAKT en post
+  (för vinet med bild, rätt namngiven enligt konventionen) - vinet utan
+  bild bidrar ingen post, plus en `UtanInloggning`-nekandetest.
+  Testbilden är samma kända 1x1-PNG som redan används i
+  `LabelScanFormIT`.
+- Verifierat manuellt mot en riktig lokal Postgres: registrerade ett
+  konto, laddade upp ett vin med bild, hämtade `/export/bilder.zip` -
+  `unzip -l` visade exakt en fil, namngiven `Pio_Cesare_Barolo_2018.png`
+  (bekräftar hela namnkonventionskedjan: producent+namn+årgång,
+  mellanslag ersatta med understreck), och den uppackade filen var
+  byte-identisk med originaluppladdningen (`cmp`). `mvn verify` grön.
+
+**WINE-24 byggd (2026-07-25): webbaserad import - torrkörning/
+förhandsgranskning, INGET sparas.** Ny `GET/POST /import`
+(`ImportController`) och `application.ImportPreviewService` (ny,
+`@Service` - kategoriserar redan tolkade `Wine`-kandidater mot
+`WineService.checkForDuplicate`, samma orkestrering-hör-hemma-i-
+applikationslagret-princip som ADR 0006). Fem sammanfattningstal (rader
+totalt, hoppade-över, fullständiga/partiella dubbletter, rena nya) -
+bara siffror, ingen radvis lista, matchar exakt vad storyn efterfrågade.
+
+**En design-diskussion innan kodningen ändrade lösningen väsentligt,
+inte bara detaljer.** Ursprungsplanen (lagra uppladdade bilder rakt i
+HTTP-sessionen mellan torrkörning och commit) ifrågasattes av
+användaren: "kommer det att fungera med 100 bilder som kanske inte är
+särskilt komprimerade?". Två verkliga problem identifierade innan någon
+kod skrevs:
+1. **`application.yml`s multipart-gräns var redan `max-request-size:
+   5MB`** (satt för "ett foto", se `WINECELLAR_LOCAL_IMAGE_FOLDER`-
+   eran) - en enda bulk-request med ~100 okomprimerade telefonfoton
+   (ofta 3-8 MB styck) hade avvisats direkt av Spring, långt innan
+   sessionslagring ens blev relevant.
+2. **HTTP-sessionen här är Tomcats vanliga in-minnet-lagring** (inget
+   Spring Session/Redis) - tiotals-hundratals MB bilddata per
+   pågående import hade legat kvar i JVM-heapen så länge sessionen
+   levde.
+
+**Lösning, båda delarna byggda i den här storyn:**
+- **Klientsidans Canvas-nedskalning** (`import.html`) - samma teknik
+  som etikettskanningens `etikett-input` (WINE-5, `vin-formular.html`),
+  men utökad till att hantera POTENTIELLT MÅNGA filer samtidigt (hela
+  `webkitdirectory`-mappen) via `Promise.all(...)`, med
+  skicka-knappen inaktiverad och ett statusmeddelande
+  ("Komprimerar N bilder...") medan nedskalningen pågår - annars hade
+  ett tidigt klick på "Förhandsgranska" skickat de OSKALADE
+  originalfilerna innan de async Canvas-anropen hunnit bli klara. Varje
+  fils ORIGINALA filnamn behålls (bara innehållet komprimeras) -
+  servern matchar bilder mot viner via filnamnet (WINE-21), inte
+  filinnehållet. Icke-bildfiler (t.ex. systemfiler i den valda mappen)
+  lämnas orörda och skickas igenom oförändrade - servern ignorerar
+  ändå okända filändelser.
+- **`max-file-size`/`max-request-size` höjda till 10MB/50MB** - även
+  efter klientsidans nedskalning (typiskt ~100-300 KB per bild) ger
+  det marginal för ~100 bilder i en och samma request, samtidigt som
+  `max-file-size` fortfarande skyddar mot en orimligt stor enskild fil
+  om JS av någon anledning inte kört.
+- **Uppladdad xlsx + bildmapp skrivs till en temporär mapp PÅ DISK**
+  (`Files.createTempDirectory("winecellar-import-")`) - bara
+  mappsökvägen (en kort sträng, inte bilddatan) hålls i
+  `HttpSession` (`ImportController.SESSION_KEY_PENDING_IMPORT_PATH`),
+  så JVM-heapen belastas inte av hur mycket data en pågående import
+  faktiskt innehåller, oavsett om nedskalningen ovan av någon
+  anledning inte skulle räcka till.
+- **WINE-27 skapad och länkad (`depends on` WINE-24) under samma
+  diskussion** - städning av övergivna temp-mappar (en användare som
+  aldrig bekräftar sin import lämnar en mapp kvar på disk) är en
+  medvetet UPPSKJUTEN, egen story snarare än något löst i förbifarten
+  här - användarens eget förslag, för att hålla WINE-24:s scope till
+  bara torrkörningen.
+- **Upptäckt under den manuella verifieringen (inte planerat i
+  förväg):** `ImportControllerTest` (som INTE mockar bort
+  `stashUploadForCommit`, bara `WineService`/`UserRepository`) skapar
+  riktiga temp-mappar på disk vid varje testkörning - samma
+  "orphaned temp dir"-problem som WINE-27 ska lösa för riktiga
+  användare uppstår alltså redan av att köra testsviten upprepade
+  gånger. Bekräftar att WINE-27 är ett verkligt, nära förestående
+  behov, inte ett hypotetiskt framtida.
+- **Varje radfel (saknat namn, men även t.ex. ett okänt betygsvärde)
+  räknas som "hoppas över" via ett brett `catch (RuntimeException e)`
+  runt varje rads parsning** - medvetet bredare än storyns bokstavliga
+  "saknar namn"-formulering, för att EN trasig rad inte ska stoppa hela
+  torrkörningen för alla andra giltiga rader. En felaktig xlsx-fil (fel
+  flikamn, helt oläsbar) fångas separat på hela-filen-nivå och visar
+  ett vänligt felmeddelande istället för att krascha.
+- **`ImportControllerTest`** bygger en riktig, minimal xlsx i minnet
+  med POI (fyra rader: fullständig dubblett, partiell dubblett, ren,
+  och en rad utan namn) istället för att checka in en testfil - mockar
+  `WineService.checkForDuplicate` via en `Answer` som växlar på vinets
+  namn (robustare än att försöka träffa en exakt `equals()`-matchad
+  `Wine`-instans för varje stubbning). `@Import({SecurityConfig.class,
+  ImportPreviewService.class})` - den riktiga `ImportPreviewService`
+  körs (bara dess `WineService`-beroende mockas), inte en egen mock av
+  hela tjänsten, eftersom det är just orkestreringen (parsning →
+  kategorisering) som ska verifieras.
+- **Formuläret för att välja dubblettstrategi (`import.html`, efter en
+  lyckad torrkörning) postar redan mot `/import/commit`** - den routen
+  finns INTE än (WINE-25). Medvetet: nästa story bygger commit-steget
+  direkt ovanpå det här, ingen anledning att skjuta upp fältnamnen.
+- Verifierat: `mvn verify` grön, plus en manuell end-to-end-rundtur mot
+  en riktig lokal Postgres - exporterade ett riktigt sparat vin,
+  laddade upp samma fil via `/import`, sammanfattningen visade
+  "1 fullständig dubblett" korrekt, och vinlistan innehöll fortfarande
+  bara det ursprungliga vinet efteråt (inget sparades).
+
+**WINE-25 byggd (2026-07-26): webbaserad import - commit-steget som
+faktiskt sparar.** Ny `POST /import/commit`, samma `ImportController`
+som WINE-24. Läser tillbaka den torrkörda filen/bildmappen från
+temp-mappen (ingen ny uppladdning krävs - hela poängen med
+temp-mappmekanismen från WINE-24), tillämpar den valda
+dubblettstrategin per rad, sparar via `WineService.save(...)`/
+`increaseQuantity(...)`, och städar bort temp-mappen efteråt.
+- **Post-Redirect-Get med flash-attribut, inte en direkt rendering av
+  resultatet.** Till skillnad från torrkörningen (som är ofarlig att
+  köra om - den sparar ju ingenting, så `POST /import` kan gott rendera
+  om samma sida direkt) hade en siduppdatering efter ett direkt-
+  renderat commit-svar orsakat en NY, dubblerande import-körning (ett
+  reellt korrekthetsproblem, inte bara kosmetiskt) om användaren
+  råkade trycka F5. Löst med `RedirectAttributes.addFlashAttribute(
+  "result", ...)` + `redirect:/import` - första gången det mönstret
+  används i projektet (övriga POST-hanterare antingen redirectar utan
+  meddelande, eller renderar om samma formulär direkt för
+  validerings-/dubblettvarningar som ÄR ofarliga att repetera).
+  Spring märger automatiskt in flash-attributet i nästa `GET /import`s
+  modell utan att `importForm()`-metoden behöver deklarera en egen
+  `Model`-parameter för det - `FlashMap`-mekanismen sker på ramverksnivå
+  innan handlern körs.
+- **`parseRows` refaktorerad till att ta emot en `InputStream` direkt**
+  (inte en `MultipartFile`) - delas nu mellan torrkörningen (läser från
+  den uppladdade filen) och commit-steget (läser tillbaka samma fil
+  från temp-mappen) - måste tolka exakt likadant båda gångerna, en
+  delad metod eliminerar risken att de två glider isär (samma princip
+  som `COL_*`-konstanterna/`EXTENSION_BY_MIME` på andra ställen i den
+  här fasen).
+- **Bildmatchning återanvänder `ImageMatcher`** (WINE-21) direkt mot
+  temp-mappens `bilder`-undermapp - `findImage(producer, name, vintage)`
+  anropas per kandidatrad precis innan sparning, bilden bäddas in i
+  `Wine.Builder` exakt som det manuella formuläret redan gör.
+- **Ingen egen `application`-tjänst för commit-orkestreringen**, till
+  skillnad från torrkörningens `ImportPreviewService` (WINE-24) - valt
+  medvetet för konsekvens med `WineController`s redan etablerade mönster,
+  där den ENSKILDA dubblettvarningens upplösning (`confirmAdd`,
+  `dubblett-oka-antal`-routen) också ligger direkt i controllern, inte i
+  `WineService`. Bulk-commit-strategin är i grunden samma sorts
+  "webblagret tolkar formulärval och orkestrerar redan befintliga
+  `WineService`-anrop"-logik, bara upprepad per rad.
+- **Två nya enum:er, `FullDuplicateStrategy`/`PartialDuplicateStrategy`**
+  (paketprivata nästlade enum:er i `ImportController`, bundna direkt via
+  Spring precis som `SortField`/`SortDirection` redan binds i
+  sök-/sorteringsformuläret) - värdena matchar exakt `import.html`s
+  `<option value="...">`-attribut från WINE-24 (byggda i förväg för att
+  matcha det här steget).
+- **Testfälla hittad av `mvn test`, inte manuellt: två nya
+  MockMvc-tester antog fel att `wineService.save(...)` skulle anropas
+  NOLL respektive EN gång.** Testfilens fjärde rad ("Rioja") är
+  medvetet en ren, icke-dubblett rad i ALLA scenarier (samma testfil
+  återanvänds för alla dubblettstrategi-kombinationer) - den sparas
+  alltså ALLTID, oavsett vilken fullständig/partiell-dubblettstrategi
+  som testas för de ANDRA raderna. Ett test som valde "hoppa över" för
+  både fullständiga och partiella dubbletter förväntade sig då NOLL
+  `save()`-anrop totalt, men fick ETT (Rioja); ett annat som valde
+  "lägg till som nytt" för partiella dubbletter förväntade sig ETT
+  `save()`-anrop (bara "Chianti") men fick TVÅ (Chianti + Rioja).
+  Fixat genom att räkna med Rioja i förväntningarna istället för att
+  ändra testdatan - testfilens fyra rader (full dubblett, partiell
+  dubblett, ren, saknar namn) var redan en medveten, minimal
+  täckning av alla fyra kategorierna och borde inte behöva bytas ut.
+- **`ImportControllerTest`s dubblettmockning fick riktiga
+  `Wine`-fixturer MED `id`** (`EXISTING_BAROLO`/`EXISTING_CHIANTI`,
+  `Wine.WineId(101L)`/`(102L)`) istället för att eka tillbaka
+  kandidatvinet självt som "existing" - kandidatvinet (nytolkat av
+  `WineRowParser`) har alltid `id() == null`, så
+  `wineService.increaseQuantity(existing.id(), owner)` hade fått ett
+  `null`-id om testet naivt återanvänt kandidaten som sitt eget
+  "befintliga vin"-mock-svar. En lärdom värd att komma ihåg för
+  framtida dubblett-relaterade tester: ett tolkat kandidatvin och ett
+  redan sparat "existing"-vin är aldrig samma objekt i verkligheten,
+  och bör inte heller vara det i en mock.
+- Verifierat manuellt, end-to-end mot en riktig lokal Postgres:
+  registrerade ett konto, lade till "Barolo" (3 flaskor), exporterade,
+  laddade upp samma fil via `/import`, valde "öka antal" för
+  fullständiga dubbletter, committade - resultatsidan visade korrekt
+  "1 fick antalet ökat", vinlistan innehöll fortfarande bara ett vin,
+  och dess flaskantal hade verkligen ökat från 3 till 4 i databasen.
+  Bekräftat att temp-mappen för DEN körningen togs bort efter commit
+  (kvarvarande temp-mappar efteråt härrörde uteslutande från
+  testsvitens egna torrkörnings-bara scenarier, som aldrig committar -
+  exakt det WINE-27 ska lösa, inte ett tecken på att städningen i den
+  här storyn brast). `mvn verify` grön.
+
+**WINE-26 byggd (2026-07-26): Playwright-täckning för hela import-/
+exportflödet - och en riktig bugg hittad av just det, som varken
+MockMvc eller curl-baserad manuell verifiering någonsin kunde ha
+avslöjat.** Ny `ImportExportFlowIT` (samma `@SpringBootTest`+
+Testcontainers-mönster som `WineListResponsiveIT`/`LabelScanFormIT`):
+konto A lägger till ett vin med bild, exporterar både `.xlsx` och
+bildzip via riktiga nedladdningar (`Page.waitForDownload(...)`), ett
+HELT ANNAT, tomt konto B laddar upp samma filer via `/import`
+(`webkitdirectory`-inputen får en MAPPSÖKVÄG, inte enskilda filer - se
+fälla nedan), kör torrkörningen, bekräftar, och kontot B:s vinlista
+verifieras innehålla vinet med en fungerande bild efteråt.
+
+- **Ingen Cucumber-scenario byggdes för de återstående
+  dubblettstrategikombinationerna, trots att storyn bad om det -
+  en medveten avvikelse, upptäckt vid närmare eftertanke innan
+  kodning.** Den faktiska "vilken WineService-metod anropas för vilken
+  dubbletttyp+strategi"-logiken bor i `ImportController` (en medveten
+  WINE-25-design, samma mönster som `WineController`s egen
+  duplicate-varning-hantering) - det finns ingen application-lagers-
+  tjänst för commit-orkestreringen att skriva ett Cucumber-scenario
+  MOT. De tre återstående kombinationerna (fullständig dubblett +
+  hoppa över, partiell dubblett + öka antal, partiell dubblett + hoppa
+  över - WINE-25s egna tester täckte bara fullständig+öka-antal och
+  partiell+lägg-till-som-nytt) lades istället till som tre nya
+  `@Test`-metoder i `ImportControllerTest` (samma MockMvc-nivå som
+  redan testar resten av importflödet) - rätt testlager för just den
+  här logiken, även om det avviker från storyns bokstavliga
+  ordalydelse.
+- **Playwrights `setInputFiles` på en `webkitdirectory`-input KRÄVER en
+  mappsökväg, inte en lista med enskilda filsökvägar** - ett första
+  försök att skicka in den uppackade bildfilens sökväg direkt gav
+  `PlaywrightException: [webkitdirectory] input requires passing a
+  path to a directory`. Löst genom att packa upp zip-filen till en EGEN
+  temporär mapp och skicka in MAPPEN till `setInputFiles` istället -
+  Playwright laddar då upp alla filer den innehåller, precis som en
+  riktig mappväljare skulle göra. Värt att komma ihåg för framtida
+  Playwright-tester mot `webkitdirectory`-inputar.
+- **Riktig produktionsbugg hittad (inte en testbugg): klientsidans
+  Canvas-nedskalning (`import.html`, WINE-24) skrev alltid om
+  bildinnehållet till JPEG, men behöll bildens URSPRUNGLIGA filnamn
+  (inklusive dess ursprungliga ändelse, t.ex. `.png`).**
+  `ImageMatcher.findImage(...)` bestämmer MIME-typ utifrån filens
+  ÄNDELSE (inte dess faktiska innehåll, se `MIME_BY_EXTENSION`) - en
+  fil som fortfarande hette `Pio_Cesare_Barolo_2018.png` men vars bytes
+  nu var en JPEG-ström fick alltså MIME-typen `image/png` felaktigt
+  rapporterad till webbläsaren, trots att innehållet var JPEG. Det
+  första testförsöket (som antog byte-identisk rundtripp, se nedan)
+  avslöjade detta indirekt via en `Content-Type: image/png`-header som
+  inte stämde med de faktiska JPEG-magibytesen. **Ingen tidigare
+  verifiering kunde ha hittat den här buggen** - `ImportControllerTest`
+  (MockMvc) skickar redan-nedskalade testbilder direkt utan att någon
+  webbläsare/JS är inblandad, och `ExportControllerTest`/den manuella
+  curl-baserade verifieringen (WINE-23) testar bara EXPORT-riktningen,
+  som aldrig skriver om bildinnehåll. Bara en RIKTIG webbläsare som
+  faktiskt kör den riktiga nedskalnings-JS:en (den här storyn) kunde
+  avslöja missmatchningen. Fixat i `import.html`: filnamnets STAM
+  behålls (så `ImageMatcher`s namnmatchning fortfarande fungerar), men
+  ändelsen byts uttryckligen till `.jpg` för att spegla vad `duk.toBlob`
+  faktiskt skrev.
+- **Testets bildjämförelse är medvetet INTE byte-identisk** (till
+  skillnad från WINE-23s curl-baserade, JS-fria verifiering av
+  EXPORT-sidan) - eftersom klientsidans nedskalning ALLTID skriver om
+  bilden till en komprimerad JPEG, är en förlustfri rundtripp genom
+  `/import` inte ens avsett att vara byte-identisk. Testet verifierar
+  istället att en bild kommer fram över huvud taget, kopplad till rätt
+  vin, med rätt (nu korrekta) `Content-Type`.
+- Verifierat: den nya `ImportExportFlowIT` grön i isolering
+  (`failsafe:integration-test -Dit.test=ImportExportFlowIT`, fyra
+  körningar innan den blev grön - se fällorna ovan för de tre
+  bakomliggande problemen), och `mvn verify` grön i sin helhet
+  efteråt.
+
+**[ADR 0015](docs/adr/0015-bulk-import-images-lossy-jpeg.md) skriven
+2026-07-26, på användarens initiativ** - fångar formellt beslutet (redan
+byggt i WINE-24/verifierat av WINE-26 ovan) att bulkimportens bilder
+medvetet INTE rundtrippar bit-exakt (klientsidans Canvas-nedskalning
+skriver alltid om till JPEG). Användaren påpekade att en export följt
+av en re-import därför inte ger tillbaka samma bildbytes, och att det
+förtjänade en egen ADR snarare än att bara stå som en rad i den här
+kronologiska loggen - eftersom det är ett bestående, avsiktligt
+avsteg från "full rundtripp" som framtida sessioner annars lätt kan
+missta för en bugg. Bekräftat i samma veva: den vanliga
+"Etikett"-filuppladdningen (ett vin i taget, `vin-formular.html`) och
+etikettskanningens (WINE-5) LLM-tolkning är BÅDA opåverkade - ingen
+nedskalning sparas någonsin som vinets bild i de flödena, bara
+bulkimportens `webkitdirectory`-väg gör det.
+
 ## Kända fällor att vara uppmärksam på (ärvda från roombooking, kan återkomma)
 
 - **Gherkin på svenska kräver `# language: sv`** som absolut första rad i

@@ -1,4 +1,4 @@
-package com.example.winecellar.importexcel;
+package com.example.winecellar.infrastructure.excel;
 
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
@@ -7,6 +7,7 @@ import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -20,22 +21,29 @@ import java.util.Map;
  * konstanter så de två klasserna aldrig kan glida isär).
  *
  * Bild-kolumnen (I, WineRowParser.COL_IMAGE) skriver etiketten som en
- * vanlig ankrad POI-{@code Picture} (byggt 2026-07-22, på användarens
- * begäran - "kan vi också exportera bilderna?") - **inte** samma sak som
- * Excelkällfilens ursprungliga "bild i cell" (inbäddad rich data), som
- * WineRowParser fortfarande medvetet inte läser vid import (se dess
- * klasskommentar). En vanlig ankrad bild är en helt annan, mycket
- * enklare mekanism att skriva än att läsa rich-data-celler.
+ * vanlig ankrad POI-{@code Picture} - **inte** samma sak som Excelkällfilens
+ * ursprungliga "bild i cell" (inbäddad rich data), som WineRowParser
+ * medvetet inte läser vid import (se dess klasskommentar). En vanlig
+ * ankrad bild är en helt annan, mycket enklare mekanism att skriva än att
+ * läsa rich-data-celler, och läses inte tillbaka av WineRowParser - bara en
+ * visuell bekvämlighet för att kunna bläddra i xlsx-filen. Fullständig
+ * bildrundtripp går via en separat mekanism (se ADR 0014/WINE-23).
  *
- * Den ankrade bilden i sig läses INTE tillbaka av ImportExcel - det är
- * bara en visuell bekvämlighet för att kunna bläddra i xlsx-filen. Den
- * fullständiga rundtrippen (byggd samma dag, se ExportExcels
- * klasskommentar) går istället via WINECELLAR_LOCAL_IMAGE_FOLDER: samma
- * bilddata skrivs ALLTID som en riktig fil i den mappen (oavsett om
- * formatet stöds av xlsx-ankring eller inte), och det är den mappen
- * ImportExcel/ImageMatcher läser tillbaka från vid en återimport.
+ * `SHEET_NAME`/{@link #writeHeaderRow} tillkom i WINE-22 (webbaserad
+ * export) - samma flikamn/rubrikrad som den tidigare CLI-exporten
+ * (`ExportExcel`, borttagen i WINE-20) skrev, flyttade hit eftersom de
+ * hör till samma delade kolumnlayout som resten av klassen.
  */
-final class WineRowWriter {
+public final class WineRowWriter {
+
+    public static final String SHEET_NAME = "Vin";
+
+    private static final String[] HEADERS = {
+            "Vintyp", "Land", "Region", "Underregion", "Druvor", "Producent", "Namn", "Årgång",
+            "Bild", "Inköpsdatum", "Pris", "Antal", "Varför köpt", "Tasting notes", "Eget betyg",
+            "Systembolagets prodnummer", "Systembolagets beskrivning", "Munskänkarnas bedömning",
+            "Munskänkarnas betyg", "Vivino", "Annan referens", "Plats"
+    };
 
     private static final Map<WineType, String> SWEDISH_WINE_TYPE = Map.of(
             WineType.RED, "Rött",
@@ -56,14 +64,14 @@ final class WineRowWriter {
     );
 
     /**
-     * `dateFormat` skapas en gång av anroparen (ExportExcel) och
-     * återanvänds för alla rader - en ny CellStyle per cell är ett känt
-     * POI-antimönster (workbookets stilpool är begränsad). `drawing`
+     * `dateFormat` skapas en gång av anroparen och återanvänds för alla
+     * rader - en ny CellStyle per cell är ett känt POI-antimönster
+     * (workbookets stilpool är begränsad). `drawing`
      * (sheet.createDrawingPatriarch()) skapas också en gång och delas -
      * en `Drawing` är sidans enda "canvas" för ankrade figurer, inte en
      * per-rad-resurs.
      */
-    void write(Wine wine, Row row, CellStyle dateFormat, Drawing<?> drawing) {
+    public void write(Wine wine, Row row, CellStyle dateFormat, Drawing<?> drawing) {
         text(row, WineRowParser.COL_WINE_TYPE, wine.wineType() == null ? null : SWEDISH_WINE_TYPE.get(wine.wineType()));
         text(row, WineRowParser.COL_COUNTRY, wine.country());
         text(row, WineRowParser.COL_REGION, wine.region());
@@ -86,6 +94,18 @@ final class WineRowWriter {
         text(row, WineRowParser.COL_OTHER_REFERENCE, wine.otherReference());
         text(row, WineRowParser.COL_LOCATION, wine.location());
         image(row, wine, drawing);
+    }
+
+    /**
+     * Skriver rubrikraden (rad 0) - anroparen ansvarar för att sedan
+     * börja skriva vinrader från rad 1 (samma konvention som
+     * `WineRowParser`s `row 0 == rubrikrad, hoppas över vid tolkning`).
+     */
+    public static void writeHeaderRow(Sheet sheet) {
+        Row headerRow = sheet.createRow(0);
+        for (int column = 0; column < HEADERS.length; column++) {
+            headerRow.createCell(column).setCellValue(HEADERS[column]);
+        }
     }
 
     private void image(Row row, Wine wine, Drawing<?> drawing) {

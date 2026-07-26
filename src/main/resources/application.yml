@@ -40,9 +40,14 @@ spring:
       separator: ";;"
   servlet:
     multipart:
-      # Vinetiketter, inte godtyckliga filer - 5 MB är gott och väl för ett foto.
-      max-file-size: 5MB
-      max-request-size: 5MB
+      # Höjt från 5MB (WINE-24, se ADR 0014/CLAUDE.md) - bulkimportens
+      # bildmapp kan innehålla ~100 foton i EN request, inte bara ett
+      # enda foto som tidigare var det enda multipart-scenariot.
+      # max-file-size skyddar fortfarande mot en orimligt stor enskild
+      # fil även om klientsidans nedskalning (se import.html) av någon
+      # anledning inte kört (t.ex. JS avstängt).
+      max-file-size: 10MB
+      max-request-size: 50MB
 
 server:
   port: 8080

@@ -1,4 +1,4 @@
-package com.example.winecellar.importexcel;
+package com.example.winecellar.infrastructure.excel;
 
 import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
@@ -23,17 +23,21 @@ import java.util.regex.Pattern;
  * layouten (A-V) är fast - se README:s Datamodell-avsnitt för vilket
  * Wine-fält varje kolumn motsvarar. Bild-kolumnen (I) hoppas medvetet
  * över: bilderna är inbäddade som Excels "bild i cell" (rich data), inte
- * vanliga cellvärden, och att extrahera dem robust är inte värt det för
- * ett engångsskript. Etiketter importeras istället separat från en
- * vanlig bildmapp - se {@link ImageMatcher} och ImportExcel - eller laddas
- * upp manuellt via webb-UI:t (vin-formuläret) efteråt.
+ * vanliga cellvärden, och att extrahera dem robust är inte värt det. Etiketter
+ * importeras istället separat - se {@link ImageMatcher}.
  *
- * **Bara namnet är obligatoriskt (ändrat 2026-07-22)** - samma regel som
- * webb-UI:t använder (se CLAUDE.md:s "Bara namnet obligatoriskt"). Alla
- * övriga fält, inklusive vintyp/land/producent som tidigare krävdes,
- * tolkas nu som valfria och blir `null` om cellen är tom.
+ * Flyttad in i huvudappen från den tidigare fristående `tools/import-excel`-
+ * modulen (WINE-20, se ADR 0014) - motsvarande CLI-verktyg
+ * (`ImportExcel`/`ExportExcel`, `DatabaseConnection`) är borttagna, den här
+ * klassen och dess syskon (`WineRowWriter`, `ImageMatcher`) lever vidare som
+ * återanvändbar kod åt den kommande webbaserade import-/exportfunktionen.
+ *
+ * **Bara namnet är obligatoriskt** - samma regel som webb-UI:t använder (se
+ * CLAUDE.md:s "Bara namnet obligatoriskt"). Alla övriga fält, inklusive
+ * vintyp/land/producent som tidigare krävdes, tolkas som valfria och blir
+ * `null` om cellen är tom.
  */
-final class WineRowParser {
+public final class WineRowParser {
 
     // Paketsynliga (inte private) sedan ExportExcel/WineRowWriter
     // tillkom 2026-07-22 - samma kolumnlayout måste hållas i synk åt
@@ -48,8 +52,7 @@ final class WineRowParser {
     static final int COL_NAME = 6;
     static final int COL_VINTAGE = 7;
     // Hoppas över vid IMPORT (se klasskommentar) - men används av
-    // WineRowWriter/ExportExcel för att ankra exporterade bilder i rätt
-    // kolumn (byggt 2026-07-22, se CLAUDE.md).
+    // WineRowWriter för att ankra exporterade bilder i rätt kolumn.
     static final int COL_IMAGE = 8;
     static final int COL_PURCHASE_DATE = 9;
     static final int COL_PRICE = 10;
@@ -81,12 +84,12 @@ final class WineRowParser {
 
     /**
      * Kastar {@link RowMissingRequiredFieldsException} istället för att
-     * returnera null - anroparen (ImportExcel) avgör om det ska hoppas
-     * över med en varning eller stoppa hela importen. Bara namnet krävs
-     * (se klasskommentaren) - en rad utan namn kan inte bli ett vin över
+     * returnera null - anroparen avgör om det ska hoppas över med en
+     * varning eller stoppa hela importen. Bara namnet krävs (se
+     * klasskommentaren) - en rad utan namn kan inte bli ett vin över
      * huvud taget, men alla andra fält får gärna vara tomma.
      */
-    Wine parse(Row row) {
+    public Wine parse(Row row) {
         String name = text(row, COL_NAME);
         if (name == null) {
             throw new RowMissingRequiredFieldsException(row.getRowNum() + 1);
@@ -202,8 +205,8 @@ final class WineRowParser {
         return value.isEmpty() ? null : value;
     }
 
-    static final class RowMissingRequiredFieldsException extends RuntimeException {
-        RowMissingRequiredFieldsException(int rowNumber) {
+    public static final class RowMissingRequiredFieldsException extends RuntimeException {
+        public RowMissingRequiredFieldsException(int rowNumber) {
             super("Rad " + rowNumber + ": saknar namn - hoppas över");
         }
     }

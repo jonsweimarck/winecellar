@@ -26,6 +26,10 @@
              den Spring Boot 3.3.4 pekar ut som standard för att kunna
              instrumentera klasser på nyare JDK:er än de BOM:en testats mot. -->
         <mockito.version>5.23.0</mockito.version>
+        <!-- Samma version som den tidigare fristående tools/import-excel-modulen
+             använde (WINE-20, se ADR 0014) - POI blir nu ett riktigt
+             runtime-beroende av den deployade appen. -->
+        <poi.version>5.2.5</poi.version>
     </properties>
 
     <dependencyManagement>
@@ -77,6 +81,16 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Excel-import/export (WINE-20, se ADR 0014) - tidigare bara ett
+             beroende av den fristående tools/import-excel-modulen, nu ett
+             riktigt runtime-beroende av den deployade appen eftersom
+             funktionen blir en webbfunktion. -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
         </dependency>
 
         <!-- Test: enhets- och integrationsnivå -->
@@ -158,17 +172,6 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <!-- Utan klassificerare skriver repackage över jaren med en
-                         Boot-fatjar (klasser under BOOT-INF/classes), vilket gör
-                         den oanvändbar som vanligt Maven-beroende. Med den här
-                         behåller `mvn install` en vanlig, platt jar som huvud-
-                         artefakt - tools/import-excel/ beror på just den för att
-                         återanvända domain-klasserna. Påverkar inte
-                         `spring-boot:run` (körs mot target/classes, inte jaren),
-                         så Clever Cloud-deployen är opåverkad. -->
-                    <classifier>exec</classifier>
-                </configuration>
             </plugin>
 
             <!-- Acceptans-/UI-tester (*IT.java) körs separat från enhetstester,

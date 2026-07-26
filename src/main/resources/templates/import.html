@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Importera vinlista - Vinkällaren</title>
+    <style>
+        body { font-family: sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem; }
+        label { display: block; margin-top: 1rem; font-weight: bold; }
+        input[type="file"] { margin-top: 0.4rem; }
+        button { margin-top: 1.5rem; padding: 0.5rem 1rem; }
+        .fel { color: #a4262c; margin-top: 1rem; }
+        .status { color: #555; margin-top: 0.5rem; font-size: 0.9rem; }
+        .sammanfattning { margin-top: 1.5rem; border: 1px solid #ccc; border-radius: 0.25rem; padding: 1rem; }
+        .sammanfattning dt { font-weight: bold; }
+        .sammanfattning dd { margin: 0 0 0.5rem 0; }
+        select { margin-top: 0.3rem; }
+        .lank { margin-top: 1.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Importera vinlista</h1>
+
+    <p class="fel" th:if="${error}" th:text="${error}"></p>
+
+    <div th:if="${preview == null and result == null}">
+        <form method="post" th:action="@{/import}" enctype="multipart/form-data">
+            <label for="fil-input">Excel-fil (.xlsx)</label>
+            <input type="file" id="fil-input" name="fil" accept=".xlsx" required="required">
+
+            <label for="bilder-input">Bildmapp (valfri)</label>
+            <input type="file" id="bilder-input" name="bilder" webkitdirectory="webkitdirectory" multiple="multiple">
+            <p class="status" id="bilder-status"></p>
+
+            <button type="submit" id="import-submit">Förhandsgranska</button>
+        </form>
+    </div>
+
+    <div class="sammanfattning" th:if="${preview != null}">
+        <dl>
+            <dt>Rader totalt</dt>
+            <dd th:text="${preview.totalRows()}"></dd>
+            <dt>Hoppas över (saknar namn eller kunde inte tolkas)</dt>
+            <dd th:text="${preview.skippedRows()}"></dd>
+            <dt>Fullständiga dubbletter (finns redan)</dt>
+            <dd th:text="${preview.fullDuplicates()}"></dd>
+            <dt>Möjliga dubbletter (liknar ett befintligt vin)</dt>
+            <dd th:text="${preview.partialDuplicates()}"></dd>
+            <dt>Nya viner</dt>
+            <dd th:text="${preview.clean()}"></dd>
+        </dl>
+
+        <form method="post" th:action="@{/import/commit}">
+            <label for="fullDuplicateStrategy">Vid fullständig dubblett</label>
+            <select id="fullDuplicateStrategy" name="fullDuplicateStrategy">
+                <option value="OKA_ANTAL">Öka antalet på det befintliga vinet</option>
+                <option value="HOPPA_OVER">Hoppa över</option>
+            </select>
+
+            <label for="partialDuplicateStrategy">Vid möjlig dubblett</label>
+            <select id="partialDuplicateStrategy" name="partialDuplicateStrategy">
+                <option value="OKA_ANTAL">Öka antalet på det befintliga vinet</option>
+                <option value="LAGG_TILL_SOM_NYTT">Lägg till som nytt vin</option>
+                <option value="HOPPA_OVER">Hoppa över</option>
+            </select>
+
+            <button type="submit">Importera</button>
+        </form>
+    </div>
+
+    <div class="sammanfattning" th:if="${result != null}">
+        <dl>
+            <dt>Importerade som nya viner</dt>
+            <dd th:text="${result.imported()}"></dd>
+            <dt>Fick antalet ökat på ett befintligt vin</dt>
+            <dd th:text="${result.increased()}"></dd>
+            <dt>Överhoppade</dt>
+            <dd th:text="${result.skipped()}"></dd>
+        </dl>
+    </div>
+
+    <p class="lank"><a th:href="@{/}">Tillbaka till vinkällaren</a></p>
+
+    <script th:inline="none">
+        // Skalar ner varje vald bild i webbläsaren innan uppladdning -
+        // samma Canvas-teknik som etikettskanningen (WINE-5,
+        // vin-formular.html), men här över POTENTIELLT MÅNGA filer
+        // samtidigt (en hel bildmapp, se webkitdirectory-inputen ovan).
+        // Utan detta hade en mapp med ~100 okomprimerade telefonfoton
+        // (flera MB styck) krascha mot multipart-storleksgränsen och
+        // belasta serverminnet i onödan när filerna mellanlagras inför
+        // WINE-25:s commit-steg - se CLAUDE.md/ADR 0014.
+        (function () {
+            var bilderInput = document.getElementById('bilder-input');
+            if (!bilderInput) {
+                return;
+            }
+            var MAX_SIDA = 1600;
+            var statusRad = document.getElementById('bilder-status');
+            var skickaKnapp = document.getElementById('import-submit');
+
+            function skalaNer(fil) {
+                return new Promise(function (resolve) {
+                    if (fil.type.indexOf('image/') !== 0) {
+                        // Inte en bildfil (t.ex. en systemfil i mappen) - lämna
+                        // orörd. Servern ignorerar ändå okända filändelser vid
+                        // matchning (se ImageMatcher).
+                        resolve(fil);
+                        return;
+                    }
+                    var bild = new Image();
+                    var läsare = new FileReader();
+                    var behållOrörd = function () {
+                        resolve(fil);
+                    };
+                    läsare.onload = function (händelse) {
+                        bild.onload = function () {
+                            var skala = Math.min(1, MAX_SIDA / Math.max(bild.width, bild.height));
+                            var duk = document.createElement('canvas');
+                            duk.width = Math.round(bild.width * skala);
+                            duk.height = Math.round(bild.height * skala);
+                            duk.getContext('2d').drawImage(bild, 0, 0, duk.width, duk.height);
+                            duk.toBlob(function (nedskalad) {
+                                if (!nedskalad) {
+                                    behållOrörd();
+                                    return;
+                                }
+                                // Behåller filnamnets STAM (servern matchar bilder mot
+                                // viner via filnamnet, WINE-21) men byter ändelsen till
+                                // .jpg - eftersom innehållet alltid skrivs om till JPEG
+                                // här måste ändelsen stämma med det, annars läser
+                                // ImageMatcher (som bestämmer MIME-typ utifrån ändelsen,
+                                // inte innehållet) fel typ ur en fil vars ändelse säger
+                                // t.ex. ".png" men vars faktiska bytes är en JPEG-ström.
+                                // Upptäckt av en riktig webbläsarrundtur (WINE-26,
+                                // ImportExportFlowIT) - varken curl-baserad manuell
+                                // verifiering eller MockMvc kör JS, så ingen tidigare
+                                // verifiering kunde ha avslöjat den här bugen.
+                                var stam = fil.name.replace(/\.[^./]+$/, '');
+                                resolve(new File([nedskalad], stam + '.jpg', {type: 'image/jpeg'}));
+                            }, 'image/jpeg', 0.85);
+                        };
+                        bild.onerror = behållOrörd;
+                        bild.src = händelse.target.result;
+                    };
+                    läsare.onerror = behållOrörd;
+                    läsare.readAsDataURL(fil);
+                });
+            }
+
+            bilderInput.addEventListener('change', function () {
+                var valda = Array.prototype.slice.call(bilderInput.files);
+                if (valda.length === 0) {
+                    return;
+                }
+                statusRad.textContent = 'Komprimerar ' + valda.length + ' bilder...';
+                skickaKnapp.disabled = true;
+
+                Promise.all(valda.map(skalaNer)).then(function (komprimerade) {
+                    var överföring = new DataTransfer();
+                    komprimerade.forEach(function (f) {
+                        överföring.items.add(f);
+                    });
+                    bilderInput.files = överföring.files;
+                    statusRad.textContent = komprimerade.length + ' bilder redo.';
+                    skickaKnapp.disabled = false;
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -16,7 +16,8 @@ Hexagonal lagerindelning:
 ```
 domain/          Rena domänobjekt (Wine, WineType, Rating), inga ramverksberoenden
 application/     Use cases och portar (WineService, WineRepository)
-infrastructure/  In-memory-testdubblett + JPA/Postgres-adapter (JpaWineRepository)
+infrastructure/  In-memory-testdubblett + JPA/Postgres-adapter (JpaWineRepository),
+                 Excel-läsning/skrivning (infrastructure/excel/)
 web/             Controller + Thymeleaf/htmx
 ```
 
@@ -200,17 +201,19 @@ mvn org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=com.microsof
 
 ## Import och export av Excel-data
 
-`tools/import-excel/` är en fristående Maven-modul (egen `pom.xml`,
-inte en del av den deployade appen) - se
-[ADR 0010](docs/adr/0010-excel-tool-standalone-module.md). Bygg roten
-lokalt först:
+En inloggad användare kan importera/exportera sin egen vinlista som
+`.xlsx`, i samma kolumnlayout som den ursprungliga `Vinlista.xlsx` -
+en webbfunktion (Fas 2, se
+[ADR 0014](docs/adr/0014-web-based-excel-import-export.md)), inte
+längre ett fristående kommandoradsverktyg. Den tidigare CLI-modulen
+(`tools/import-excel/`, se
+[ADR 0010](docs/adr/0010-excel-tool-standalone-module.md), Superseded
+av ADR 0014) är borttagen - `WineRowParser`/`WineRowWriter`/
+`ImageMatcher` lever kvar som återanvändbar kod i huvudappen
+(`infrastructure/excel/`).
 
-```powershell
-cd C:\projects\winecellar
-mvn install -DskipTests
-```
-
-Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `WineRowParser`:
+Kolumnlayouten (A-V på `Vin`-fliken), oförändrad och fortfarande
+relevant, är hårdkodad i `WineRowParser`:
 
 | Kolumn | Fält | Kolumn | Fält |
 |---|---|---|---|
@@ -227,77 +230,46 @@ Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `WineRowParser`:
 | K | Pris | V | Plats |
 
 Bara namnet är obligatoriskt vid import (samma regel som webb-UI:t, se
-[ADR 0005](docs/adr/0005-only-name-required.md)) - en rad utan namn
-hoppas över med en utskriven varning.
-
-### Import
-
-**I PowerShell** - sätt anslutningen som miljövariabler och skicka bara
-filsökvägen som argument (annars trasslar PowerShells
-citattecken-hantering med `-Dexec.args`):
-
-```powershell
-$env:POSTGRESQL_ADDON_HOST = "<host>"
-$env:POSTGRESQL_ADDON_PORT = "<port>"
-$env:POSTGRESQL_ADDON_DB = "<databasnamn>"
-$env:POSTGRESQL_ADDON_USER = "<användare>"
-$env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
-$env:WINECELLAR_LOCAL_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"  # valfri, se nedan
-
-cd tools\import-excel
-mvn exec:java "-Dexec.args=C:\Users\jonsw\Documents\Vin\Vinlista.xlsx"
-```
-
-**I Bash** går flervärdesargumentet att skicka direkt:
-
-```bash
-cd tools/import-excel
-mvn exec:java -Dexec.args="<sökväg-till-Vinlista.xlsx> <jdbc-url> <användare> <lösenord>"
-```
-
-Utan `jdbc-url`/`användare`/`lösenord` som argument används
-`POSTGRESQL_ADDON_*`-miljövariablerna, annars
-`localhost`/`winecellar`/`winecellar` (docker-compose-databasen).
-Verktyget har ingen dedupliceringslogik - kör inte importen två gånger
-mot samma databas.
-
-`WINECELLAR_LOCAL_IMAGE_FOLDER` (valfri) pekar ut en mapp med bildfiler
-döpta exakt som respektive vins namn (t.ex. `Barolo.jpg`) -
-`jpg`/`jpeg`/`png`/`gif`/`webp` känns igen. Matchning är exakt
-(filnamnsstam mot `name`, ingen normalisering). Två tvetydighetsfall
-hoppas över med en utskriven varning: flera bildfiler med samma stam
-men olika ändelse, och flera viner med exakt samma namn (samma bildfil
-kopplas då till alla).
+[ADR 0005](docs/adr/0005-only-name-required.md)) - en rad som saknar
+namn eller på annat sätt inte kan tolkas hoppas över, utan att stoppa
+resten av importen.
 
 ### Export
 
-`ExportExcel` skriver `wines`-tabellen till en `.xlsx`-fil i samma
-kolumnlayout som importen förväntar sig - se
-[ADR 0011](docs/adr/0011-excel-image-roundtrip-dual-mechanism.md) för
-hur bilder hanteras. Kräver ett explicit `-Dexec.mainClass`-argument
-(annars körs `ImportExcel` som standard):
+- `GET /export/xlsx` - laddar ner den inloggade användarens egna viner
+  som en `.xlsx`-fil, sorterade på namn.
+- `GET /export/bilder.zip` - laddar ner en zip med etikettbilderna,
+  namngivna `<producent>_<namn>_<årgång>.<ändelse>` (eller bara
+  `<namn>.<ändelse>` om producent eller årgång saknas) - samma
+  konvention som importen matchar bilder mot.
 
-```powershell
-cd C:\projects\winecellar\tools\import-excel
+Båda länkarna finns direkt i vinlistan. Exporten är byte-exakt -
+bilderna som laddas ner är identiska med det som en gång laddades upp.
 
-$env:POSTGRESQL_ADDON_HOST = "<host>"
-$env:POSTGRESQL_ADDON_PORT = "<port>"
-$env:POSTGRESQL_ADDON_DB = "<databasnamn>"
-$env:POSTGRESQL_ADDON_USER = "<användare>"
-$env:POSTGRESQL_ADDON_PASSWORD = "<lösenord>"
-$env:WINECELLAR_LOCAL_IMAGE_FOLDER = "C:\Users\jonsw\Documents\Vin\Etiketter"  # valfri, se nedan
+### Import
 
-mvn exec:java "-Dexec.mainClass=com.example.winecellar.importexcel.ExportExcel" "-Dexec.args=C:\Users\jonsw\Documents\Vin\Vinlista-export.xlsx"
-```
+`GET /import` visar ett formulär för att ladda upp en `.xlsx`-fil och,
+valfritt, en bildmapp (webbläsarens mappväljare). Importen sker i två
+steg:
 
-Utan `POSTGRESQL_ADDON_*`-miljövariabler används
-`localhost`/`winecellar`/`winecellar`. Bilder skrivs till
-`WINECELLAR_LOCAL_IMAGE_FOLDER` om variabeln är satt (mappen skapas
-automatiskt om den inte finns) - **samma mapp som import använder**,
-och det är den som gör en efterföljande återimport bildmedveten. Bilder
-bäddas dessutom alltid in direkt i xlsx-filens "Bild"-kolumn där
-formatet stöds (JPEG/PNG/GIF, inte WEBP) - bara en visuell bekvämlighet
-för att bläddra i Excel, läses inte tillbaka vid import.
+1. **Torrkörning** (`POST /import`) - parsar filen och
+   dubblettkontrollerar varje rad mot den inloggade användarens egna
+   viner (samma identitet - namn/producent/årgång - som
+   dubblettvarningen vid manuellt tillägg av ett enskilt vin), UTAN
+   att spara något. Visar en sammanfattning: rader totalt, överhoppade,
+   fullständiga/partiella dubbletter, rena nya viner.
+2. **Commit** (`POST /import/commit`) - efter att ha valt en
+   dubblettstrategi (öka antal / lägg till som nytt / hoppa över -
+   separata val för fullständiga och partiella dubbletter) sparas
+   raderna faktiskt.
+
+**Bilder i den uppladdade mappen skalas ned och konverteras till JPEG
+i webbläsaren innan uppladdning** - annars hade en mapp med många
+okomprimerade telefonfoton krockat med uppladdningsgränsen eller
+belastat serverminnet. Det gör att en export följt av en re-import
+INTE ger tillbaka bit-identiska bilder, bara visuellt likvärdiga - en
+medveten avvägning, se
+[ADR 0015](docs/adr/0015-bulk-import-images-lossy-jpeg.md).
 
 ## Deploy
 

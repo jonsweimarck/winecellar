@@ -2,6 +2,11 @@
 
 ## Status
 
+Superseded av [0014](0014-web-based-excel-import-export.md) (2026-07-25,
+WINE-20) - `tools/import-excel/` är borttagen, importen/exporten blir en
+webbfunktion i huvudappen istället. Kvar nedan som historik för varför
+den ursprungliga modellen såg ut som den gjorde.
+
 Accepted (2026-07-17)
 
 ## Context

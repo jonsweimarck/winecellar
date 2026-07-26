@@ -57,18 +57,13 @@ public class WineController {
     }
 
     /**
-     * WINE-13: null betyder oscopeat, inte "ägs av ingen" - ursprungligen
-     * till för de hårdkodade admin/readonly-kontona (som inte fanns i
-     * users-tabellen och medvetet var oscopeade under övergången). Sedan
-     * WINE-15 (admin/readonly borttagna) hittar `userRepository` alltid
-     * en träff för en riktigt inloggad `Authentication` - `.orElse(null)`
-     * är kvar som ett ofarligt, numera i praktiken oanvänt skyddsnät,
-     * inte för att någon oscopead inloggning fortfarande kan förekomma.
+     * WINE-13: se {@link CurrentUser} för null-konventionens bakgrund -
+     * logiken flyttades dit i WINE-22 när `ExportController` fick samma
+     * behov, den här metoden är bara en tunn bekvämlighetswrapper så
+     * befintliga anropsplatser i den här klassen slapp ändras.
      */
     private UserId currentOwner(Authentication authentication) {
-        return userRepository.findByUsername(authentication.getName())
-                .map(user -> user.id())
-                .orElse(null);
+        return CurrentUser.owner(authentication, userRepository);
     }
 
     @GetMapping("/")
