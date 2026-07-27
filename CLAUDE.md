@@ -2120,6 +2120,54 @@ etikettskanningens (WINE-5) LLM-tolkning är BÅDA opåverkade - ingen
 nedskalning sparas någonsin som vinets bild i de flödena, bara
 bulkimportens `webkitdirectory`-väg gör det.
 
+**WINE-29 (2026-07-27): transparens bevaras vid bulkimport - ADR 0015
+uppdaterad, inte reverserad.** En bild med transparent bakgrund tappade
+sin transparens helt vid bulkimport (rapporterad bugg) - en direkt,
+förutsägbar konsekvens av att ADR 0015:s ursprungliga beslut alltid
+skrev om till JPEG, som helt saknar alfakanal. Avstämt med användaren
+innan kodning (se ADR 0015s eget "Tillägg 2026-07-27"-avsnitt för den
+fulla motiveringen) - **inte** en reversering av det ursprungliga
+beslutet, bara ett villkorat undantag för bilder som faktiskt har
+transparens.
+- **`import.html`s Canvas-kod skannar nu alfakanalen** (`getImageData`,
+  leta efter alfavärde < 255) efter nedskalningen, innan `toBlob`
+  anropas. Helt ogenomskinliga bilder är HELT oförändrade (samma
+  `image/jpeg`, kvalitet 0.85, som innan) - bara bilder med minst en
+  transparent/halvtransparent pixel begär `'image/webp'` istället.
+- **Filändelsen läses av EFTER `toBlob`, från blobbens FAKTISKA
+  `type`** (`ÄNDELSE_PER_MIME`-uppslagning), inte hårdkodad i förväg -
+  eftersom HTML-specen kräver att en webbläsare som inte kan koda WebP
+  MÅSTE falla tillbaka till PNG (aldrig JPEG, aldrig `null`), och vilket
+  av de två som faktiskt kom tillbaka avgörs alltså av webbläsaren, inte
+  av vår kod. Samma klass av bugg som WINE-26 en gång fixade (ändelse
+  som inte stämde med det faktiska innehållet) skulle annars kunna
+  återuppstå i det nya PNG/WebP-fallet.
+- **Ingen serverändring behövdes** - `ImageMatcher` kände redan igen
+  både `webp` och `png` (`MIME_BY_EXTENSION`/`EXTENSION_BY_MIME`,
+  byggda i tidigare stories).
+- **Verifiering krävde en RIKTIG webbläsare, inte Java-avkodning** -
+  JVM:ens `ImageIO` saknar inbyggt WebP-stöd (samma typ av begränsning
+  som redan gäller för `WineRowWriter`s xlsx-inbäddning, se
+  Excel-import-avsnittet: "Inte WEBP"). `ImportExportFlowIT` fick ett
+  nytt scenario som istället kör `Page.evaluate(...)` i webbläsaren
+  själv: hämtar den importerade bilden via `fetch`, ritar den på en
+  `OffscreenCanvas` via `createImageBitmap`, och läser tillbaka
+  alfavärdet direkt i webbläsarkontexten - format-agnostiskt (fungerar
+  oavsett om resultatet blev WebP eller PNG-fallbacken) och testar det
+  faktiska felet (tappad transparens), inte bara `Content-Type`.
+- **Ny testbild krävdes:** den befintliga `EN_PIXEL_PNG`-fixturen
+  (`ImportExportFlowIT`, delad med `LabelScanFormIT`) visade sig vid
+  närmare granskning vara grayscale+alfa (PNG-färgtyp 4) men med
+  alfavärde 255 - alltså tekniskt alfakapabel men i praktiken helt
+  ogenomskinlig, så den triggar inte den nya kodvägen. En ny
+  `HALVTRANSPARENT_PIXEL_PNG`-fixtur (1x1 RGBA, alfa 128) byggdes
+  istället - `läggTillVinMedBild(...)` gjordes parametriserbar
+  (bild-bytes/filnamn/mime-typ) så båda testbilderna kan återanvända
+  samma uppladdningshjälpare.
+- Verifierat: `ImportExportFlowIT` grön i isolering (båda scenarierna -
+  det befintliga opaka fallet är oförändrat, det nya transparenta
+  fallet grönt), och `mvn verify` grön i sin helhet efteråt.
+
 ## Kända fällor att vara uppmärksam på (ärvda från roombooking, kan återkomma)
 
 - **Gherkin på svenska kräver `# language: sv`** som absolut första rad i

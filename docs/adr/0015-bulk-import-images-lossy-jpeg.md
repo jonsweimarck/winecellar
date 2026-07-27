@@ -60,11 +60,12 @@ Alternativ som övervägdes och förkastades:
 
 - En bulkimporterad bild är ALDRIG bit-exakt densamma som originalet -
   bara visuellt likvärdig (nedskalad till max 1600px långsida,
-  JPEG-komprimerad med kvalitet 0.85). Om bit-exakt bildbevarande
-  någonsin blir ett krav för bulkimporten specifikt är det en ny,
-  separat avvägning (t.ex. ett kryssalternativ "skala inte ned" som
-  skickar originalfilerna okomprimerade, med de multipart-/
-  minneskonsekvenser det innebär).
+  JPEG-komprimerad med kvalitet 0.85, se dock tillägget nedan för
+  transparenta bilder). Om bit-exakt bildbevarande någonsin blir ett
+  krav för bulkimporten specifikt är det en ny, separat avvägning
+  (t.ex. ett kryssalternativ "skala inte ned" som skickar
+  originalfilerna okomprimerade, med de multipart-/minneskonsekvenser
+  det innebär).
 - "Full rundtripp" för import/export-funktionen (se ADR 0014) gäller
   alltså textdata fullständigt, men bilder bara visuellt/praktiskt -
   inte bit-exakt - för just bulkvägen.
@@ -72,3 +73,36 @@ Alternativ som övervägdes och förkastades:
   bulkimporterad bild INTE är byte-identisk, bara att den kommer fram
   med korrekt `Content-Type` kopplad till rätt vin - ett medvetet
   testval som direkt speglar det här beslutet.
+
+## Tillägg 2026-07-27 (WINE-29): transparens bevaras, JPEG bara för
+## ogenomskinliga bilder
+
+WINE-29 rapporterade att en bild med transparent bakgrund tappade sin
+transparens vid bulkimport - en direkt, förutsägbar konsekvens av att
+`import.html` **alltid** skrev om till JPEG oavsett ursprungsformat,
+eftersom JPEG helt saknar stöd för alfakanal. Det ursprungliga beslutet
+ovan vägde bara in filstorlek/minne, inte bildfidelitet för
+transparenta bilder specifikt - det gapet var värt att täppa till,
+utan att ge upp anledningen till att konvertera/komprimera
+ogenomskinliga bilder över huvud taget.
+
+**Justerat beslut:** efter nedskalningen på `<canvas>` läses
+pixeldatan (`getImageData`) och alfakanalen skannas. Är bilden helt
+ogenomskinlig (inget alfavärde < 255) är beteendet OFÖRÄNDRAT - JPEG,
+kvalitet 0.85, exakt som innan. Har bilden minst en transparent/
+halvtransparent pixel begärs istället `canvas.toBlob(callback,
+'image/webp', 0.85)` - WebP stöder alfakanal och komprimerar
+fortfarande bättre än PNG för de flesta bilder. HTML-specen kräver att
+en webbläsare som inte kan koda WebP måste falla tillbaka till PNG
+(aldrig till JPEG, som skulle återintroducera buggen, och aldrig
+`null`) - `import.html` litar på detta och läser av den faktiska
+returnerade blobbens `type` istället för att anta vilket format som
+kom tillbaka, så filändelsen alltid stämmer med innehållet (samma
+klass av bugg som WINE-26 redan fixade en gång, se `import.html`).
+Servern behövde ingen ändring - `ImageMatcher` kände redan igen både
+`webp` och `png` (`MIME_BY_EXTENSION`/`EXTENSION_BY_MIME`).
+
+Detta är en förfining av samma beslut, inte en reversering - filstorlek
+och minnesbegränsningen som motiverade nedskalning/komprimering från
+början gäller fortfarande fullt ut, bara kodningsvalet är nu villkorat
+på om bilden faktiskt har transparens.

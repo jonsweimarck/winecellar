@@ -38,5 +38,5 @@ Varje post följer samma enkla mall:
 | [0012](0012-label-scanning-llm-integration.md) | Etikettskanning via Anthropic-API, port/adapter + RestClient | Accepted |
 | [0013](0013-multi-user-accounts.md) | Flera användare med egna, privata vinlistor | Accepted |
 | [0014](0014-web-based-excel-import-export.md) | Webbaserad Excel-import/export, scopead till inloggad användare | Accepted |
-| [0015](0015-bulk-import-images-lossy-jpeg.md) | Bulkimportens bilder skalas ned och konverteras till JPEG - ingen bit-exakt rundtripp | Accepted |
+| [0015](0015-bulk-import-images-lossy-jpeg.md) | Bulkimportens bilder skalas ned och komprimeras (JPEG, eller WebP/PNG vid transparens) - ingen bit-exakt rundtripp | Accepted |
 | [0016](0016-quantity-also-mandatory.md) | Antal flaskor blir obligatoriskt, precis som namnet | Accepted |
