@@ -2168,6 +2168,42 @@ transparens.
   det befintliga opaka fallet är oförändrat, det nya transparenta
   fallet grönt), och `mvn verify` grön i sin helhet efteråt.
 
+**WINE-32 byggd (2026-07-27): "Bild"-kolumnen i Excel-import/export
+borttagen helt - ADR 0011 markerad Deprecated (inte reverserad, den
+beskriver bara ett beslut som inte längre är relevant).** Kolumnen
+(I, `WineRowParser.COL_IMAGE`) lästes redan aldrig vid import - den
+enda kvarvarande användningen var att `WineRowWriter` skrev en ankrad
+POI-`Picture` dit vid export, en ren visuell bekvämlighet som aldrig
+var en del av den faktiska bildrundtrippen (den går via
+`/export/bilder.zip`, se ADR 0014/WINE-23). Eftersom mekanism 2 i
+ADR 0011 (den delade lokala bildmappen) redan försvann i WINE-20/23
+fanns ingen kvarvarande anledning att behålla den sista xlsx-specifika
+bildvägen heller.
+- **Kolumnen togs bort helt ur layouten, inte bara tömdes** - layouten
+  gick från A-V (22 kolumner) till A-U (21). `WineRowParser.COL_IMAGE`
+  togs bort och alla kolumner efter den (Inköpsdatum och framåt)
+  skiftade ett steg åt vänster. Samma sorts mekaniska indexskifte som
+  när Systembolagets prodnummer en gång sköt in en NY kolumn (se
+  Excel-import-avsnittet ovan) - fast i motsatt riktning.
+- **`WineRowWriter`:** `image(...)`-metoden, `"Bild"` ur `HEADERS`,
+  `POI_PICTURE_TYPE_BY_MIME`-kartan och det `Drawing<?> drawing`-
+  parametret på `write(...)` togs bort helt - `ExportController`
+  slutade därmed också behöva `sheet.createDrawingPatriarch()`.
+- **Två tester i `WineRowWriterTest` togs bort** (inte bara justerade)
+  - de testade specifikt bildinbäddningen (byte-identisk PNG, webp
+    hoppas över med varning), en funktion som inte längre finns.
+    Kvarvarande tester i `WineRowParserTest`/`WineRowWriterTest`/
+    `ImportControllerTest` fick sina hårdkodade kolumnindex justerade
+    till den nya layouten - inga nya tester behövdes (matchar
+    storyns eget acceptanskriterium).
+- **ADR 0011 markerad Deprecated, med en konkret motivering skriven
+  in i ADR:n själv** (inte bara en hänvisning till story-numret,
+  på uttrycklig begäran från användaren) - båda mekanismerna beslutet
+  en gång beskrev är nu borta, och det finns ingen efterträdande ADR
+  eftersom det här är en ren avveckling, inte ett nytt beslut.
+- Verifierat: `mvn verify` grön (106 enhets-/webblagertester,
+  50 IT-tester).
+
 ## Kända fällor att vara uppmärksam på (ärvda från roombooking, kan återkomma)
 
 - **Gherkin på svenska kräver `# language: sv`** som absolut första rad i

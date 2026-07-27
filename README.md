@@ -213,22 +213,25 @@ av ADR 0014) är borttagen - `WineRowParser`/`WineRowWriter`/
 `ImageMatcher` lever kvar som återanvändbar kod i huvudappen
 (`infrastructure/excel/`).
 
-Kolumnlayouten (A-V på `Vin`-fliken), oförändrad och fortfarande
-relevant, är hårdkodad i `WineRowParser`:
+Kolumnlayouten (A-U på `Vin`-fliken) är hårdkodad i `WineRowParser`.
+Det finns ingen egen bild-kolumn (togs bort i WINE-32 - se
+[ADR 0011](docs/adr/0011-excel-image-roundtrip-dual-mechanism.md),
+Deprecated) - etikettbilder hanteras uteslutande via
+`/export/bilder.zip`/mappuppladdningen, inte via själva kalkylbladet:
 
 | Kolumn | Fält | Kolumn | Fält |
 |---|---|---|---|
-| A | Vintyp | L | Antal |
-| B | Land | M | Varför köpt |
-| C | Region | N | Tasting notes |
-| D | Underregion | O | Eget betyg |
-| E | Druvor | P | Systembolagets prodnummer |
-| F | Producent | Q | Systembolagets beskrivning |
-| G | Namn | R | Munskänkarnas bedömning |
-| H | Årgång | S | Munskänkarnas betyg |
-| I | Bild (läses ej vid import) | T | Vivino |
-| J | Inköpsdatum | U | Annan referens |
-| K | Pris | V | Plats |
+| A | Vintyp | L | Varför köpt |
+| B | Land | M | Tasting notes |
+| C | Region | N | Eget betyg |
+| D | Underregion | O | Systembolagets prodnummer |
+| E | Druvor | P | Systembolagets beskrivning |
+| F | Producent | Q | Munskänkarnas bedömning |
+| G | Namn | R | Munskänkarnas betyg |
+| H | Årgång | S | Vivino |
+| I | Inköpsdatum | T | Annan referens |
+| J | Pris | U | Plats |
+| K | Antal | | |
 
 Namn och antal flaskor är obligatoriska vid import (samma regel som
 webb-UI:t, se [ADR 0016](docs/adr/0016-quantity-also-mandatory.md)) - en

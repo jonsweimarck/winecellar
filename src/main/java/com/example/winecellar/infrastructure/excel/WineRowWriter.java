@@ -4,12 +4,8 @@ import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.ClientAnchor;
-import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,14 +16,12 @@ import java.util.Map;
  * med samma kolumnlayout (WineRowParser.COL_*, delade paketsynliga
  * konstanter så de två klasserna aldrig kan glida isär).
  *
- * Bild-kolumnen (I, WineRowParser.COL_IMAGE) skriver etiketten som en
- * vanlig ankrad POI-{@code Picture} - **inte** samma sak som Excelkällfilens
- * ursprungliga "bild i cell" (inbäddad rich data), som WineRowParser
- * medvetet inte läser vid import (se dess klasskommentar). En vanlig
- * ankrad bild är en helt annan, mycket enklare mekanism att skriva än att
- * läsa rich-data-celler, och läses inte tillbaka av WineRowParser - bara en
- * visuell bekvämlighet för att kunna bläddra i xlsx-filen. Fullständig
- * bildrundtripp går via en separat mekanism (se ADR 0014/WINE-23).
+ * **Ingen egen bild-kolumn** (WINE-32, 2026-07-27) - skrev tidigare
+ * etiketten som en ankrad POI-{@code Picture} i en egen kolumn, men det
+ * var bara en visuell bekvämlighet som aldrig lästes tillbaka av
+ * WineRowParser. Riktig bildrundtripp går via en separat mekanism (se
+ * ADR 0014/WINE-23, `/export/bilder.zip`). Se
+ * `docs/adr/0011-excel-image-roundtrip-dual-mechanism.md` (Deprecated).
  *
  * `SHEET_NAME`/{@link #writeHeaderRow} tillkom i WINE-22 (webbaserad
  * export) - samma flikamn/rubrikrad som den tidigare CLI-exporten
@@ -40,7 +34,7 @@ public final class WineRowWriter {
 
     private static final String[] HEADERS = {
             "Vintyp", "Land", "Region", "Underregion", "Druvor", "Producent", "Namn", "Årgång",
-            "Bild", "Inköpsdatum", "Pris", "Antal", "Varför köpt", "Tasting notes", "Eget betyg",
+            "Inköpsdatum", "Pris", "Antal", "Varför köpt", "Tasting notes", "Eget betyg",
             "Systembolagets prodnummer", "Systembolagets beskrivning", "Munskänkarnas bedömning",
             "Munskänkarnas betyg", "Vivino", "Annan referens", "Plats"
     };
@@ -53,25 +47,12 @@ public final class WineRowWriter {
             WineType.FORTIFIED, "Starkvin"
     );
 
-    // Samma MIME-typer som ImageMatcher känner igen vid import, MINUS
-    // "image/webp" - OOXML (.xlsx) har inget bildformat för webp, och
-    // POI har ingen PICTURE_TYPE-konstant för det. En sådan bild hoppas
-    // över vid export med en utskriven varning istället för att krascha.
-    private static final Map<String, Integer> POI_PICTURE_TYPE_BY_MIME = Map.of(
-            "image/jpeg", Workbook.PICTURE_TYPE_JPEG,
-            "image/png", Workbook.PICTURE_TYPE_PNG,
-            "image/gif", XSSFWorkbook.PICTURE_TYPE_GIF
-    );
-
     /**
      * `dateFormat` skapas en gång av anroparen och återanvänds för alla
      * rader - en ny CellStyle per cell är ett känt POI-antimönster
-     * (workbookets stilpool är begränsad). `drawing`
-     * (sheet.createDrawingPatriarch()) skapas också en gång och delas -
-     * en `Drawing` är sidans enda "canvas" för ankrade figurer, inte en
-     * per-rad-resurs.
+     * (workbookets stilpool är begränsad).
      */
-    public void write(Wine wine, Row row, CellStyle dateFormat, Drawing<?> drawing) {
+    public void write(Wine wine, Row row, CellStyle dateFormat) {
         text(row, WineRowParser.COL_WINE_TYPE, wine.wineType() == null ? null : SWEDISH_WINE_TYPE.get(wine.wineType()));
         text(row, WineRowParser.COL_COUNTRY, wine.country());
         text(row, WineRowParser.COL_REGION, wine.region());
@@ -93,7 +74,6 @@ public final class WineRowWriter {
         decimal(row, WineRowParser.COL_VIVINO, wine.vivinoRating());
         text(row, WineRowParser.COL_OTHER_REFERENCE, wine.otherReference());
         text(row, WineRowParser.COL_LOCATION, wine.location());
-        image(row, wine, drawing);
     }
 
     /**
@@ -106,23 +86,6 @@ public final class WineRowWriter {
         for (int column = 0; column < HEADERS.length; column++) {
             headerRow.createCell(column).setCellValue(HEADERS[column]);
         }
-    }
-
-    private void image(Row row, Wine wine, Drawing<?> drawing) {
-        if (wine.image() == null) {
-            return;
-        }
-        Integer poiPictureType = POI_PICTURE_TYPE_BY_MIME.get(wine.imageMimeType());
-        if (poiPictureType == null) {
-            System.out.println("Varning: bilden för \"" + wine.name() + "\" har MIME-typen \""
-                    + wine.imageMimeType() + "\", som Excel-export inte stöder - bilden hoppas över "
-                    + "(databasens rådata påverkas inte).");
-            return;
-        }
-        int pictureIndex = row.getSheet().getWorkbook().addPicture(wine.image(), poiPictureType);
-        ClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0,
-                WineRowParser.COL_IMAGE, row.getRowNum(), WineRowParser.COL_IMAGE + 1, row.getRowNum() + 1);
-        drawing.createPicture(anchor, pictureIndex);
     }
 
     private void text(Row row, int col, String value) {

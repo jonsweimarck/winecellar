@@ -34,7 +34,7 @@ Varje post följer samma enkla mall:
 | [0008](0008-filter-chips-plain-links.md) | Filterchips är vanliga länkar, inte htmx | Accepted |
 | [0009](0009-whole-app-http-basic-auth.md) | Hela appen bakom HTTP Basic, med ett delat läsbehörighetskonto | Superseded av [0013](0013-multi-user-accounts.md) |
 | [0010](0010-excel-tool-standalone-module.md) | Excel-import/export som en fristående Maven-modul | Superseded av [0014](0014-web-based-excel-import-export.md) |
-| [0011](0011-excel-image-roundtrip-dual-mechanism.md) | Excel-bildrundtripp via två oberoende mekanismer | Delvis Superseded av [0014](0014-web-based-excel-import-export.md)/[0015](0015-bulk-import-images-lossy-jpeg.md) |
+| [0011](0011-excel-image-roundtrip-dual-mechanism.md) | Excel-bildrundtripp via två oberoende mekanismer | Deprecated (WINE-32) |
 | [0012](0012-label-scanning-llm-integration.md) | Etikettskanning via Anthropic-API, port/adapter + RestClient | Accepted |
 | [0013](0013-multi-user-accounts.md) | Flera användare med egna, privata vinlistor | Accepted |
 | [0014](0014-web-based-excel-import-export.md) | Webbaserad Excel-import/export, scopead till inloggad användare | Accepted |

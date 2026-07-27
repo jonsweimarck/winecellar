@@ -307,7 +307,7 @@ class ImportControllerTest {
 
     /**
      * Fyra rader, samma kolumnlayout som `WineRowParser`/README:s
-     * Datamodell-avsnitt (A=vintyp ... G=namn, H=årgång ... L=antal):
+     * Datamodell-avsnitt (A=vintyp ... G=namn, H=årgång ... K=antal):
      * "Barolo" (fullständig identitet, mockas som fullständig dubblett),
      * "Chianti" (mockas som partiell dubblett), "Rioja" (ren, ny), och
      * en rad helt utan namn (hoppas över av WineRowParser självt).
@@ -339,7 +339,7 @@ class ImportControllerTest {
             row.createCell(7).setCellValue(vintage);
         }
         if (quantity > 0) {
-            row.createCell(11).setCellValue(quantity);
+            row.createCell(10).setCellValue(quantity);
         }
     }
 }
