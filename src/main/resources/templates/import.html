@@ -113,13 +113,47 @@
                     var behållOrörd = function () {
                         resolve(fil);
                     };
+                    // Filändelse per faktiskt returnerad MIME-typ - läses av EFTER
+                    // toBlob (se nedan) istället för att antas i förväg, eftersom
+                    // vilket format som faktiskt kom tillbaka beror på både
+                    // transparensskanningen och webbläsarens WebP-stöd.
+                    var ÄNDELSE_PER_MIME = {
+                        'image/jpeg': '.jpg',
+                        'image/png': '.png',
+                        'image/webp': '.webp'
+                    };
                     läsare.onload = function (händelse) {
                         bild.onload = function () {
                             var skala = Math.min(1, MAX_SIDA / Math.max(bild.width, bild.height));
                             var duk = document.createElement('canvas');
                             duk.width = Math.round(bild.width * skala);
                             duk.height = Math.round(bild.height * skala);
-                            duk.getContext('2d').drawImage(bild, 0, 0, duk.width, duk.height);
+                            var kontext = duk.getContext('2d');
+                            kontext.drawImage(bild, 0, 0, duk.width, duk.height);
+
+                            // WINE-29: JPEG saknar alfakanal, så en bild med
+                            // transparent bakgrund tappade sin transparens helt vid
+                            // bulkimport. Skanna pixeldatan efter minst ett
+                            // alfavärde < 255 - bara DÅ behöver vi ge upp
+                            // JPEG-komprimeringen för den här bilden.
+                            var pixeldata = kontext.getImageData(0, 0, duk.width, duk.height).data;
+                            var harTransparens = false;
+                            for (var i = 3; i < pixeldata.length; i += 4) {
+                                if (pixeldata[i] < 255) {
+                                    harTransparens = true;
+                                    break;
+                                }
+                            }
+
+                            // Transparenta bilder ber om WebP (stöder alfakanal,
+                            // komprimerar bättre än PNG) - HTML-specen kräver att en
+                            // webbläsare som inte kan koda WebP faller tillbaka till
+                            // PNG (aldrig JPEG, aldrig null), så vi läser av blobbens
+                            // FAKTISKA typ nedan istället för att anta vilken som kom
+                            // tillbaka. Ogenomskinliga bilder är oförändrat JPEG,
+                            // exakt som innan den här ändringen.
+                            var önskadTyp = harTransparens ? 'image/webp' : 'image/jpeg';
+
                             duk.toBlob(function (nedskalad) {
                                 if (!nedskalad) {
                                     behållOrörd();
@@ -127,18 +161,19 @@
                                 }
                                 // Behåller filnamnets STAM (servern matchar bilder mot
                                 // viner via filnamnet, WINE-21) men byter ändelsen till
-                                // .jpg - eftersom innehållet alltid skrivs om till JPEG
-                                // här måste ändelsen stämma med det, annars läser
-                                // ImageMatcher (som bestämmer MIME-typ utifrån ändelsen,
-                                // inte innehållet) fel typ ur en fil vars ändelse säger
-                                // t.ex. ".png" men vars faktiska bytes är en JPEG-ström.
-                                // Upptäckt av en riktig webbläsarrundtur (WINE-26,
-                                // ImportExportFlowIT) - varken curl-baserad manuell
-                                // verifiering eller MockMvc kör JS, så ingen tidigare
-                                // verifiering kunde ha avslöjat den här bugen.
+                                // vad blobben FAKTISKT blev - annars läser ImageMatcher
+                                // (som bestämmer MIME-typ utifrån ändelsen, inte
+                                // innehållet) fel typ ur en fil vars ändelse inte
+                                // stämmer med de faktiska bytesen. Upptäckt av en
+                                // riktig webbläsarrundtur (WINE-26, ImportExportFlowIT)
+                                // - varken curl-baserad manuell verifiering eller
+                                // MockMvc kör JS, så ingen tidigare verifiering kunde
+                                // ha avslöjat den ursprungliga varianten av den här
+                                // bugen.
                                 var stam = fil.name.replace(/\.[^./]+$/, '');
-                                resolve(new File([nedskalad], stam + '.jpg', {type: 'image/jpeg'}));
-                            }, 'image/jpeg', 0.85);
+                                var ändelse = ÄNDELSE_PER_MIME[nedskalad.type] || '.jpg';
+                                resolve(new File([nedskalad], stam + ändelse, {type: nedskalad.type}));
+                            }, önskadTyp, 0.85);
                         };
                         bild.onerror = behållOrörd;
                         bild.src = händelse.target.result;

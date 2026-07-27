@@ -67,6 +67,8 @@ class ImportExportFlowIT {
 
     private static final String KONTO_A_ANVÄNDARNAMN = "importExportFlowA";
     private static final String KONTO_B_ANVÄNDARNAMN = "importExportFlowB";
+    private static final String KONTO_TRANSPARENS_A_ANVÄNDARNAMN = "importExportFlowTransparentA";
+    private static final String KONTO_TRANSPARENS_B_ANVÄNDARNAMN = "importExportFlowTransparentB";
     private static final String LÖSENORD = "testlösenord123";
 
     private static Playwright playwright;
@@ -90,6 +92,14 @@ class ImportExportFlowIT {
     // import.html ska fungera.
     private static final byte[] EN_PIXEL_PNG = Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+
+    // 1x1 RGBA-PNG med en halvtransparent röd pixel (alfa 128 av 255) - till
+    // skillnad från EN_PIXEL_PNG ovan (grayscale+alfa, men den enda pixeln är
+    // faktiskt helt ogenomskinlig, alfa 255) behöver WINE-29-testet en bild
+    // som FAKTISKT har transparens för att träffa den nya kodvägen i
+    // import.html.
+    private static final byte[] HALVTRANSPARENT_PIXEL_PNG = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DQAAAEgQGALFXOsAAAAABJRU5ErkJggg==");
 
     @Test
     void skaExporteraOchImporteraEttVinMedBildTillEttAnnatKontoIdentiskt(@TempDir Path tempDir) throws Exception {
@@ -150,7 +160,78 @@ class ImportExportFlowIT {
         }
     }
 
+    /**
+     * WINE-29: en bild med transparent bakgrund tappade sin transparens helt
+     * vid bulkimport, eftersom import.html:s Canvas-nedskalning ALLTID skrev
+     * om innehållet till JPEG (som saknar alfakanal) oavsett ursprungsformat -
+     * se tillägget i ADR 0015. Samma rundtur som testet ovan (konto A sparar
+     * ett vin med bild, exporterar, konto B bulk-importerar tillbaka), men med
+     * en FAKTISKT transparent testbild och en assertion på att alfakanalen
+     * fortfarande finns kvar efter rundtrippen - inte bara att en bild kommer
+     * fram.
+     */
+    @Test
+    void skaBevaraTransparensVidBulkimportAvEnBildMedGenomskinligBakgrund(@TempDir Path tempDir) throws Exception {
+        registrationService.register(KONTO_TRANSPARENS_A_ANVÄNDARNAMN, LÖSENORD);
+        registrationService.register(KONTO_TRANSPARENS_B_ANVÄNDARNAMN, LÖSENORD);
+
+        try (BrowserContext kontoA = nyKontext()) {
+            loggaIn(kontoA, KONTO_TRANSPARENS_A_ANVÄNDARNAMN);
+            läggTillVinMedBild(kontoA, HALVTRANSPARENT_PIXEL_PNG, "etikett.png", "image/png");
+
+            Path xlsxFil = ladda(kontoA, "/export/xlsx", tempDir.resolve("vinlista.xlsx"));
+            Path zipFil = ladda(kontoA, "/export/bilder.zip", tempDir.resolve("bilder.zip"));
+            Path bildmapp = packaUppIEgenMapp(zipFil, tempDir);
+
+            try (BrowserContext kontoB = nyKontext()) {
+                loggaIn(kontoB, KONTO_TRANSPARENS_B_ANVÄNDARNAMN);
+                Page sida = kontoB.newPage();
+                sida.navigate("http://localhost:" + port + "/import");
+
+                sida.locator("#fil-input").setInputFiles(xlsxFil);
+                sida.locator("#bilder-input").setInputFiles(bildmapp);
+                sida.locator("#import-submit:not([disabled])").waitFor();
+                sida.locator("#import-submit").click();
+                sida.waitForURL("**/import");
+
+                sida.locator("button:has-text(\"Importera\")").click();
+                sida.waitForURL("**/import");
+
+                sida.navigate("http://localhost:" + port + "/");
+                String bildUrl = sida.locator("img[src*='/bild']").first().getAttribute("src");
+
+                // Content-Type ska INTE vara image/jpeg (JPEG saknar alfakanal -
+                // om vi ser jpeg här har transparensen redan gått förlorad).
+                APIResponse bildSvar = kontoB.request().get("http://localhost:" + port + bildUrl);
+                assertThat(bildSvar.headers().get("content-type")).isNotEqualTo("image/jpeg");
+
+                // Avkoda den FAKTISKA responsen i webbläsaren själv (inte via
+                // Java/ImageIO - JVM:en saknar inbyggt WebP-stöd, som är precis
+                // det format Chromiums canvas.toBlob väljer för transparenta
+                // bilder) och läs av alfavärdet för pixeln efter hela
+                // rundtrippen (uppladdning → nedskalning → export → bulkimport
+                // → visning).
+                Object alfavärde = sida.evaluate("async (url) => {"
+                        + "const svar = await fetch(url);"
+                        + "const blob = await svar.blob();"
+                        + "const bitmap = await createImageBitmap(blob);"
+                        + "const duk = new OffscreenCanvas(bitmap.width, bitmap.height);"
+                        + "const kontext = duk.getContext('2d');"
+                        + "kontext.drawImage(bitmap, 0, 0);"
+                        + "return kontext.getImageData(0, 0, 1, 1).data[3];"
+                        + "}", bildUrl);
+
+                assertThat(((Number) alfavärde).intValue()).isLessThan(255);
+            }
+        }
+    }
+
     private void läggTillVinMedBild(BrowserContext context) throws IOException {
+        läggTillVinMedBild(context, EN_PIXEL_PNG, "etikett.png", "image/png");
+    }
+
+    private void läggTillVinMedBild(BrowserContext context, byte[] bildBytes, String filnamn, String mimeTyp)
+            throws IOException {
         Page sida = context.newPage();
         sida.navigate("http://localhost:" + port + "/wines/nytt");
 
@@ -165,7 +246,7 @@ class ImportExportFlowIT {
         // och det vanliga bildfältet i huvudformuläret) - nth(1) är det
         // vanliga, synliga fältet.
         sida.locator("input[name=bild]").nth(1).setInputFiles(
-                new FilePayload("etikett.png", "image/png", EN_PIXEL_PNG));
+                new FilePayload(filnamn, mimeTyp, bildBytes));
 
         sida.locator("button:has-text(\"Lägg till\")").click();
         sida.waitForURL("http://localhost:" + port + "/");
