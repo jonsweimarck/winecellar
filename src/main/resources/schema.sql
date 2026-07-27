@@ -87,15 +87,26 @@ UPDATE wines SET search_vector =
 CREATE INDEX IF NOT EXISTS wines_search_vector_idx ON wines USING GIN (search_vector);;
 
 -- Namn är sedan 2026-07-22 det enda obligatoriska fältet (se CLAUDE.md) -
--- vintage/quantity var tidigare Java-primitiver (int) och fick därför
--- automatiskt en NOT NULL-kolumn av Hibernate när tabellen skapades.
--- ddl-auto: update lägger bara till nya kolumner/tabeller, det lättar
--- aldrig på en befintlig NOT NULL-begränsning även om Java-typen ändras
--- till en nullable Integer - därav den här kompletterande satsen.
--- DROP NOT NULL är själv idempotent i Postgres (ingen "IF EXISTS" behövs
--- - att köra den mot en redan nullable kolumn är ett ofarligt no-op).
+-- vintage var tidigare en Java-primitiv (int) och fick därför automatiskt
+-- en NOT NULL-kolumn av Hibernate när tabellen skapades. ddl-auto: update
+-- lägger bara till nya kolumner/tabeller, det lättar aldrig på en
+-- befintlig NOT NULL-begränsning även om Java-typen ändras till en
+-- nullable Integer - därav den här kompletterande satsen. DROP NOT NULL
+-- är själv idempotent i Postgres (ingen "IF EXISTS" behövs - att köra den
+-- mot en redan nullable kolumn är ett ofarligt no-op).
 ALTER TABLE wines ALTER COLUMN vintage DROP NOT NULL;;
-ALTER TABLE wines ALTER COLUMN quantity DROP NOT NULL;;
+
+-- WINE-28/ADR 0016: quantity ("antal flaskor") blev obligatorisk igen
+-- (se docs/adr/0016-quantity-also-mandatory.md) - motsatt riktning av
+-- raden ovan, satt direkt i SQL av samma skäl som owner_id nedan
+-- (Hibernates ddl-auto: update lättar aldrig på en begränsning den inte
+-- känner till från annoteringarna, och kan inte heller pålitligt skärpa
+-- en befintlig kolumn - se CLAUDE.md om search_vector-sagan). Idempotent
+-- - SET NOT NULL på en redan NOT NULL-kolumn är ett ofarligt no-op.
+-- Kräver att 2026-07-26-backfill-null-quantity-before-not-null.sql redan
+-- körts (alla rader har ett antal) - annars skulle den här satsen
+-- misslyckas mot kvarvarande NULL-rader.
+ALTER TABLE wines ALTER COLUMN quantity SET NOT NULL;;
 
 -- WINE-15: owner_id är obligatoriskt sedan admin-kontot (den enda
 -- kodvägen som kunde skapa ett ägarlöst vin, se WineController/

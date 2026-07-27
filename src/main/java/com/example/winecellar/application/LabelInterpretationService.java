@@ -36,6 +36,11 @@ public class LabelInterpretationService {
                 .vintage(label.vintage())
                 .country(label.country())
                 .region(label.region())
+                // Antal är obligatoriskt (ADR 0016) - precis som det tomma
+                // "nytt vin"-formuläret (WineController.emptyDraft()) förifyller
+                // det här utkastet med 1, inte tolkat/markerat, bara ett rimligt
+                // standardvärde.
+                .quantity(1)
                 .build();
 
         Set<String> interpretedFields = new HashSet<>();

@@ -18,12 +18,14 @@ import java.time.LocalDate;
  * satta via importskriptet. De flesta är nullable, konsekvent med att
  * webbformuläret bara sätter kärnfälten.
  *
- * `name` är det enda obligatoriska fältet (byggt 2026-07-22, se
- * CLAUDE.md) - alla övriga, inklusive `wineType`/`vintage`/`quantity`/
- * `country`/`producer`/`location` som tidigare krävdes, är nullable så
- * att ett vin går att spara snabbt med bara namnet och fyllas i senare.
- * `vintage`/`quantity` är därför `Integer`, inte primitiv `int` (som
- * inte kan representera "inget värde ännu").
+ * `name` och `quantity` är de enda obligatoriska fälten (`name` sedan
+ * 2026-07-22, `quantity` sedan 2026-07-26 - se ADR 0016) - alla övriga,
+ * inklusive `wineType`/`vintage`/`country`/`producer`/`location`, är
+ * nullable så att ett vin går att spara snabbt och fyllas i senare.
+ * `vintage` är därför `Integer`, inte primitiv `int` (som inte kan
+ * representera "inget värde ännu") - `quantity` är sedan ADR 0016
+ * MEDVETET primitiv `int` igen, av samma skäl i motsatt riktning: det
+ * fältet ska inte längre kunna representera "inget värde".
  */
 public record Wine(
         WineId id,
@@ -47,7 +49,7 @@ public record Wine(
         Integer vintage,
         LocalDate purchaseDate,
         BigDecimal price,
-        Integer quantity,
+        int quantity,
         String purchaseReason,
         String tastingNotes,
         Rating ownRating,
@@ -62,7 +64,7 @@ public record Wine(
         String imageMimeType
 ) {
 
-    public Wine withQuantity(Integer newQuantity) {
+    public Wine withQuantity(int newQuantity) {
         return toBuilder().quantity(newQuantity).build();
     }
 
@@ -140,7 +142,7 @@ public record Wine(
         private Integer vintage;
         private LocalDate purchaseDate;
         private BigDecimal price;
-        private Integer quantity;
+        private int quantity;
         private String purchaseReason;
         private String tastingNotes;
         private Rating ownRating;
@@ -214,7 +216,7 @@ public record Wine(
             return this;
         }
 
-        public Builder quantity(Integer quantity) {
+        public Builder quantity(int quantity) {
             this.quantity = quantity;
             return this;
         }

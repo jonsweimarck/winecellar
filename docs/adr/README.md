@@ -28,7 +28,7 @@ Varje post följer samma enkla mall:
 | [0002](0002-responsive-list-dual-layout.md) | Responsiv vinlista via två layouter bakom en CSS-brytpunkt | Accepted |
 | [0003](0003-wine-builder-pattern.md) | `Wine` byggs med Builder-mönster, inte positionell konstruktor | Accepted |
 | [0004](0004-images-in-bytea.md) | Bilder lagras som `bytea` i Postgres, inte i objektlagring | Accepted |
-| [0005](0005-only-name-required.md) | Bara vinets namn är obligatoriskt | Accepted |
+| [0005](0005-only-name-required.md) | Bara vinets namn är obligatoriskt | Superseded av [0016](0016-quantity-also-mandatory.md) |
 | [0006](0006-search-orchestration-in-application-layer.md) | Filtrering/sökning/sortering orkestreras i `WineService`, inte i controllern | Accepted |
 | [0007](0007-fulltext-search-tsvector.md) | Fritextsökning via en genererad `tsvector`-kolumn i Postgres | Accepted |
 | [0008](0008-filter-chips-plain-links.md) | Filterchips är vanliga länkar, inte htmx | Accepted |
@@ -39,3 +39,4 @@ Varje post följer samma enkla mall:
 | [0013](0013-multi-user-accounts.md) | Flera användare med egna, privata vinlistor | Accepted |
 | [0014](0014-web-based-excel-import-export.md) | Webbaserad Excel-import/export, scopead till inloggad användare | Accepted |
 | [0015](0015-bulk-import-images-lossy-jpeg.md) | Bulkimportens bilder skalas ned och konverteras till JPEG - ingen bit-exakt rundtripp | Accepted |
+| [0016](0016-quantity-also-mandatory.md) | Antal flaskor blir obligatoriskt, precis som namnet | Accepted |

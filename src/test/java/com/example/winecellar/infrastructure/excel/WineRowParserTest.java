@@ -85,6 +85,7 @@ class WineRowParserTest {
         writeCell(row, 0, "Rött");
         writeCell(row, 1, "Frankrike");
         writeCell(row, 5, "Domaine Fond Moiroux");
+        writeCell(row, 11, 3);
         // Ingen namn-cell (kolumn 6) - motsvarar en ofullständig utkastrad i kalkylen.
 
         assertThatThrownBy(() -> parser.parse(row))
@@ -92,12 +93,25 @@ class WineRowParserTest {
     }
 
     @Test
-    void skaTillåtaRadMedBaraNamnIfyllt() {
+    void skaHoppaÖverRadSomSaknarAntal() {
         Row row = rowWith(sheet -> {
         });
         writeCell(row, 6, "Anteckning om ett vin");
-        // Alla andra kolumner lämnas tomma - bara namnet är obligatoriskt,
-        // samma regel som webb-UI:t (se CLAUDE.md).
+        // Ingen antal-cell (kolumn 11) - antal är obligatoriskt sedan ADR 0016,
+        // precis som namnet.
+
+        assertThatThrownBy(() -> parser.parse(row))
+                .isInstanceOf(WineRowParser.RowMissingRequiredFieldsException.class);
+    }
+
+    @Test
+    void skaTillåtaRadMedBaraNamnOchAntalIfyllt() {
+        Row row = rowWith(sheet -> {
+        });
+        writeCell(row, 6, "Anteckning om ett vin");
+        writeCell(row, 11, 1);
+        // Alla andra kolumner lämnas tomma - namn och antal är de enda
+        // obligatoriska fälten, samma regel som webb-UI:t (se ADR 0016).
 
         Wine wine = parser.parse(row);
 
@@ -106,7 +120,7 @@ class WineRowParserTest {
         assertThat(wine.country()).isNull();
         assertThat(wine.producer()).isNull();
         assertThat(wine.vintage()).isNull();
-        assertThat(wine.quantity()).isNull();
+        assertThat(wine.quantity()).isEqualTo(1);
     }
 
     @Test
@@ -159,6 +173,7 @@ class WineRowParserTest {
         writeCell(row, 1, "Frankrike");
         writeCell(row, 5, "Joseph Drouhin");
         writeCell(row, 6, "Saint-Véran");
+        writeCell(row, 11, 1);
         return row;
     }
 

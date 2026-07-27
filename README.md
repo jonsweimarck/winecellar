@@ -55,13 +55,13 @@ Tabell `wines`:
 | subregion | `text`, nullable | |
 | grapes | `text`, nullable | Fritext |
 | producer | `text`, nullable | |
-| name | `text`, **NOT NULL** | Enda obligatoriska fältet |
+| name | `text`, **NOT NULL** | Ett av de två obligatoriska fälten |
 | vintage | `smallint`, nullable | `Integer` i Java |
 | image | `bytea`, nullable | Vinetikett |
 | image_mime_type | `text`, nullable | T.ex. `image/jpeg` |
 | purchase_date | `date`, nullable | |
 | price | `numeric(10,2)`, nullable | |
-| quantity | `integer`, nullable | `Integer` i Java |
+| quantity | `integer`, **NOT NULL** | `int` i Java, se [ADR 0016](docs/adr/0016-quantity-also-mandatory.md) |
 | purchase_reason | `text`, nullable | |
 | tasting_notes | `text`, nullable | |
 | own_rating | `text` + `CHECK`, nullable | 29 fasta värden, se `Rating` |
@@ -86,8 +86,9 @@ som ett separat fält; `Rating.fromLabel(text)` normaliserar mellanslag
 innan matchning.
 
 Se [ADR 0004](docs/adr/0004-images-in-bytea.md) för varför bilder
-lagras i `bytea` och [ADR 0005](docs/adr/0005-only-name-required.md)
-för varför bara `name` är obligatoriskt.
+lagras i `bytea` och [ADR 0016](docs/adr/0016-quantity-also-mandatory.md)
+(som ersätter [ADR 0005](docs/adr/0005-only-name-required.md)) för varför
+`name` och `quantity` är de enda obligatoriska fälten.
 
 ### Flera användare
 
@@ -229,10 +230,10 @@ relevant, är hårdkodad i `WineRowParser`:
 | J | Inköpsdatum | U | Annan referens |
 | K | Pris | V | Plats |
 
-Bara namnet är obligatoriskt vid import (samma regel som webb-UI:t, se
-[ADR 0005](docs/adr/0005-only-name-required.md)) - en rad som saknar
-namn eller på annat sätt inte kan tolkas hoppas över, utan att stoppa
-resten av importen.
+Namn och antal flaskor är obligatoriska vid import (samma regel som
+webb-UI:t, se [ADR 0016](docs/adr/0016-quantity-also-mandatory.md)) - en
+rad som saknar något av de två fälten eller på annat sätt inte kan
+tolkas hoppas över, utan att stoppa resten av importen.
 
 ### Export
 

@@ -152,7 +152,11 @@ public class ImportController {
             DuplicateCheck check = wineService.checkForDuplicate(candidate, owner);
             if (check instanceof DuplicateCheck.FullDuplicate full) {
                 if (fullDuplicateStrategy == FullDuplicateStrategy.OKA_ANTAL) {
-                    wineService.increaseQuantity(full.existing().id(), owner);
+                    // WINE-28: lägg till radens EGET antal, inte en hårdkodad
+                    // +1 (som increaseQuantity ensam hade gett) - annars blir
+                    // sluttalet fel så fort den importerade raden anger fler
+                    // än en flaska.
+                    wineService.increaseQuantityBy(full.existing().id(), owner, candidate.quantity());
                     increased++;
                 } else {
                     skipped++;
@@ -160,7 +164,7 @@ public class ImportController {
             } else if (check instanceof DuplicateCheck.PartialDuplicate partial) {
                 switch (partialDuplicateStrategy) {
                     case OKA_ANTAL -> {
-                        wineService.increaseQuantity(partial.existing().id(), owner);
+                        wineService.increaseQuantityBy(partial.existing().id(), owner, candidate.quantity());
                         increased++;
                     }
                     case LAGG_TILL_SOM_NYTT -> {

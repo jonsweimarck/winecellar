@@ -30,6 +30,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -74,10 +75,19 @@ class ImportControllerTest {
     // i testfilen mockas matcha - avgörande att dessa har ett `id`, till
     // skillnad från de nytolkade kandidaterna (som WineRowParser aldrig
     // sätter id på) - annars blir `existing.id()` null och
-    // `increaseQuantity`-verifieringarna nedan meningslösa.
+    // `increaseQuantityBy`-verifieringarna nedan meningslösa.
+    //
+    // BAROLO_EXISTING_QUANTITY/BAROLO_ROW_QUANTITY speglar exakt WINE-28s
+    // felrapport (2 befintliga + 2 importerade ska ge 4, inte 3) - se
+    // skaOkaAntalVidFullständigDubblettMedStrategiÖkaAntal.
+    private static final int BAROLO_EXISTING_QUANTITY = 2;
+    private static final int BAROLO_ROW_QUANTITY = 2;
+    private static final int CHIANTI_ROW_QUANTITY = 4;
+    private static final int RIOJA_ROW_QUANTITY = 5;
+
     private static final Wine EXISTING_BAROLO = Wine.builder()
             .id(new Wine.WineId(101L)).owner(MIN_ANVÄNDARE_ID)
-            .name("Barolo").producer("Pio Cesare").vintage(2018).quantity(3)
+            .name("Barolo").producer("Pio Cesare").vintage(2018).quantity(BAROLO_EXISTING_QUANTITY)
             .build();
 
     private static final Wine EXISTING_CHIANTI = Wine.builder()
@@ -149,6 +159,14 @@ class ImportControllerTest {
         verify(wineService, never()).save(any());
     }
 
+    /**
+     * Reproducerar WINE-28 exakt: Barolo finns med 2 flaskor
+     * (BAROLO_EXISTING_QUANTITY), importraden anger också 2
+     * (BAROLO_ROW_QUANTITY). Den gamla buggen anropade increaseQuantity
+     * (alltid +1) rakt av, vilket hade gett 2+1=3 - rätt anrop är
+     * increaseQuantityBy(..., 2), vilket (verifierat separat i
+     * WineService-nivåns Cucumber-scenario) faktiskt ger 2+2=4.
+     */
     @Test
     void skaOkaAntalVidFullständigDubblettMedStrategiÖkaAntal() throws Exception {
         stubbaDubblettkontroll();
@@ -162,7 +180,7 @@ class ImportControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/import"));
 
-        verify(wineService).increaseQuantity(eq(EXISTING_BAROLO.id()), eq(MIN_ANVÄNDARE_ID));
+        verify(wineService).increaseQuantityBy(eq(EXISTING_BAROLO.id()), eq(MIN_ANVÄNDARE_ID), eq(BAROLO_ROW_QUANTITY));
         // "Rioja" är en ren rad (ingen dubblett) i testfilen - sparas alltid,
         // oavsett vilken dubblettstrategi som väljs för de andra raderna.
         ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
@@ -183,7 +201,7 @@ class ImportControllerTest {
                 .andExpect(status().is3xxRedirection());
 
         ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
-        verify(wineService, never()).increaseQuantity(eq(EXISTING_CHIANTI.id()), any());
+        verify(wineService, never()).increaseQuantityBy(eq(EXISTING_CHIANTI.id()), any(), anyInt());
         // Två sparade: "Chianti" (partiell dubblett, lägg till som nytt) och
         // "Rioja" (ren rad, sparas alltid oavsett strategi).
         verify(wineService, times(2)).save(captor.capture());
@@ -213,7 +231,7 @@ class ImportControllerTest {
                         .with(user("testperson")).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
-        verify(wineService, never()).increaseQuantity(eq(EXISTING_BAROLO.id()), any());
+        verify(wineService, never()).increaseQuantityBy(eq(EXISTING_BAROLO.id()), any(), anyInt());
         // Bara "Rioja" (ren rad) sparas - Barolo (full dubblett) och
         // Chianti (partiell dubblett) hoppas båda över.
         ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
@@ -233,7 +251,7 @@ class ImportControllerTest {
                         .with(user("testperson")).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
-        verify(wineService).increaseQuantity(eq(EXISTING_CHIANTI.id()), eq(MIN_ANVÄNDARE_ID));
+        verify(wineService).increaseQuantityBy(eq(EXISTING_CHIANTI.id()), eq(MIN_ANVÄNDARE_ID), eq(CHIANTI_ROW_QUANTITY));
         ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
         verify(wineService).save(captor.capture());
         assertThat(captor.getValue().name()).isEqualTo("Rioja");
@@ -258,8 +276,8 @@ class ImportControllerTest {
                         .with(user("testperson")).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
-        verify(wineService).increaseQuantity(eq(EXISTING_BAROLO.id()), eq(MIN_ANVÄNDARE_ID));
-        verify(wineService, never()).increaseQuantity(eq(EXISTING_CHIANTI.id()), any());
+        verify(wineService).increaseQuantityBy(eq(EXISTING_BAROLO.id()), eq(MIN_ANVÄNDARE_ID), eq(BAROLO_ROW_QUANTITY));
+        verify(wineService, never()).increaseQuantityBy(eq(EXISTING_CHIANTI.id()), any(), anyInt());
         ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
         verify(wineService).save(captor.capture());
         assertThat(captor.getValue().name()).isEqualTo("Rioja");
@@ -289,18 +307,20 @@ class ImportControllerTest {
 
     /**
      * Fyra rader, samma kolumnlayout som `WineRowParser`/README:s
-     * Datamodell-avsnitt (A=vintyp ... G=namn, H=årgång ...):
+     * Datamodell-avsnitt (A=vintyp ... G=namn, H=årgång ... L=antal):
      * "Barolo" (fullständig identitet, mockas som fullständig dubblett),
      * "Chianti" (mockas som partiell dubblett), "Rioja" (ren, ny), och
      * en rad helt utan namn (hoppas över av WineRowParser självt).
+     * Antal är obligatoriskt sedan ADR 0016 - varje riktig rad måste
+     * alltså ha en ifylld antal-cell, annars hoppas den också över.
      */
     private byte[] enkelXlsxMedFyraRader() throws Exception {
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Vin");
-            skrivRad(sheet, 0, "Rubrik", "", "", 0);
-            skrivRad(sheet, 1, "Barolo", "Pio Cesare", "Rött", 2018);
-            skrivRad(sheet, 2, "Chianti", "Antinori", "Rött", 2019);
-            skrivRad(sheet, 3, "Rioja", "Muga", "Rött", 2020);
+            skrivRad(sheet, 0, "Rubrik", "", "", 0, 0);
+            skrivRad(sheet, 1, "Barolo", "Pio Cesare", "Rött", 2018, BAROLO_ROW_QUANTITY);
+            skrivRad(sheet, 2, "Chianti", "Antinori", "Rött", 2019, CHIANTI_ROW_QUANTITY);
+            skrivRad(sheet, 3, "Rioja", "Muga", "Rött", 2020, RIOJA_ROW_QUANTITY);
             Row utanNamn = sheet.createRow(4);
             utanNamn.createCell(5).setCellValue("Okänd producent utan namn");
 
@@ -310,13 +330,16 @@ class ImportControllerTest {
         }
     }
 
-    private void skrivRad(Sheet sheet, int rowNum, String name, String producer, String wineType, int vintage) {
+    private void skrivRad(Sheet sheet, int rowNum, String name, String producer, String wineType, int vintage, int quantity) {
         Row row = sheet.createRow(rowNum);
         row.createCell(0).setCellValue(wineType);
         row.createCell(5).setCellValue(producer);
         row.createCell(6).setCellValue(name);
         if (vintage > 0) {
             row.createCell(7).setCellValue(vintage);
+        }
+        if (quantity > 0) {
+            row.createCell(11).setCellValue(quantity);
         }
     }
 }

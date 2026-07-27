@@ -77,7 +77,7 @@ public class AddWineSteps {
         assertThat(wine.producer()).isNull();
         assertThat(wine.country()).isNull();
         assertThat(wine.vintage()).isNull();
-        assertThat(wine.quantity()).isNull();
+        assertThat(wine.quantity()).isEqualTo(0);
         assertThat(wine.location()).isNull();
     }
 
