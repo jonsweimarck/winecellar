@@ -7,7 +7,6 @@ import com.example.winecellar.domain.Wine;
 import com.example.winecellar.infrastructure.excel.ImageMatcher;
 import com.example.winecellar.infrastructure.excel.WineRowWriter;
 import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.http.HttpHeaders;
@@ -126,12 +125,11 @@ public class ExportController {
 
             CellStyle dateFormat = workbook.createCellStyle();
             dateFormat.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("yyyy-mm-dd"));
-            Drawing<?> drawing = sheet.createDrawingPatriarch();
             WineRowWriter writer = new WineRowWriter();
 
             int rowNumber = 1;
             for (Wine wine : wines) {
-                writer.write(wine, sheet.createRow(rowNumber++), dateFormat, drawing);
+                writer.write(wine, sheet.createRow(rowNumber++), dateFormat);
             }
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();

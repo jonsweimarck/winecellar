@@ -2,18 +2,31 @@
 
 ## Status
 
-Delvis Superseded (2026-07-26, WINE-20/WINE-23, se
-[0014](0014-web-based-excel-import-export.md)/
-[0015](0015-bulk-import-images-lossy-jpeg.md)) - mekanism 2 nedan
-(`WINECELLAR_LOCAL_IMAGE_FOLDER`, den delade lokala mappen) fanns bara
-i det nu helt borttagna CLI-verktyget (`tools/import-excel/`) och
-existerar inte längre. Ersatt av en webbaserad zip-nedladdning/
--uppladdning (`GET /export/bilder.zip`, `POST /import`) - som
-dessutom, till skillnad från den gamla mekanismen, INTE är bit-exakt
-för bulkimportens del (klientsidans bildkomprimering, se ADR 0015).
-Mekanism 1 (ankrad xlsx-`Picture`) lever kvar OFÖRÄNDRAD i
-`WineRowWriter`/`ExportController` - den delen av beslutet nedan
-gäller fortfarande som skrivet.
+Deprecated (2026-07-27, WINE-32). Båda de två mekanismerna beslutet
+nedan beskriver är nu borta:
+
+- Mekanism 2 (`WINECELLAR_LOCAL_IMAGE_FOLDER`, den delade lokala
+  mappen) fanns bara i det nu helt borttagna CLI-verktyget
+  (`tools/import-excel/`) och försvann redan 2026-07-26 (WINE-20/
+  WINE-23, se [0014](0014-web-based-excel-import-export.md)/
+  [0015](0015-bulk-import-images-lossy-jpeg.md)) - ersatt av en
+  webbaserad zip-nedladdning/-uppladdning (`GET /export/bilder.zip`,
+  `POST /import`), som till skillnad från den gamla mekanismen INTE är
+  bit-exakt för bulkimportens del (klientsidans bildkomprimering, se
+  ADR 0015).
+- Mekanism 1 (ankrad xlsx-`Picture` i "Bild"-kolumnen) togs bort
+  2026-07-27 (WINE-32): den var alltid bara en visuell bekvämlighet
+  för att bläddra bilder direkt i Excel, aldrig en del av den faktiska
+  rundtrippen - `WineRowParser` läste den aldrig tillbaka (se dess
+  klasskommentar), och sedan mekanism 2 försvann fanns ingen kvarvarande
+  anledning att behålla en xlsx-specifik bildväg som ingen kod längre
+  läste. Kolumnen är nu helt borttagen ur layouten (inte bara tömd) -
+  se README:s Datamodell-avsnitt för den nya, en kolumn kortare,
+  layouten.
+
+Ingen efterträdande ADR - det här är en ren avveckling, inte en
+ersättning med ett nytt beslut. Innehållet nedan är historiskt: det
+beskriver ett beslut som en gång gällde, inte hur koden fungerar idag.
 
 Accepted (2026-07-22)
 

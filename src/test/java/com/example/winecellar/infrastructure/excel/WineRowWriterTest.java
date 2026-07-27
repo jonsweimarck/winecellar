@@ -4,16 +4,13 @@ import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
 import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -108,43 +105,6 @@ class WineRowWriterTest {
         assertThat(readBack.quantity()).isEqualTo(0);
     }
 
-    /**
-     * En riktig, minimal 1x1-PNG (inte bara godtyckliga bytes) - POI
-     * läser inte bildinnehållet vid addPicture, men en verklig bild gör
-     * testet en trovärdig verifiering av att den faktiska etikettdatan
-     * skrivs, inte bara att metoden inte kraschar på slumpmässiga bytes.
-     */
-    private static final byte[] ONE_PIXEL_PNG = Base64.getDecoder().decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
-
-    @Test
-    void skaBäddaInBildenAnkradIBildkolumnen() {
-        Wine original = minimalWine().toBuilder().image(ONE_PIXEL_PNG).imageMimeType("image/png").build();
-
-        XSSFWorkbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("Vin");
-        Row row = sheet.createRow(1);
-        XSSFDrawing drawing = (XSSFDrawing) sheet.createDrawingPatriarch();
-        writer.write(original, row, dateFormat(workbook), drawing);
-
-        assertThat(drawing.getShapes()).hasSize(1);
-        assertThat(workbook.getAllPictures()).hasSize(1);
-        assertThat(workbook.getAllPictures().get(0).getData()).isEqualTo(ONE_PIXEL_PNG);
-    }
-
-    @Test
-    void skaHoppaÖverBildMedOstöddMimeTypUtanAttKrascha() {
-        Wine original = minimalWine().toBuilder().image(new byte[]{1, 2, 3}).imageMimeType("image/webp").build();
-
-        XSSFWorkbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("Vin");
-        Row row = sheet.createRow(1);
-        XSSFDrawing drawing = (XSSFDrawing) sheet.createDrawingPatriarch();
-        writer.write(original, row, dateFormat(workbook), drawing);
-
-        assertThat(drawing.getShapes()).isEmpty();
-    }
-
     private Wine minimalWine() {
         return Wine.builder()
                 .country("Frankrike").producer("Joseph Drouhin").name("Saint-Véran")
@@ -155,8 +115,7 @@ class WineRowWriterTest {
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Vin");
         Row row = sheet.createRow(1);
-        Drawing<?> drawing = sheet.createDrawingPatriarch();
-        writer.write(wine, row, dateFormat(workbook), drawing);
+        writer.write(wine, row, dateFormat(workbook));
         return row;
     }
 

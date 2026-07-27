@@ -39,19 +39,19 @@ class WineRowParserTest {
         writeCell(row, 5, "Eduardo Torres Acosta");
         writeCell(row, 6, "Versante Nord");
         writeCell(row, 7, 2022);
-        writeCell(row, 9, DateUtil.getExcelDate(LocalDate.of(2024, 3, 15)));
-        writeCell(row, 10, 260);
-        writeCell(row, 11, 3);
-        writeCell(row, 12, "Prisvärt enligt munskänkarna");
-        writeCell(row, 13, "Ljusröd, doft av jordgubbe.");
-        writeCell(row, 14, "16 (15 - 17,5 Högklassigt vin)");
-        writeCell(row, 15, "9363301");
-        writeCell(row, 16, "Nyanserad, kryddig smak.");
-        writeCell(row, 17, "Mer än prisvärt\n\nNågot återhållen doft.");
-        writeCell(row, 18, "14,5 (12 - 14,5 Bra till mycket bra vin)");
-        writeCell(row, 19, 4.0999999999999996);
-        writeCell(row, 20, "https://example.com/vin");
-        writeCell(row, 21, "Låda 2");
+        writeCell(row, 8, DateUtil.getExcelDate(LocalDate.of(2024, 3, 15)));
+        writeCell(row, 9, 260);
+        writeCell(row, 10, 3);
+        writeCell(row, 11, "Prisvärt enligt munskänkarna");
+        writeCell(row, 12, "Ljusröd, doft av jordgubbe.");
+        writeCell(row, 13, "16 (15 - 17,5 Högklassigt vin)");
+        writeCell(row, 14, "9363301");
+        writeCell(row, 15, "Nyanserad, kryddig smak.");
+        writeCell(row, 16, "Mer än prisvärt\n\nNågot återhållen doft.");
+        writeCell(row, 17, "14,5 (12 - 14,5 Bra till mycket bra vin)");
+        writeCell(row, 18, 4.0999999999999996);
+        writeCell(row, 19, "https://example.com/vin");
+        writeCell(row, 20, "Låda 2");
 
         Wine wine = parser.parse(row);
 
@@ -85,7 +85,7 @@ class WineRowParserTest {
         writeCell(row, 0, "Rött");
         writeCell(row, 1, "Frankrike");
         writeCell(row, 5, "Domaine Fond Moiroux");
-        writeCell(row, 11, 3);
+        writeCell(row, 10, 3);
         // Ingen namn-cell (kolumn 6) - motsvarar en ofullständig utkastrad i kalkylen.
 
         assertThatThrownBy(() -> parser.parse(row))
@@ -97,7 +97,7 @@ class WineRowParserTest {
         Row row = rowWith(sheet -> {
         });
         writeCell(row, 6, "Anteckning om ett vin");
-        // Ingen antal-cell (kolumn 11) - antal är obligatoriskt sedan ADR 0016,
+        // Ingen antal-cell (kolumn 10) - antal är obligatoriskt sedan ADR 0016,
         // precis som namnet.
 
         assertThatThrownBy(() -> parser.parse(row))
@@ -109,7 +109,7 @@ class WineRowParserTest {
         Row row = rowWith(sheet -> {
         });
         writeCell(row, 6, "Anteckning om ett vin");
-        writeCell(row, 11, 1);
+        writeCell(row, 10, 1);
         // Alla andra kolumner lämnas tomma - namn och antal är de enda
         // obligatoriska fälten, samma regel som webb-UI:t (se ADR 0016).
 
@@ -127,7 +127,7 @@ class WineRowParserTest {
     void skaMatchaBetygMedDubblaMellanslagIKällfilen() {
         Row row = minimalRow();
         // Källfilens rad för 8,5 har dubbla mellanslag: "8,5  (6 - 8,5  Enkel vin)".
-        writeCell(row, 14, "8,5  (6 - 8,5  Enkel vin)");
+        writeCell(row, 13, "8,5  (6 - 8,5  Enkel vin)");
 
         Wine wine = parser.parse(row);
 
@@ -137,7 +137,7 @@ class WineRowParserTest {
     @Test
     void skaTolkaPrisMedExtraAnteckningPåEgenRad() {
         Row row = minimalRow();
-        writeCell(row, 10, "329\n(2021)");
+        writeCell(row, 9, "329\n(2021)");
 
         Wine wine = parser.parse(row);
 
@@ -147,8 +147,8 @@ class WineRowParserTest {
     @Test
     void skaLämnaSystembolagetsBeskrivningNullOmDenSaknasMenAnvändaProduktnummerkolumnen() {
         Row row = minimalRow();
-        writeCell(row, 15, "5020201");
-        // Kolumn 16 (beskrivningen) lämnas tom.
+        writeCell(row, 14, "5020201");
+        // Kolumn 15 (beskrivningen) lämnas tom.
 
         Wine wine = parser.parse(row);
 
@@ -159,7 +159,7 @@ class WineRowParserTest {
     @Test
     void skaKastaTydligtFelOmBetygetInteMatcharNågotAvDe29Kända() {
         Row row = minimalRow();
-        writeCell(row, 14, "999 (påhittat betyg)");
+        writeCell(row, 13, "999 (påhittat betyg)");
 
         assertThatThrownBy(() -> parser.parse(row))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -173,7 +173,7 @@ class WineRowParserTest {
         writeCell(row, 1, "Frankrike");
         writeCell(row, 5, "Joseph Drouhin");
         writeCell(row, 6, "Saint-Véran");
-        writeCell(row, 11, 1);
+        writeCell(row, 10, 1);
         return row;
     }
 

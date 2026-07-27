@@ -20,11 +20,17 @@ import java.util.regex.Pattern;
 
 /**
  * Mappar en rad från Vin-fliken i Vinlista.xlsx till ett Wine. Kolumn-
- * layouten (A-V) är fast - se README:s Datamodell-avsnitt för vilket
- * Wine-fält varje kolumn motsvarar. Bild-kolumnen (I) hoppas medvetet
- * över: bilderna är inbäddade som Excels "bild i cell" (rich data), inte
- * vanliga cellvärden, och att extrahera dem robust är inte värt det. Etiketter
- * importeras istället separat - se {@link ImageMatcher}.
+ * layouten (A-U) är fast - se README:s Datamodell-avsnitt för vilket
+ * Wine-fält varje kolumn motsvarar. Etiketter importeras separat - se
+ * {@link ImageMatcher}.
+ *
+ * **Ingen egen bild-kolumn** (WINE-32, 2026-07-27) - källfilens
+ * ursprungliga "bild i cell" (Excels inbäddade rich data) lästes redan
+ * aldrig här (att extrahera den robust var aldrig värt komplexiteten),
+ * och den ankrade POI-bilden som `WineRowWriter` en gång skrev till
+ * samma kolumn vid export var bara en visuell bekvämlighet - ingen av
+ * de två användes någonsin av en efterföljande import. Se
+ * `docs/adr/0011-excel-image-roundtrip-dual-mechanism.md` (Deprecated).
  *
  * Flyttad in i huvudappen från den tidigare fristående `tools/import-excel`-
  * modulen (WINE-20, se ADR 0014) - motsvarande CLI-verktyg
@@ -50,24 +56,21 @@ public final class WineRowParser {
     static final int COL_PRODUCER = 5;
     static final int COL_NAME = 6;
     static final int COL_VINTAGE = 7;
-    // Hoppas över vid IMPORT (se klasskommentar) - men används av
-    // WineRowWriter för att ankra exporterade bilder i rätt kolumn.
-    static final int COL_IMAGE = 8;
-    static final int COL_PURCHASE_DATE = 9;
-    static final int COL_PRICE = 10;
-    static final int COL_QUANTITY = 11;
-    static final int COL_PURCHASE_REASON = 12;
-    static final int COL_TASTING_NOTES = 13;
-    static final int COL_OWN_RATING = 14;
+    static final int COL_PURCHASE_DATE = 8;
+    static final int COL_PRICE = 9;
+    static final int COL_QUANTITY = 10;
+    static final int COL_PURCHASE_REASON = 11;
+    static final int COL_TASTING_NOTES = 12;
+    static final int COL_OWN_RATING = 13;
     // "Systembolagets prodnummer" - egen kolumn sedan 2026-07-20, tidigare
     // ihopklistrad med beskrivningen i COL_SYSTEMBOLAGET (se git-historiken).
-    static final int COL_SYSTEMBOLAGET_PRODUCT_NUMBER = 15;
-    static final int COL_SYSTEMBOLAGET = 16;
-    static final int COL_MUNSKANKARNA_REVIEW = 17;
-    static final int COL_MUNSKANKARNA_RATING = 18;
-    static final int COL_VIVINO = 19;
-    static final int COL_OTHER_REFERENCE = 20;
-    static final int COL_LOCATION = 21;
+    static final int COL_SYSTEMBOLAGET_PRODUCT_NUMBER = 14;
+    static final int COL_SYSTEMBOLAGET = 15;
+    static final int COL_MUNSKANKARNA_REVIEW = 16;
+    static final int COL_MUNSKANKARNA_RATING = 17;
+    static final int COL_VIVINO = 18;
+    static final int COL_OTHER_REFERENCE = 19;
+    static final int COL_LOCATION = 20;
 
     private static final Map<String, WineType> WINE_TYPES = Map.of(
             "rött", WineType.RED,
