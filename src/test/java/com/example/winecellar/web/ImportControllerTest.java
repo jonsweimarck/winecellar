@@ -24,6 +24,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -114,6 +116,16 @@ class ImportControllerTest {
 
     /** Kör torrkörningen (POST /import) och returnerar sessionen så commit-steget kan återanvända den. */
     private MockHttpSession körTorrkörning(MockMultipartFile... bilder) throws Exception {
+        return körTorrkörning(new MockHttpSession(), bilder);
+    }
+
+    /**
+     * Samma sak, men i en REDAN existerande session - används för att
+     * verifiera att en andra torrkörning i samma session städar bort den
+     * första, ej committerade temp-mappen (WINE-27) istället för att bara
+     * skriva över sökvägen i sessionen och lämna den övergiven på disk.
+     */
+    private MockHttpSession körTorrkörning(MockHttpSession session, MockMultipartFile... bilder) throws Exception {
         byte[] xlsx = enkelXlsxMedFyraRader();
         MockMultipartFile fil = new MockMultipartFile("fil", "vinlista.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx);
@@ -123,7 +135,7 @@ class ImportControllerTest {
             builder = builder.file(bild);
         }
 
-        MvcResult result = mockMvc.perform(builder.with(user("testperson")).with(csrf()))
+        MvcResult result = mockMvc.perform(builder.session(session).with(user("testperson")).with(csrf()))
                 .andExpect(status().isOk())
                 .andReturn();
         return (MockHttpSession) result.getRequest().getSession();
@@ -157,6 +169,26 @@ class ImportControllerTest {
                 .andExpect(content().string(containsString("Rader totalt")));
 
         verify(wineService, never()).save(any());
+    }
+
+    /**
+     * WINE-27: en andra torrkörning i samma session (t.ex. användaren
+     * laddade upp fel fil och försöker igen, utan att committa den första)
+     * ska städa bort den första temp-mappen, inte bara skriva över
+     * sökvägen i sessionen och lämna mappen övergiven på disk för alltid.
+     */
+    @Test
+    void skaStädaBortTidigareOkommitteradTempMappVidNyTorrkörning() throws Exception {
+        stubbaDubblettkontroll();
+        MockHttpSession session = körTorrkörning();
+        String förstaSökvägen = (String) session.getAttribute(ImportController.SESSION_KEY_PENDING_IMPORT_PATH);
+        assertThat(Files.exists(Path.of(förstaSökvägen))).isTrue();
+
+        körTorrkörning(session);
+
+        String andraSökvägen = (String) session.getAttribute(ImportController.SESSION_KEY_PENDING_IMPORT_PATH);
+        assertThat(andraSökvägen).isNotEqualTo(förstaSökvägen);
+        assertThat(Files.exists(Path.of(förstaSökvägen))).isFalse();
     }
 
     /**

@@ -40,3 +40,4 @@ Varje post följer samma enkla mall:
 | [0014](0014-web-based-excel-import-export.md) | Webbaserad Excel-import/export, scopead till inloggad användare | Accepted |
 | [0015](0015-bulk-import-images-lossy-jpeg.md) | Bulkimportens bilder skalas ned och komprimeras (JPEG, eller WebP/PNG vid transparens) - ingen bit-exakt rundtripp | Accepted |
 | [0016](0016-quantity-also-mandatory.md) | Antal flaskor blir obligatoriskt, precis som namnet | Accepted |
+| [0017](0017-login-triggered-temp-import-cleanup.md) | Övergivna temp-importmappar städas vid inloggning, inte via ett schema | Accepted |

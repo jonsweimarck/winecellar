@@ -46,13 +46,17 @@ import java.util.List;
  * avvägningen kring ~100 bilder). Klientsidans Canvas-nedskalning
  * (`import.html`, samma teknik som etikettskanningen, WINE-5) håller
  * nere hur stora bilderna faktiskt blir innan de ens når servern.
- * Städning av övergivna (aldrig committade) temp-mappar är en egen
- * story, WINE-27.
+ * Övergivna (aldrig committade) temp-mappar städas dels direkt här
+ * (en ny torrkörning i samma session tar bort en tidigare, ej
+ * committerad temp-mapp innan en ny skapas), dels av
+ * {@link PendingImportCleanup} som ett säkerhetsnät för mappar från
+ * sessioner som aldrig kom tillbaka alls (se ADR 0017, WINE-27).
  */
 @Controller
 public class ImportController {
 
     static final String SESSION_KEY_PENDING_IMPORT_PATH = "pendingImportPath";
+    static final String TEMP_DIR_PREFIX = "winecellar-import-";
 
     private final ImportPreviewService importPreviewService;
     private final WineService wineService;
@@ -88,6 +92,12 @@ public class ImportController {
         }
 
         ImportPreview preview = importPreviewService.preview(candidates, skippedRows, owner);
+
+        // En tidigare, aldrig committerad torrkörning i samma session (t.ex.
+        // användaren laddade upp fel fil och försöker igen) får annars sin
+        // temp-mapp övergiven på disk - sökvägen skrivs bara över i
+        // sessionen nedan, ingenting städade bort mappen tidigare.
+        deletePreviousPendingImport(request);
 
         Path tempDir = stashUploadForCommit(fil, bilder);
         request.getSession().setAttribute(SESSION_KEY_PENDING_IMPORT_PATH, tempDir.toString());
@@ -224,8 +234,15 @@ public class ImportController {
         return skipped;
     }
 
+    private void deletePreviousPendingImport(HttpServletRequest request) throws IOException {
+        String pendingPath = (String) request.getSession().getAttribute(SESSION_KEY_PENDING_IMPORT_PATH);
+        if (pendingPath != null) {
+            deleteRecursively(Path.of(pendingPath));
+        }
+    }
+
     private Path stashUploadForCommit(MultipartFile fil, List<MultipartFile> bilder) throws IOException {
-        Path tempDir = Files.createTempDirectory("winecellar-import-");
+        Path tempDir = Files.createTempDirectory(TEMP_DIR_PREFIX);
         Files.copy(fil.getInputStream(), tempDir.resolve("data.xlsx"));
 
         if (bilder != null && !bilder.isEmpty()) {
@@ -243,13 +260,18 @@ public class ImportController {
     }
 
     private void deleteRecursively(Path directory) throws IOException {
+        // Mappen kan redan vara borta - t.ex. om PendingImportCleanup (WINE-27)
+        // städade bort den som övergiven strax innan detta anrop hann köra.
+        if (!Files.exists(directory)) {
+            return;
+        }
         try (var paths = Files.walk(directory)) {
             paths.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.delete(path);
                 } catch (IOException e) {
-                    // Best effort - en kvarglömd fil här fångas ändå upp av WINE-27s
-                    // kommande städning av gamla temp-mappar.
+                    // Best effort - en kvarglömd fil här fångas ändå upp av
+                    // PendingImportCleanups svep vid nästa inloggning.
                 }
             });
         }
