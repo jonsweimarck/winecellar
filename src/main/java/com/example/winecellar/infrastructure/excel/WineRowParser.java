@@ -32,10 +32,9 @@ import java.util.regex.Pattern;
  * klassen och dess syskon (`WineRowWriter`, `ImageMatcher`) lever vidare som
  * återanvändbar kod åt den kommande webbaserade import-/exportfunktionen.
  *
- * **Bara namnet är obligatoriskt** - samma regel som webb-UI:t använder (se
- * CLAUDE.md:s "Bara namnet obligatoriskt"). Alla övriga fält, inklusive
- * vintyp/land/producent som tidigare krävdes, tolkas som valfria och blir
- * `null` om cellen är tom.
+ * **Namn och antal flaskor är obligatoriska** (se ADR 0016) - samma regel
+ * som webb-UI:t använder. Alla övriga fält, inklusive vintyp/land/producent
+ * som tidigare krävdes, tolkas som valfria och blir `null` om cellen är tom.
  */
 public final class WineRowParser {
 
@@ -85,13 +84,14 @@ public final class WineRowParser {
     /**
      * Kastar {@link RowMissingRequiredFieldsException} istället för att
      * returnera null - anroparen avgör om det ska hoppas över med en
-     * varning eller stoppa hela importen. Bara namnet krävs (se
-     * klasskommentaren) - en rad utan namn kan inte bli ett vin över
-     * huvud taget, men alla andra fält får gärna vara tomma.
+     * varning eller stoppa hela importen. Namn OCH antal flaskor krävs
+     * (se klasskommentaren/ADR 0016) - en rad utan endera kan inte bli
+     * ett vin över huvud taget, men alla andra fält får gärna vara tomma.
      */
     public Wine parse(Row row) {
         String name = text(row, COL_NAME);
-        if (name == null) {
+        Integer quantity = integer(row, COL_QUANTITY);
+        if (name == null || quantity == null) {
             throw new RowMissingRequiredFieldsException(row.getRowNum() + 1);
         }
         String wineTypeText = text(row, COL_WINE_TYPE);
@@ -107,7 +107,7 @@ public final class WineRowParser {
                 .vintage(integer(row, COL_VINTAGE))
                 .purchaseDate(date(row, COL_PURCHASE_DATE))
                 .price(price(row, COL_PRICE))
-                .quantity(integer(row, COL_QUANTITY))
+                .quantity(quantity)
                 .purchaseReason(text(row, COL_PURCHASE_REASON))
                 .tastingNotes(text(row, COL_TASTING_NOTES))
                 .ownRating(rating(row, COL_OWN_RATING, row.getRowNum() + 1, "eget betyg"))
@@ -207,7 +207,7 @@ public final class WineRowParser {
 
     public static final class RowMissingRequiredFieldsException extends RuntimeException {
         public RowMissingRequiredFieldsException(int rowNumber) {
-            super("Rad " + rowNumber + ": saknar namn - hoppas över");
+            super("Rad " + rowNumber + ": saknar namn och/eller antal flaskor - hoppas över");
         }
     }
 }

@@ -268,7 +268,7 @@ class WineControllerTest {
         }
 
         @Test
-        @DisplayName("ska rendera ett vin som bara har namnet ifyllt utan att krascha (typ/årgång/antal/land/producent/plats null)")
+        @DisplayName("ska rendera ett vin som bara har namnet ifyllt utan att krascha (typ/årgång/land/producent/plats null)")
         void skaRenderaEttVinMedBaraNamnetIfylltUtanAttKrascha() throws Exception {
             Wine minimaltVin = Wine.builder().id(new WineId(1L)).name("Chianti Classico").build();
             when(wineService.search(any(), any())).thenReturn(List.of(minimaltVin));
@@ -871,7 +871,7 @@ class WineControllerTest {
         }
 
         @Test
-        @DisplayName("ska gå att lägga till ett vin med bara namnet ifyllt - övriga fält blir null, inte tomma strängar/0")
+        @DisplayName("ska gå att lägga till ett vin med bara namnet ifyllt - antal faller tillbaka till 1, övriga fält blir null")
         void skaGåAttLäggaTillMedBaraNamnet() throws Exception {
             mockMvc.perform(post("/wines")
                             .with(user("admin").roles("ADMIN")).with(csrf())
@@ -881,6 +881,7 @@ class WineControllerTest {
 
             verify(wineService).save(Wine.builder()
                     .name("Chianti Classico")
+                    .quantity(1)
                     .build());
         }
 
@@ -963,7 +964,7 @@ class WineControllerTest {
                     .andExpect(redirectedUrl("/"));
 
             verify(wineService, never()).checkForDuplicate(any(), any());
-            verify(wineService).save(Wine.builder().name("Barolo").build());
+            verify(wineService).save(Wine.builder().name("Barolo").quantity(1).build());
         }
     }
 

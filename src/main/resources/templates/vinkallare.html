@@ -397,7 +397,7 @@
 
         <div id="vinlista-tabell" class="vinlista-tabell">
             <div class="vinkort-bred" th:each="vin : ${wines}">
-                <span class="flaskor-badge" th:if="${vin.quantity != null}" th:text="${vin.quantity}" title="Antal flaskor"></span>
+                <span class="flaskor-badge" th:text="${vin.quantity}" title="Antal flaskor"></span>
                 <div class="vk-topp">
                     <div class="vk-bildyta">
                         <a th:if="${vin.hasImage()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">
@@ -485,7 +485,7 @@
 
         <div id="vinlista-kort" class="vinlista-kort">
             <div class="vinkort" th:each="vin : ${wines}">
-                <span class="flaskor-badge" th:if="${vin.quantity != null}" th:text="${vin.quantity}" title="Antal flaskor"></span>
+                <span class="flaskor-badge" th:text="${vin.quantity}" title="Antal flaskor"></span>
                 <div class="vinkort-topp">
                     <div class="vinkort-bildyta">
                         <a th:if="${vin.hasImage()}" th:href="@{/wines/{id}/bild(id=${vin.id.value})}">

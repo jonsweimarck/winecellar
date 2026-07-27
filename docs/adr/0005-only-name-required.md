@@ -1,6 +1,11 @@
-# 0005: Bara vinets namn är obligatoriskt
+claude -# 0005: Bara vinets namn är obligatoriskt
 
 ## Status
+
+Superseded av [0016](0016-quantity-also-mandatory.md) (2026-07-26) -
+`quantity` blev sedan också obligatoriskt, se den ADR:n för
+motiveringen. Resten av det här beslutet (alla övriga fält, inklusive
+`vintage`, förblir nullable) gäller fortfarande oförändrat.
 
 Accepted (2026-07-22)
 

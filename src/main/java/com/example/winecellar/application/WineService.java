@@ -139,13 +139,23 @@ public class WineService {
 
     /**
      * Ökar antalet flaskor på ett redan sparat vin med 1 - används av
-     * dubblettvarningens "öka antal istället"-val (WINE-6). Null-antal
-     * (aldrig satt) behandlas som 0.
+     * dubblettvarningens "öka antal istället"-val (WINE-6). Tunn wrapper
+     * runt increaseQuantityBy(...) - oförändrat beteende för den UI:n.
      */
     public Wine increaseQuantity(WineId id, UserId owner) {
+        return increaseQuantityBy(id, owner, 1);
+    }
+
+    /**
+     * Ökar antalet flaskor på ett redan sparat vin med `amount` - används
+     * av bulkimportens "öka antal"-dubblettstrategi (WINE-25), där varje
+     * importerad rad kan representera fler än en flaska. Att tidigare
+     * återanvända increaseQuantity(...) (som alltid lade till exakt 1)
+     * för bulkimporten gav fel sluttal - se WINE-28/ADR 0016.
+     */
+    public Wine increaseQuantityBy(WineId id, UserId owner, int amount) {
         Wine existing = wineRepository.findByIdAndOwner(id, owner)
                 .orElseThrow(() -> new IllegalArgumentException("Inget vin med id " + id));
-        int currentQuantity = existing.quantity() == null ? 0 : existing.quantity();
-        return wineRepository.save(existing.withQuantity(currentQuantity + 1));
+        return wineRepository.save(existing.withQuantity(existing.quantity() + amount));
     }
 }

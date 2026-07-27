@@ -86,12 +86,12 @@ class WineRowWriterTest {
     }
 
     /**
-     * Ett vin som bara har namnet ifyllt (möjligt sedan bara namnet blev
-     * obligatoriskt i webb-UI:t, se CLAUDE.md) skrivs till Excel och
-     * återläses nu korrekt - WineRowParser kräver sedan 2026-07-22 bara
-     * namnet, samma regel åt båda hållen (tidigare hoppade parsern över
-     * en sådan rad vid återimport; det var den kända begränsningen som
-     * ledde till den ändringen).
+     * Ett vin som bara har namnet uttryckligen ifyllt skrivs till Excel och
+     * återläses korrekt - `quantity` är sedan ADR 0016 en primitiv `int`
+     * (inte längre `Integer`), så en `Wine` som aldrig fick `.quantity(...)`
+     * satt bär ändå med sig Javas primitiva standardvärde 0, inte `null`.
+     * Antal är obligatoriskt i sig (se `WineRowParser`), men 0 är ett giltigt
+     * ifyllt värde - raden hoppas alltså INTE över vid återimport.
      */
     @Test
     void ettVinMedBaraNamnetSkrivsOchÅterlässKorrekt() {
@@ -105,7 +105,7 @@ class WineRowWriterTest {
         assertThat(readBack.country()).isNull();
         assertThat(readBack.producer()).isNull();
         assertThat(readBack.vintage()).isNull();
-        assertThat(readBack.quantity()).isNull();
+        assertThat(readBack.quantity()).isEqualTo(0);
     }
 
     /**

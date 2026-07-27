@@ -257,7 +257,7 @@ public class WineController {
 
     @GetMapping("/wines/nytt")
     public String newWineForm(Model model) {
-        model.addAttribute("wine", Wine.builder().build());
+        model.addAttribute("wine", emptyDraft());
         model.addAttribute("ratings", Rating.values());
         return "vin-formular";
     }
@@ -279,10 +279,19 @@ public class WineController {
             model.addAttribute("interpretedFields", interpreted.interpretedFields());
             model.addAttribute("interpretedFieldLabels", interpretedFieldLabels(interpreted.interpretedFields()));
         } else {
-            model.addAttribute("wine", Wine.builder().build());
+            model.addAttribute("wine", emptyDraft());
             model.addAttribute("labelInterpretationFailed", true);
         }
         return "vin-formular";
+    }
+
+    /**
+     * Ett tomt, osparat utkast till "nytt vin"-formuläret - antal förifyllt
+     * med 1 (ADR 0016: antal är obligatoriskt, löst i formuläret med ett
+     * förifyllt standardvärde istället för en valideringsspärr).
+     */
+    private static Wine emptyDraft() {
+        return Wine.builder().quantity(1).build();
     }
 
     private static final List<String> INTERPRETED_FIELD_ORDER = List.of("name", "producer", "vintage", "country", "region");
@@ -493,9 +502,13 @@ public class WineController {
      * tomt formulärfält blir annars en tom sträng som Spring försöker
      * binda rakt av och kraschar på, inte null. Samma sorts hantering som
      * WineRowParser gör för Excel-celler. Namn är sedan 2026-07-22 det enda
-     * obligatoriska fältet (se CLAUDE.md) - övriga tolkas alla till null
-     * om blanka, inklusive wineType/vintage/quantity/producer/country/
-     * location som tidigare krävdes ifyllda.
+     * obligatoriska fältet (se CLAUDE.md), och sedan ADR 0016 är
+     * quantity ett andra obligatoriskt fält - löst med ett förifyllt
+     * standardvärde i formuläret (se emptyDraft()) snarare än en
+     * valideringsspärr, så parseQuantity faller tillbaka på 1 om fältet
+     * ändå kommer in tomt. Övriga fält tolkas alla till null om blanka,
+     * inklusive wineType/vintage/producer/country/location som tidigare
+     * krävdes ifyllda.
      */
     private static Wine.Builder applyFormFields(
             Wine.Builder builder,
@@ -512,7 +525,7 @@ public class WineController {
                 .producer(blankToNull(producer)).country(blankToNull(country))
                 .region(blankToNull(region)).subregion(blankToNull(subregion)).grapes(blankToNull(grapes))
                 .vintage(parseInteger(vintage)).purchaseDate(parseDate(purchaseDate)).price(parseDecimal(price))
-                .quantity(parseInteger(quantity))
+                .quantity(parseQuantity(quantity))
                 .purchaseReason(blankToNull(purchaseReason)).tastingNotes(blankToNull(tastingNotes))
                 .ownRating(parseRating(ownRating))
                 .systembolagetProductNumber(blankToNull(systembolagetProductNumber))
@@ -534,6 +547,17 @@ public class WineController {
 
     private static Integer parseInteger(String value) {
         return blankToNull(value) == null ? null : Integer.valueOf(value.trim());
+    }
+
+    /**
+     * Antal är obligatoriskt (ADR 0016), men löst i formuläret med ett
+     * förifyllt standardvärde (se emptyDraft()) istället för en
+     * valideringsspärr - en tom inskickning faller därför tillbaka på 1
+     * här också, istället för att krascha eller kräva null-hantering
+     * ända ner i domänen.
+     */
+    private static int parseQuantity(String value) {
+        return blankToNull(value) == null ? 1 : Integer.parseInt(value.trim());
     }
 
     private static Rating parseRating(String value) {
