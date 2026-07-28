@@ -2204,6 +2204,59 @@ bildvägen heller.
 - Verifierat: `mvn verify` grön (106 enhets-/webblagertester,
   50 IT-tester).
 
+**WINE-27 byggd (2026-07-28): övergivna temp-importmappar städas nu,
+en diskussionsstory (som WINE-9/WINE-19) avstämd med användaren innan
+kodning.** [ADR 0017](docs/adr/0017-login-triggered-temp-import-cleanup.md)
+fångar det arkitektoniska valet - kort sammanfattat: två alternativ
+diskuterades (schemalagd bakgrundsuppgift kontra att haka på ett
+redan existerande, återkommande händelseflöde), och valet föll på det
+senare: en lyckad inloggning (`InteractiveAuthenticationSuccessEvent`)
+triggar ett svep av alla `winecellar-import-*`-mappar äldre än 2 timmar
+i OS-temp-katalogen. Motiveringen (ingen ny bakgrundsmekanism för ett
+lågriskproblem som bara handlar om diskstädning) finns i ADR:n, inte
+här.
+- **En andra, mer akut läcka hittades under kodgranskningen, inte
+  nämnd i storyns ursprungliga beskrivning:** `ImportController.
+  preview()` (torrkörningen) skapade tidigare en HELT NY temp-mapp vid
+  varje anrop, även om sessionen redan hade en overkommitterad från en
+  tidigare torrkörning - den gamla sökvägen skrevs bara över i
+  sessionen, mappen blev övergiven direkt (inte bara vid ett
+  övergivet-helt-flöde). Fixat genom att ta bort en eventuell
+  tidigare, ej committerad temp-mapp INNAN en ny skapas
+  (`deletePreviousPendingImport`) - oberoende av
+  `PendingImportCleanup`, som bara är säkerhetsnätet för mappar från
+  sessioner som aldrig kom tillbaka alls.
+- **Ny klass `PendingImportCleanup`** (`web`-paketet, paketprivat, samma
+  synlighetskonvention som `CurrentUser`) - tar emot `tempRoot` som
+  konstruktorargument (produktionskoden använder
+  `System.getProperty("java.io.tmpdir")`, testerna en JUnit
+  `@TempDir`) och `now` som metodargument till
+  `cleanupAbandonedImports(Instant)` - båda medvetet injicerade istället
+  för att läsas direkt i metoden, för att göra klassen testbar utan att
+  röra den riktiga OS-temp-katalogen eller förlita sig på riktiga
+  sömnar för att simulera en gammal mapp.
+- **`ImportController.TEMP_DIR_PREFIX`** extraherades till en delad,
+  paketsynlig konstant (tidigare en bokstavlig sträng inline i
+  `Files.createTempDirectory(...)`) - `PendingImportCleanup` refererar
+  samma konstant istället för att duplicera strängen, samma
+  "en delad källa till sanning"-princip som `WineRowParser.COL_*`
+  redan följer för Excel-kolumner.
+- **Testfälla hittad under testskrivningen:** ett första försök i
+  `PendingImportCleanupTest` satte en testmapps ändringstid till 3
+  timmar bakåt och skrev SEDAN en fil i den - vilket i praktiken
+  uppdaterade mappens mtime tillbaka till "nu" igen (att skriva en fil
+  i en katalog rör katalogens egen ändringstid på de flesta
+  filsystem), så det simulerade åldern upphävdes tyst och testet
+  failade. Fixat genom att skriva filen FÖRST och sätta
+  `FileTime`/`Files.setLastModifiedTime` sist.
+- **`ImportControllerTest`** fick en ny `körTorrkörning(MockHttpSession,
+  MockMultipartFile...)`-overload (den befintliga varianten utan
+  session delegerar nu till den med en ny `MockHttpSession`) för att
+  kunna köra två torrkörningar i EXAKT samma session och verifiera att
+  den första temp-mappen verkligen försvinner när den andra körs.
+- Verifierat: `mvn verify` grön (110 enhets-/webblagertester,
+  50 IT-tester).
+
 ## Kända fällor att vara uppmärksam på (ärvda från roombooking, kan återkomma)
 
 - **Gherkin på svenska kräver `# language: sv`** som absolut första rad i
