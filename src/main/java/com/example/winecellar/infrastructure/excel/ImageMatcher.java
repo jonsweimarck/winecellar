@@ -12,15 +12,22 @@ import java.util.stream.Stream;
 
 /**
  * Matchar bildfiler i en mapp mot viner via filnamnet. I första hand mot
- * den entydiga identitetskonventionen {@code <producent>_<namn>_<årgång>}
- * (samma identitetsfält som dubblettvarningen, se {@code Wine.
- * matchesIdentityOf}/WINE-6) - entydig även när flera viner delar namn,
- * till skillnad från den tidigare namn-bara matchningen. Faller tillbaka
- * till namn-bara matchning (en fil som heter exakt samma sak som vinets
- * namn, t.ex. "Barolo.jpg") när producent eller årgång saknas - annars
- * hade ofullständiga rader (ett medvetet stött scenario, se
- * ADR 0005/"Bara namnet obligatoriskt") blivit sämre betjänade än innan
- * (WINE-21, se ADR 0014).
+ * den entydiga identitetskonventionen byggd av vinets satta fält:
+ * <ul>
+ *   <li>bara namn: {@code <namn>}</li>
+ *   <li>producent + namn: {@code <producent>_<namn>}</li>
+ *   <li>namn + årgång: {@code <namn>_<årgång>}</li>
+ *   <li>producent + namn + årgång: {@code <producent>_<namn>_<årgång>}</li>
+ * </ul>
+ * (WINE-30). Detta gör att två viner med samma namn men olika
+ * kombinationer av producent/årgång kan ha skilda bildfiler, istället
+ * för att båda faller tillbaka till samma namn-bara fil.
+ *
+ * Faller tillbaka till namn-bara matchning (en fil som heter exakt samma
+ * sak som vinets namn, t.ex. "Barolo.jpg") om den mer specifika stammen
+ * inte ger träff - det håller importen bakåtkompatibel med äldre
+ * bildnamn och med rader där bara namnet är känt (ADR 0005/"Bara
+ * namnet obligatoriskt").
  *
  * Ingen normalisering av filnamnet (mellanslag, specialtecken) - exakt
  * strängmatchning mot stammen, samma "exakt matchning, ingen gissning"-
@@ -29,7 +36,7 @@ import java.util.stream.Stream;
  * Om flera filer i mappen har samma filnamnsstam (t.ex. "Barolo.jpg" och
  * "Barolo.png") är det tvetydigt vilken som ska användas - den stammen
  * hoppas då över med en varning istället för att gissa. Gäller lika för
- * bägge konventionerna, eftersom båda bara är strängar i samma
+ * alla konventioner, eftersom de bara är strängar i samma
  * uppslagstabell.
  */
 public final class ImageMatcher {
@@ -86,20 +93,17 @@ public final class ImageMatcher {
     }
 
     /**
-     * Försöker i första hand med den fullständiga identitetsstammen
-     * ({@link #identityFileNameStem}, kräver att både `producer` och
-     * `vintage` är satta) - faller tillbaka till namn-bara matchning
-     * (mot `name`) om det inte gav träff, oavsett anledning (fältet
-     * saknades, eller ingen fil i mappen råkade följa den konventionen).
-     * Null om ingen av de två gav träff, eller om den träffade stammen
-     * var tvetydig (se konstruktorn).
+     * Försöker i första hand med den mest specifika stammen som vinets
+     * satta fält tillåter (se klassbeskrivningen) - faller tillbaka till
+     * namn-bara matchning (mot {@code name}) om det inte gav träff,
+     * oavsett anledning (fält saknades, eller ingen fil i mappen råkade
+     * följa den konventionen). Null om ingen av stammarna gav träff,
+     * eller om den träffade stammen var tvetydig (se konstruktorn).
      */
     public Image findImage(String producer, String name, Integer vintage) throws IOException {
-        if (producer != null && vintage != null) {
-            Image match = findByStem(identityFileNameStem(producer, name, vintage));
-            if (match != null) {
-                return match;
-            }
+        Image match = findByStem(fileNameStem(producer, name, vintage));
+        if (match != null) {
+            return match;
         }
         return findByStem(name);
     }
@@ -132,15 +136,26 @@ public final class ImageMatcher {
     /**
      * Vilken stam ett vins bildfil ska få vid EXPORT (skrivsidan, WINE-23)
      * - till skillnad från {@link #findImage} (läsningen, som kan
-     * acceptera BÅDA konventionerna liggande på disk) måste skrivsidan
+     * acceptera FLERA konventionerna liggande på disk) måste skrivsidan
      * committa till exakt EN stam per vin. Samma regel som läsningens
-     * förstahandsval: fullständig identitet om både producer och vintage
-     * är satta, annars bara namnet.
+     * förstahandsval: inkludera varje satt fält (producer/vintage)
+     * separerat med understreck; bara namnet om inget av dem är satt.
      */
     public static String fileNameStem(String producer, String name, Integer vintage) {
-        return producer != null && vintage != null
-                ? identityFileNameStem(producer, name, vintage)
-                : name;
+        StringBuilder stem = new StringBuilder();
+        if (producer != null) {
+            stem.append(withoutSpaces(producer));
+        }
+        if (name != null) {
+            if (stem.length() > 0) {
+                stem.append('_');
+            }
+            stem.append(withoutSpaces(name));
+        }
+        if (vintage != null) {
+            stem.append('_').append(vintage);
+        }
+        return stem.toString();
     }
 
     private static String withoutSpaces(String value) {
