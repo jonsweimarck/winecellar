@@ -66,17 +66,22 @@ fungerar.
    - **Partiell dubblett:** "öka antal på befintligt", "lägg till som
      nytt vin ändå", eller "hoppa över".
 
-5. **Bilder matchas via filnamn byggt av vinets satta fält**:
+5. **Bilder matchas EXAKT via filnamn byggt av vinets satta fält**:
    `<producent>_<namn>_<årgång>` när alla tre finns, `<producent>_<namn>`
    när årgång saknas, `<namn>_<årgång>` när producent saknas, och bara
    `<namn>` när endast namnet är känt. Mellanslag inom producent- och
    vinnamn bevaras; endast separatorn mellan fälten är understreck.
    Detta är entydigt även när flera viner delar namn, vilket den
    tidigare namn-bara matchningen (`ImageMatcher`) inte klarade.
-   **Fallback till namn-bara matchning** (samma som tidigare, inklusive
-   dess befintliga varning vid tvetydighet - flera viner med samma namn)
-   om den mer specifika stammen inte hittas - det håller importen
-   bakåtkompatibel med äldre bildfiler och med rader där bara namnet är
+   **Ingen fallback till namn-bara matchning för en rad med känd
+   identitet** (WINE-35) - en rad med producent och/eller årgång satt
+   matchar bara sin egen, specifika stam; hittas ingen fil kopplas ingen
+   bild, hellre än att råka matcha en annan, oidentifierad bildfil som
+   händelsevis delar namn (det hade återinfört exakt den tvetydighet den
+   här punkten är till för att lösa). En rad helt UTAN identitet (bara
+   namnet känt) får redan en stam identisk med namnet, så namn-bara
+   bildfiler fortsätter fungera för sådana rader precis som innan -
+   bakåtkompatibelt med äldre bildfiler och med rader där bara namnet är
    känt (redan idag ett medvetet stött scenario, se
    [0005](0005-only-name-required.md)).
 
