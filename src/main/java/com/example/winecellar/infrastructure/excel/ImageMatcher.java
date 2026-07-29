@@ -29,9 +29,11 @@ import java.util.stream.Stream;
  * bildnamn och med rader där bara namnet är känt (ADR 0005/"Bara
  * namnet obligatoriskt").
  *
- * Ingen normalisering av filnamnet (mellanslag, specialtecken) - exakt
- * strängmatchning mot stammen, samma "exakt matchning, ingen gissning"-
- * princip som redan gällde för den namn-bara varianten.
+ * Ingen normalisering av filnamnet (skiftläge, diakritiska tecken,
+ * mellanslag inom ett fält) - endast understreck används som separator
+ * mellan fälten. Exakt strängmatchning mot stammen, samma "exakt
+ * matchning, ingen gissning"-princip som redan gällde för den namn-bara
+ * varianten.
  *
  * Om flera filer i mappen har samma filnamnsstam (t.ex. "Barolo.jpg" och
  * "Barolo.png") är det tvetydigt vilken som ska användas - den stammen
@@ -119,47 +121,29 @@ public final class ImageMatcher {
     }
 
     /**
-     * Den delade namnkonventionen `<producent>_<namn>_<årgång>` - används
-     * här för uppslag och (senare, WINE-23) för att namnge exporterade
-     * bildfiler, så läs-/skrivsidan aldrig kan glida isär. Mellanslag
-     * inom producent/namn ersätts med understreck (ett vanligt
-     * filnamn ska inte innehålla mellanslag) - i övrigt ingen
-     * normalisering (skiftläge/diakritiska tecken lämnas orörda, exakt
-     * strängmatchning precis som den namn-bara varianten). Anroparen
-     * ansvarar för att bara skicka in fält som faktiskt är satta (se
-     * {@link #findImage}).
-     */
-    public static String identityFileNameStem(String producer, String name, int vintage) {
-        return withoutSpaces(producer) + "_" + withoutSpaces(name) + "_" + vintage;
-    }
-
-    /**
      * Vilken stam ett vins bildfil ska få vid EXPORT (skrivsidan, WINE-23)
      * - till skillnad från {@link #findImage} (läsningen, som kan
      * acceptera FLERA konventionerna liggande på disk) måste skrivsidan
      * committa till exakt EN stam per vin. Samma regel som läsningens
      * förstahandsval: inkludera varje satt fält (producer/vintage)
      * separerat med understreck; bara namnet om inget av dem är satt.
+     * Mellanslag inom producent- och vinnamn bevaras.
      */
     public static String fileNameStem(String producer, String name, Integer vintage) {
         StringBuilder stem = new StringBuilder();
         if (producer != null) {
-            stem.append(withoutSpaces(producer));
+            stem.append(producer);
         }
         if (name != null) {
             if (stem.length() > 0) {
                 stem.append('_');
             }
-            stem.append(withoutSpaces(name));
+            stem.append(name);
         }
         if (vintage != null) {
             stem.append('_').append(vintage);
         }
         return stem.toString();
-    }
-
-    private static String withoutSpaces(String value) {
-        return value.trim().replaceAll("\\s+", "_");
     }
 
     public record Image(byte[] data, String mimeType) {

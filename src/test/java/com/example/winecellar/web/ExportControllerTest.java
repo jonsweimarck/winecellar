@@ -78,6 +78,12 @@ class ExportControllerTest {
             .vintage(2021).quantity(1).location("Låda 4")
             .build();
 
+    private static final Wine CHIANTI_UTAN_ÅRGÅNG = Wine.builder()
+            .id(new WineId(4L)).owner(MIN_ANVÄNDARE_ID)
+            .name("Chianti").wineType(WineType.RED).producer("Antinori").country("Italien")
+            .quantity(6).location("Låda 5")
+            .build();
+
     // En riktig, avkodningsbar 1x1-PNG (samma testbild som används på
     // flera andra ställen i testsviten, t.ex. LabelScanFormIT).
     private static final byte[] EN_PIXEL_PNG = Base64.getDecoder().decode(
@@ -156,7 +162,7 @@ class ExportControllerTest {
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             ZipEntry entry = zip.getNextEntry();
             assertThat(entry).isNotNull();
-            assertThat(entry.getName()).isEqualTo("Pio_Cesare_Barolo_2018.png");
+            assertThat(entry.getName()).isEqualTo("Pio Cesare_Barolo_2018.png");
             assertThat(zip.readAllBytes()).isEqualTo(EN_PIXEL_PNG);
 
             assertThat(zip.getNextEntry()).isNull();
@@ -186,6 +192,28 @@ class ExportControllerTest {
             ZipEntry entry = zip.getNextEntry();
             assertThat(entry).isNotNull();
             assertThat(entry.getName()).isEqualTo("Riesling_2021.png");
+            assertThat(zip.readAllBytes()).isEqualTo(EN_PIXEL_PNG);
+
+            assertThat(zip.getNextEntry()).isNull();
+        }
+    }
+
+    @Test
+    void skaExporteraZipMedPartiellIdentitetNärÅrgångSaknas() throws Exception {
+        Wine chiantiMedBild = CHIANTI_UTAN_ÅRGÅNG.toBuilder()
+                .image(EN_PIXEL_PNG).imageMimeType("image/png")
+                .build();
+        when(wineService.listWines(MIN_ANVÄNDARE_ID)).thenReturn(List.of(chiantiMedBild));
+
+        MvcResult result = mockMvc.perform(get("/export/bilder.zip").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        byte[] zipBytes = result.getResponse().getContentAsByteArray();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry = zip.getNextEntry();
+            assertThat(entry).isNotNull();
+            assertThat(entry.getName()).isEqualTo("Antinori_Chianti.png");
             assertThat(zip.readAllBytes()).isEqualTo(EN_PIXEL_PNG);
 
             assertThat(zip.getNextEntry()).isNull();

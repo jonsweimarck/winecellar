@@ -78,7 +78,7 @@ class ImageMatcherTest {
     @Test
     void skaMatchaViaFullständigIdentitetNärProducentOchÅrgångÄrSatta() throws Exception {
         // Två viner som delar namn - bara identitetskonventionen kan skilja dem åt.
-        Files.write(imageFolder.resolve("Pio_Cesare_Barolo_2018.jpg"), new byte[] {1});
+        Files.write(imageFolder.resolve("Pio Cesare_Barolo_2018.jpg"), new byte[] {1});
         Files.write(imageFolder.resolve("Damilano_Barolo_2019.jpg"), new byte[] {2});
 
         ImageMatcher matcher = new ImageMatcher(imageFolder);
@@ -109,12 +109,6 @@ class ImageMatcherTest {
     }
 
     @Test
-    void identityFileNameStemSkaKombineraFältenMedUnderstreckOchErsättaMellanslag() {
-        assertThat(ImageMatcher.identityFileNameStem("Pio Cesare", "Barolo", 2018))
-                .isEqualTo("Pio_Cesare_Barolo_2018");
-    }
-
-    @Test
     void fileNameStemSkaAnvändaBaraNamnetNärProducentOchÅrgångSaknas() {
         assertThat(ImageMatcher.fileNameStem(null, "Barolo", null)).isEqualTo("Barolo");
     }
@@ -122,7 +116,7 @@ class ImageMatcherTest {
     @Test
     void fileNameStemSkaAnvändaProducentOchNamnNärÅrgångSaknas() {
         assertThat(ImageMatcher.fileNameStem("Pio Cesare", "Barolo", null))
-                .isEqualTo("Pio_Cesare_Barolo");
+                .isEqualTo("Pio Cesare_Barolo");
     }
 
     @Test
@@ -133,12 +127,18 @@ class ImageMatcherTest {
     @Test
     void fileNameStemSkaAnvändaAllaTreFältenNärDeÄrSatta() {
         assertThat(ImageMatcher.fileNameStem("Pio Cesare", "Barolo", 2018))
-                .isEqualTo("Pio_Cesare_Barolo_2018");
+                .isEqualTo("Pio Cesare_Barolo_2018");
+    }
+
+    @Test
+    void fileNameStemSkaBevaraMellanslagInomProducentOchNamn() {
+        assertThat(ImageMatcher.fileNameStem("Château Margaux", "Pauillac Rouge", 2015))
+                .isEqualTo("Château Margaux_Pauillac Rouge_2015");
     }
 
     @Test
     void skaMatchaBildMedProducentOchNamnNärÅrgångSaknas() throws Exception {
-        Files.write(imageFolder.resolve("Pio_Cesare_Barolo.jpg"), new byte[] {5});
+        Files.write(imageFolder.resolve("Pio Cesare_Barolo.jpg"), new byte[] {5});
 
         ImageMatcher matcher = new ImageMatcher(imageFolder);
 
@@ -166,7 +166,7 @@ class ImageMatcherTest {
 
     @Test
     void skaSkiljaPåVinMedSammaNamnMenOlikaPartiellIdentitet() throws Exception {
-        Files.write(imageFolder.resolve("Pio_Cesare_Barolo.jpg"), new byte[] {8});
+        Files.write(imageFolder.resolve("Pio Cesare_Barolo.jpg"), new byte[] {8});
         Files.write(imageFolder.resolve("Barolo_2018.jpg"), new byte[] {9});
         Files.write(imageFolder.resolve("Barolo.jpg"), new byte[] {10});
 
