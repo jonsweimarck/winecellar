@@ -78,7 +78,7 @@ class ImageMatcherTest {
     @Test
     void skaMatchaViaFullständigIdentitetNärProducentOchÅrgångÄrSatta() throws Exception {
         // Två viner som delar namn - bara identitetskonventionen kan skilja dem åt.
-        Files.write(imageFolder.resolve("Pio_Cesare_Barolo_2018.jpg"), new byte[] {1});
+        Files.write(imageFolder.resolve("Pio Cesare_Barolo_2018.jpg"), new byte[] {1});
         Files.write(imageFolder.resolve("Damilano_Barolo_2019.jpg"), new byte[] {2});
 
         ImageMatcher matcher = new ImageMatcher(imageFolder);
@@ -109,8 +109,71 @@ class ImageMatcherTest {
     }
 
     @Test
-    void identityFileNameStemSkaKombineraFältenMedUnderstreckOchErsättaMellanslag() {
-        assertThat(ImageMatcher.identityFileNameStem("Pio Cesare", "Barolo", 2018))
-                .isEqualTo("Pio_Cesare_Barolo_2018");
+    void fileNameStemSkaAnvändaBaraNamnetNärProducentOchÅrgångSaknas() {
+        assertThat(ImageMatcher.fileNameStem(null, "Barolo", null)).isEqualTo("Barolo");
+    }
+
+    @Test
+    void fileNameStemSkaAnvändaProducentOchNamnNärÅrgångSaknas() {
+        assertThat(ImageMatcher.fileNameStem("Pio Cesare", "Barolo", null))
+                .isEqualTo("Pio Cesare_Barolo");
+    }
+
+    @Test
+    void fileNameStemSkaAnvändaNamnOchÅrgångNärProducentSaknas() {
+        assertThat(ImageMatcher.fileNameStem(null, "Barolo", 2018)).isEqualTo("Barolo_2018");
+    }
+
+    @Test
+    void fileNameStemSkaAnvändaAllaTreFältenNärDeÄrSatta() {
+        assertThat(ImageMatcher.fileNameStem("Pio Cesare", "Barolo", 2018))
+                .isEqualTo("Pio Cesare_Barolo_2018");
+    }
+
+    @Test
+    void fileNameStemSkaBevaraMellanslagInomProducentOchNamn() {
+        assertThat(ImageMatcher.fileNameStem("Château Margaux", "Pauillac Rouge", 2015))
+                .isEqualTo("Château Margaux_Pauillac Rouge_2015");
+    }
+
+    @Test
+    void skaMatchaBildMedProducentOchNamnNärÅrgångSaknas() throws Exception {
+        Files.write(imageFolder.resolve("Pio Cesare_Barolo.jpg"), new byte[] {5});
+
+        ImageMatcher matcher = new ImageMatcher(imageFolder);
+
+        assertThat(matcher.findImage("Pio Cesare", "Barolo", null).data()).containsExactly(5);
+    }
+
+    @Test
+    void skaMatchaBildMedNamnOchÅrgångNärProducentSaknas() throws Exception {
+        Files.write(imageFolder.resolve("Barolo_2018.jpg"), new byte[] {6});
+
+        ImageMatcher matcher = new ImageMatcher(imageFolder);
+
+        assertThat(matcher.findImage(null, "Barolo", 2018).data()).containsExactly(6);
+    }
+
+    @Test
+    void skaFallaTillbakaTillNamnBaraMatchningNärPartiellIdentitetInteGerTräff() throws Exception {
+        // Raden har producent + namn, men bildfilen följer den äldre namn-bara konventionen.
+        Files.write(imageFolder.resolve("Barolo.jpg"), new byte[] {7});
+
+        ImageMatcher matcher = new ImageMatcher(imageFolder);
+
+        assertThat(matcher.findImage("Pio Cesare", "Barolo", null).data()).containsExactly(7);
+    }
+
+    @Test
+    void skaSkiljaPåVinMedSammaNamnMenOlikaPartiellIdentitet() throws Exception {
+        Files.write(imageFolder.resolve("Pio Cesare_Barolo.jpg"), new byte[] {8});
+        Files.write(imageFolder.resolve("Barolo_2018.jpg"), new byte[] {9});
+        Files.write(imageFolder.resolve("Barolo.jpg"), new byte[] {10});
+
+        ImageMatcher matcher = new ImageMatcher(imageFolder);
+
+        assertThat(matcher.findImage("Pio Cesare", "Barolo", null).data()).containsExactly(8);
+        assertThat(matcher.findImage(null, "Barolo", 2018).data()).containsExactly(9);
+        assertThat(matcher.findImage(null, "Barolo", null).data()).containsExactly(10);
     }
 }

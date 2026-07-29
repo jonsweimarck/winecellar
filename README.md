@@ -243,8 +243,11 @@ tolkas hoppas över, utan att stoppa resten av importen.
 - `GET /export/xlsx` - laddar ner den inloggade användarens egna viner
   som en `.xlsx`-fil, sorterade på namn.
 - `GET /export/bilder.zip` - laddar ner en zip med etikettbilderna,
-  namngivna `<producent>_<namn>_<årgång>.<ändelse>` (eller bara
-  `<namn>.<ändelse>` om producent eller årgång saknas) - samma
+  namngivna efter vinets satta fält: `<producent>_<namn>_<årgång>`
+  när alla tre finns, `<producent>_<namn>` när årgång saknas,
+  `<namn>_<årgång>` när producent saknas, och bara `<namn>` när
+  endast namnet är känt. Mellanslag inom producent- och vinnamn
+  bevaras; endast separatorn mellan fälten är understreck. Samma
   konvention som importen matchar bilder mot.
 
 Båda länkarna finns direkt i vinlistan. Exporten är byte-exakt -

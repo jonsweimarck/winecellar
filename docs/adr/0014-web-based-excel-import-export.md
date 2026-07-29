@@ -66,21 +66,25 @@ fungerar.
    - **Partiell dubblett:** "öka antal på befintligt", "lägg till som
      nytt vin ändå", eller "hoppa över".
 
-5. **Bilder matchas via filnamn `<producent>_<namn>_<årgång>`** när
-   raden har alla tre identitetsfälten ifyllda - entydigt även när flera
-   viner delar namn, vilket dagens namn-bara matchning (`ImageMatcher`)
-   inte klarar. **Fallback till namn-bara matchning** (samma som idag,
-   inklusive dess befintliga varning vid tvetydighet - flera viner med
-   samma namn) när producent eller årgång saknas på raden - att kräva
-   full identitet och hoppa över bilden helt hade gjort ofullständiga
-   rader (redan idag ett medvetet stött scenario, se
-   [0005](0005-only-name-required.md)) sämre betjänade än innan.
+5. **Bilder matchas via filnamn byggt av vinets satta fält**:
+   `<producent>_<namn>_<årgång>` när alla tre finns, `<producent>_<namn>`
+   när årgång saknas, `<namn>_<årgång>` när producent saknas, och bara
+   `<namn>` när endast namnet är känt. Mellanslag inom producent- och
+   vinnamn bevaras; endast separatorn mellan fälten är understreck.
+   Detta är entydigt även när flera viner delar namn, vilket den
+   tidigare namn-bara matchningen (`ImageMatcher`) inte klarade.
+   **Fallback till namn-bara matchning** (samma som tidigare, inklusive
+   dess befintliga varning vid tvetydighet - flera viner med samma namn)
+   om den mer specifika stammen inte hittas - det håller importen
+   bakåtkompatibel med äldre bildfiler och med rader där bara namnet är
+   känt (redan idag ett medvetet stött scenario, se
+   [0005](0005-only-name-required.md)).
 
 6. **Export är två separata nedladdningar:** en `.xlsx`-fil (scopead
    till inloggad användares egna viner, samma kolumnlayout som idag) och
    en `.zip`-nedladdning med bildfiler namngivna enligt samma
-   `<producent>_<namn>_<årgång>`-konvention som import förväntar sig -
-   det är zip-filens bilder, inte xlsx-filens inbäddade `Picture`-objekt
+   fältbaserade konvention som import förväntar sig (se punkt 5) - det
+   är zip-filens bilder, inte xlsx-filens inbäddade `Picture`-objekt
    (se [0011](0011-excel-image-roundtrip-dual-mechanism.md) punkt 1, som
    kvarstår oförändrad som en ren visuell bekvämlighet i Excel), som ger
    en fullständig rundtripp: användaren väljer samma uppackade zip-mapp

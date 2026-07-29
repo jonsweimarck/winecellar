@@ -337,6 +337,38 @@ class ImportControllerTest {
         assertThat(saved.imageMimeType()).isEqualTo("image/jpeg");
     }
 
+    @Test
+    void skaKopplaBildTillNyttVinMedPartiellIdentitet() throws Exception {
+        stubbaDubblettkontroll();
+        byte[] xlsx = xlsxMedEnRadUtanÅrgång();
+        MockMultipartFile fil = new MockMultipartFile("fil", "vinlista.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx);
+        MockMultipartFile bild = new MockMultipartFile(
+                "bilder", "Muga_Rioja.jpg", "image/jpeg", new byte[] {8, 8, 8});
+
+        MvcResult result = mockMvc.perform(multipart("/import").file(fil).file(bild)
+                        .with(user("testperson")).with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) result.getRequest().getSession();
+
+        mockMvc.perform(post("/import/commit")
+                        .session(session)
+                        .param("fullDuplicateStrategy", "HOPPA_OVER")
+                        .param("partialDuplicateStrategy", "HOPPA_OVER")
+                        .with(user("testperson")).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+
+        ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
+        verify(wineService).save(captor.capture());
+        Wine saved = captor.getValue();
+        assertThat(saved.name()).isEqualTo("Rioja");
+        assertThat(saved.producer()).isEqualTo("Muga");
+        assertThat(saved.vintage()).isNull();
+        assertThat(saved.image()).isEqualTo(new byte[] {8, 8, 8});
+        assertThat(saved.imageMimeType()).isEqualTo("image/jpeg");
+    }
+
     /**
      * Fyra rader, samma kolumnlayout som `WineRowParser`/README:s
      * Datamodell-avsnitt (A=vintyp ... G=namn, H=årgång ... K=antal):
@@ -355,6 +387,18 @@ class ImportControllerTest {
             skrivRad(sheet, 3, "Rioja", "Muga", "Rött", 2020, RIOJA_ROW_QUANTITY);
             Row utanNamn = sheet.createRow(4);
             utanNamn.createCell(5).setCellValue("Okänd producent utan namn");
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] xlsxMedEnRadUtanÅrgång() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Vin");
+            skrivRad(sheet, 0, "Rubrik", "", "", 0, 0);
+            skrivRad(sheet, 1, "Rioja", "Muga", "Rött", 0, RIOJA_ROW_QUANTITY);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);

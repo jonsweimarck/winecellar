@@ -2257,6 +2257,53 @@ här.
 - Verifierat: `mvn verify` grön (110 enhets-/webblagertester,
   50 IT-tester).
 
+**WINE-30 byggd (2026-07-29): bildnamngivning använder partiell
+identitet, inte bara fullständig identitet eller namn-ensamt.**
+Buggen: `ImageMatcher.findImage` försökte tidigare bara den
+fullständiga identitetsstammen (`<producent>_<namn>_<årgång>`) när
+BÅDA `producer` och `vintage` var satta - annars föll den direkt
+tillbaka till namn-bara matchning. Två viner med samma namn men OLIKA
+partiell identitet (t.ex. ett med bara producent satt, ett annat med
+bara årgång) förväntade sig då båda samma namn-bara bildfil, trots att
+de inte alls behöver vara samma vin.
+- **Ny regel:** `ImageMatcher.fileNameStem`/`findImage` bygger stammen
+  av VILKA fält som faktiskt är satta (producent/namn/årgång),
+  separerade med understreck - namn är det enda obligatoriska
+  fragmentet. `findImage` provar den mest specifika stammen vinets
+  satta fält tillåter först, och faller alltid tillbaka till namn-bara
+  matchning om det inte gav träff - håller bakåtkompatibiliteten med
+  äldre bildfiler/rader där bara namnet är känt (ADR 0005).
+- **Kodgranskning (av Claude, på användarens begäran) hittade två
+  saker i den första implementationen som fixades i en uppföljande
+  commit:** `ImageMatcher.identityFileNameStem` (den gamla
+  fullständig-identitet-metoden) hade blivit dödkod - `fileNameStem`
+  byggde nu stammen själv istället för att anropa den, men den gamla
+  metoden och dess dedikerade test lämnades kvar oanvända. Samt:
+  README.md:s exportavsnitt beskrev fortfarande den GAMLA regeln
+  ("bara `<namn>` om producent ELLER årgång saknas"), vilket nu var
+  direkt felaktigt eftersom namn+årgång (utan producent) ger
+  `<namn>_<årgång>`, inte bara `<namn>`. Båda fixades: dödkoden togs
+  bort helt, README.md och ADR 0014 uppdaterades att beskriva alla
+  fyra fallen korrekt.
+- **Uppföljningen gick längre än granskningens frågor också:**
+  mellanslag inom producent-/vinnamn bevaras nu (tidigare ersattes de
+  med understreck via en `withoutSpaces`-hjälpare, som försvann i
+  samma städning) - bara separatorn MELLAN fälten är understreck, t.ex.
+  `Château Margaux_Pauillac Rouge_2015` istället för
+  `Château_Margaux_Pauillac_Rouge_2015`. Ingen ökad kollisionsrisk
+  jämfört med innan (samma "bara ett fält som redan innehåller ett
+  bokstavligt understreck kan krocka"-begränsning som redan fanns).
+- **Ny testtäckning utöver det granskningen efterfrågade:** ett
+  enhetstest för mellanslagsbevarande med flerordiga fält i alla tre
+  positionerna, ett nytt `ExportControllerTest`-scenario för
+  producent+namn-utan-årgång, och - viktigast - ett helt nytt
+  integrationstest i `ImportControllerTest` som verifierar att en
+  uppladdad bild faktiskt kopplas till rätt vin genom HELA
+  importflödet för ett partiellt identitetsfall, inte bara isolerat
+  mot `ImageMatcher` i ett enhetstest.
+- Verifierat: `mvn verify` grön (121 enhets-/webblagertester,
+  50 IT-tester).
+
 ## Kända fällor att vara uppmärksam på (ärvda från roombooking, kan återkomma)
 
 - **Gherkin på svenska kräver `# language: sv`** som absolut första rad i
