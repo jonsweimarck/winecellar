@@ -337,6 +337,35 @@ class ImportControllerTest {
         assertThat(saved.imageMimeType()).isEqualTo("image/jpeg");
     }
 
+    /**
+     * WINE-35: en rad med känd identitet (producent+namn+årgång) ska INTE
+     * kopplas till en bildfil som bara heter namnet, även om en sådan fil
+     * råkar finnas i bildmappen (t.ex. kvarglömd från den äldre, namn-bara
+     * konventionen) - verifierar fixen genom HELA importflödet, inte bara
+     * isolerat mot ImageMatcher i ett enhetstest.
+     */
+    @Test
+    void skaInteKopplaNamnBaraBildTillNyttVinMedKändIdentitet() throws Exception {
+        stubbaDubblettkontroll();
+        MockMultipartFile bild = new MockMultipartFile(
+                "bilder", "Rioja.jpg", "image/jpeg", new byte[] {9, 9, 9});
+        MockHttpSession session = körTorrkörning(bild);
+
+        mockMvc.perform(post("/import/commit")
+                        .session(session)
+                        .param("fullDuplicateStrategy", "HOPPA_OVER")
+                        .param("partialDuplicateStrategy", "HOPPA_OVER")
+                        .with(user("testperson")).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+
+        ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
+        verify(wineService).save(captor.capture());
+        Wine saved = captor.getValue();
+        assertThat(saved.name()).isEqualTo("Rioja");
+        assertThat(saved.image()).isNull();
+        assertThat(saved.imageMimeType()).isNull();
+    }
+
     @Test
     void skaKopplaBildTillNyttVinMedPartiellIdentitet() throws Exception {
         stubbaDubblettkontroll();
