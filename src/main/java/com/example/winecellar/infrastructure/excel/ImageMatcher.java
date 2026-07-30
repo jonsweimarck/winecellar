@@ -23,11 +23,16 @@ import java.util.stream.Stream;
  * kombinationer av producent/årgång kan ha skilda bildfiler, istället
  * för att båda faller tillbaka till samma namn-bara fil.
  *
- * Faller tillbaka till namn-bara matchning (en fil som heter exakt samma
- * sak som vinets namn, t.ex. "Barolo.jpg") om den mer specifika stammen
- * inte ger träff - det håller importen bakåtkompatibel med äldre
- * bildnamn och med rader där bara namnet är känt (ADR 0005/"Bara
- * namnet obligatoriskt").
+ * Matchningen är EXAKT mot den stammen - ingen fallback till namn-bara
+ * matchning för en rad som har MINST ett identitetsfält (producent
+ * och/eller årgång) satt (WINE-35). En rad helt utan identitet får redan
+ * en stam identisk med namnet (se {@link #fileNameStem}), så namn-bara
+ * bildfiler fortsätter fungera för sådana rader precis som innan
+ * (bakåtkompatibelt med äldre bildnamn och med rader där bara namnet är
+ * känt, ADR 0005/"Bara namnet obligatoriskt") - men en rad med känd
+ * identitet vars specifika fil saknas får INGEN bild, hellre än att
+ * råka matcha en annan, oidentifierad bildfil som händelsevis delar
+ * namn (exakt den ursprungliga WINE-30-buggen).
  *
  * Ingen normalisering av filnamnet (skiftläge, diakritiska tecken,
  * mellanslag inom ett fält) - endast understreck används som separator
@@ -95,19 +100,13 @@ public final class ImageMatcher {
     }
 
     /**
-     * Försöker i första hand med den mest specifika stammen som vinets
-     * satta fält tillåter (se klassbeskrivningen) - faller tillbaka till
-     * namn-bara matchning (mot {@code name}) om det inte gav träff,
-     * oavsett anledning (fält saknades, eller ingen fil i mappen råkade
-     * följa den konventionen). Null om ingen av stammarna gav träff,
-     * eller om den träffade stammen var tvetydig (se konstruktorn).
+     * Matchar exakt mot den stam vinets satta fält ger ({@link #fileNameStem},
+     * se klassbeskrivningen/WINE-35) - ingen ytterligare fallback. Null om
+     * stammen inte hittas, eller om den träffade stammen var tvetydig (se
+     * konstruktorn).
      */
     public Image findImage(String producer, String name, Integer vintage) throws IOException {
-        Image match = findByStem(fileNameStem(producer, name, vintage));
-        if (match != null) {
-            return match;
-        }
-        return findByStem(name);
+        return findByStem(fileNameStem(producer, name, vintage));
     }
 
     private Image findByStem(String stem) throws IOException {

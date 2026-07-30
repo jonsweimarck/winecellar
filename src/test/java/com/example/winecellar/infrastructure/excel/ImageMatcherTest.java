@@ -87,25 +87,41 @@ class ImageMatcherTest {
         assertThat(matcher.findImage("Damilano", "Barolo", 2019).data()).containsExactly(2);
     }
 
+    /**
+     * WINE-35: fallback till namn-bara matchning togs bort för rader med
+     * känd identitet - annars kunde två viner med samma namn men olika
+     * identitet råka dela en bildfil som bara heter namnet, exakt den
+     * ursprungliga WINE-30-buggen. En rad med producent OCH/ELLER årgång
+     * satt matchar bara sin egen, specifika stam - ingen träff betyder
+     * ingen bild, inte en gissning mot namnet.
+     */
     @Test
-    void skaFallaTillbakaTillNamnMatchningOmProducentEllerÅrgångSaknas() throws Exception {
+    void skaInteMatchaNamnBaraFilOmProducentÄrKäntMenIngenSpecifikFilFinns() throws Exception {
         Files.write(imageFolder.resolve("Barolo.jpg"), new byte[] {3});
 
         ImageMatcher matcher = new ImageMatcher(imageFolder);
 
-        assertThat(matcher.findImage(null, "Barolo", 2018).data()).containsExactly(3);
-        assertThat(matcher.findImage("Pio Cesare", "Barolo", null).data()).containsExactly(3);
+        assertThat(matcher.findImage("Pio Cesare", "Barolo", null)).isNull();
     }
 
     @Test
-    void skaFallaTillbakaTillNamnMatchningOmFullständigIdentitetInteGerTräff() throws Exception {
-        // Raden har full identitet, men bildfilen är fortfarande namngiven
-        // enligt den äldre, namn-bara konventionen.
+    void skaInteMatchaNamnBaraFilOmÅrgångÄrKäntMenIngenSpecifikFilFinns() throws Exception {
+        Files.write(imageFolder.resolve("Barolo.jpg"), new byte[] {3});
+
+        ImageMatcher matcher = new ImageMatcher(imageFolder);
+
+        assertThat(matcher.findImage(null, "Barolo", 2018)).isNull();
+    }
+
+    @Test
+    void skaInteMatchaNamnBaraFilOmFullständigIdentitetÄrKäntMenIngenSpecifikFilFinns() throws Exception {
+        // Raden har full identitet, men bara en äldre, namn-bara bildfil
+        // finns i mappen - ska INTE matcha den.
         Files.write(imageFolder.resolve("Barolo.jpg"), new byte[] {4});
 
         ImageMatcher matcher = new ImageMatcher(imageFolder);
 
-        assertThat(matcher.findImage("Pio Cesare", "Barolo", 2018).data()).containsExactly(4);
+        assertThat(matcher.findImage("Pio Cesare", "Barolo", 2018)).isNull();
     }
 
     @Test
@@ -152,16 +168,6 @@ class ImageMatcherTest {
         ImageMatcher matcher = new ImageMatcher(imageFolder);
 
         assertThat(matcher.findImage(null, "Barolo", 2018).data()).containsExactly(6);
-    }
-
-    @Test
-    void skaFallaTillbakaTillNamnBaraMatchningNärPartiellIdentitetInteGerTräff() throws Exception {
-        // Raden har producent + namn, men bildfilen följer den äldre namn-bara konventionen.
-        Files.write(imageFolder.resolve("Barolo.jpg"), new byte[] {7});
-
-        ImageMatcher matcher = new ImageMatcher(imageFolder);
-
-        assertThat(matcher.findImage("Pio Cesare", "Barolo", null).data()).containsExactly(7);
     }
 
     @Test

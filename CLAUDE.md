@@ -2304,6 +2304,42 @@ de inte alls behöver vara samma vin.
 - Verifierat: `mvn verify` grön (121 enhets-/webblagertester,
   50 IT-tester).
 
+**WINE-35 byggd (2026-07-29): bild-fallback till namn-bara matchning
+togs bort för rader med känd identitet - upptäckt av användaren efter
+att WINE-30 redan var mergad, inte av granskningen.** WINE-30:s
+`ImageMatcher.findImage` provade i första hand den mest specifika
+stammen vinets satta fält gav, men föll ALLTID tillbaka till namn-bara
+matchning om den inte gav träff - oavsett om producent/årgång faktiskt
+var kända för raden. Konsekvens: två viner med samma namn men olika
+identitet kunde fortfarande råka dela en namn-bara bildfil så snart
+bildmappen inte råkade innehålla den mer specifika filen - exakt den
+ursprungliga WINE-30-buggen, bara med lägre sannolikhet.
+- **Ny regel:** ingen fallback alls för en rad med MINST ett
+  identitetsfält (producent och/eller årgång) satt - hittas ingen fil
+  som matchar den specifika stammen exakt kopplas ingen bild, istället
+  för att gissa mot namnet. En rad helt utan identitet (bara namnet
+  känt) är opåverkad - `fileNameStem` ger redan en stam identisk med
+  namnet för den, så samma sökning löser fortfarande namn-bara
+  bildfiler precis som innan.
+- **Fixen förenklade `findImage` dramatiskt** - hela den villkorade
+  fallback-grenen (separat andra sökning mot `name`) blev överflödig
+  och togs bort helt, eftersom `fileNameStem(null, name, null)` redan
+  ÄR `name`. Metoden är nu bara `return findByStem(fileNameStem(
+  producer, name, vintage));` - en rad.
+- **Tre tester i `ImageMatcherTest` som testade den gamla
+  (nu felaktiga) fallback-logiken skrevs om till att förvänta `null`**
+  istället för ett träffat namn-bara vin - en riktig fälla att komma
+  ihåg: en bugfix som gör kod ENKLARE kan ändå kräva att flera
+  befintliga, tidigare gröna tester medvetet vänds till sin motsats,
+  inte bara justeras marginellt. Ett fjärde, duplicerat testfall (samma
+  scenario som redan täcktes av ett av de tre) togs bort istället för
+  att uppdateras.
+- **ADR 0014 punkt 5 uppdaterad** - beskrev tidigare fallbacken som
+  ovillkorlig, vilket inte längre stämmer.
+- Verifierat: `mvn verify` grön (121 enhets-/webblagertester,
+  50 IT-tester - nettoförändringen i testantal är liten eftersom tre
+  omskrivna tester plus ett borttaget duplicat ungefär tar ut varandra).
+
 ## Kända fällor att vara uppmärksam på (ärvda från roombooking, kan återkomma)
 
 - **Gherkin på svenska kräver `# language: sv`** som absolut första rad i
