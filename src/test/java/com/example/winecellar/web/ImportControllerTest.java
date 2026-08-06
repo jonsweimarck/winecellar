@@ -166,9 +166,36 @@ class ImportControllerTest {
 
         mockMvc.perform(multipart("/import").file(fil).with(user("testperson")).with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Rader totalt")));
+                .andExpect(content().string(containsString("Rader totalt")))
+                .andExpect(content().string(containsString("Rad 5: Vinet måste ha ett namn")));
 
         verify(wineService, never()).save(any());
+    }
+
+    @Test
+    void skaVisaDetaljeratFelFörInternDubblettIFilen() throws Exception {
+        stubbaDubblettkontroll();
+
+        byte[] xlsx = xlsxMedInternDubblett();
+        MockMultipartFile fil = new MockMultipartFile("fil", "vinlista.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx);
+
+        MvcResult result = mockMvc.perform(multipart("/import").file(fil).with(user("testperson")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Rad 2: Vinet är en dublett av ett annat vin (rad 3)")))
+                .andExpect(content().string(containsString("Rad 3: Vinet är en dublett av ett annat vin (rad 2)")))
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) result.getRequest().getSession();
+
+        mockMvc.perform(post("/import/commit")
+                        .session(session)
+                        .param("fullDuplicateStrategy", "HOPPA_OVER")
+                        .param("partialDuplicateStrategy", "HOPPA_OVER")
+                        .with(user("testperson")).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+
+        verify(wineService, never()).save(any());
+        verify(wineService, never()).increaseQuantityBy(any(), any(), anyInt());
     }
 
     /**
@@ -428,6 +455,19 @@ class ImportControllerTest {
             Sheet sheet = workbook.createSheet("Vin");
             skrivRad(sheet, 0, "Rubrik", "", "", 0, 0);
             skrivRad(sheet, 1, "Rioja", "Muga", "Rött", 0, RIOJA_ROW_QUANTITY);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] xlsxMedInternDubblett() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Vin");
+            skrivRad(sheet, 0, "Rubrik", "", "", 0, 0);
+            skrivRad(sheet, 1, "Dublett", "Samma Producent", "Rött", 2020, 1);
+            skrivRad(sheet, 2, "Dublett", "Samma Producent", "Rött", 2020, 1);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);

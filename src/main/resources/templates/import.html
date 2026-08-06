@@ -41,7 +41,7 @@
             <dt>Rader totalt</dt>
             <dd th:text="${preview.totalRows()}"></dd>
             <dt>Hoppas över (saknar namn eller kunde inte tolkas)</dt>
-            <dd th:text="${preview.skippedRows()}"></dd>
+            <dd th:text="${preview.issues().size()}"></dd>
             <dt>Fullständiga dubbletter (finns redan)</dt>
             <dd th:text="${preview.fullDuplicates()}"></dd>
             <dt>Möjliga dubbletter (liknar ett befintligt vin)</dt>
@@ -49,6 +49,10 @@
             <dt>Nya viner</dt>
             <dd th:text="${preview.clean()}"></dd>
         </dl>
+
+        <ul th:if="${!preview.issues().isEmpty()}">
+            <li th:each="issue : ${preview.issues()}" th:text="${issue.message()}"></li>
+        </ul>
 
         <form method="post" th:action="@{/import/commit}">
             <label for="fullDuplicateStrategy">Vid fullständig dubblett</label>
