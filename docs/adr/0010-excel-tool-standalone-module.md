@@ -1,56 +1,46 @@
-# 0010: Excel-import/export som en fristående Maven-modul
+# 0010: Excel-import/export som ett fristående, separat verktyg
 
 ## Status
 
-Superseded av [0014](0014-web-based-excel-import-export.md) (2026-07-25,
-WINE-20) - `tools/import-excel/` är borttagen, importen/exporten blir en
-webbfunktion i huvudappen istället. Kvar nedan som historik för varför
-den ursprungliga modellen såg ut som den gjorde.
+Superseded av [0014](0014-web-based-excel-import-export.md)
+(2026-07-25, WINE-20) - det fristående verktyget är borttaget,
+importen/exporten blev en webbfunktion i huvudappen istället. Kvar
+nedan som historik för varför den ursprungliga modellen såg ut som den
+gjorde.
 
 Accepted (2026-07-17)
 
 ## Context
 
-Den befintliga vinsamlingen fanns i en Excel-fil (`Vinlista.xlsx`) som
-skulle importeras en gång, och en motsvarande exportmöjlighet önskades
-senare för redigering/backup. Apache POI (för att läsa/skriva `.xlsx`)
-är ett tungt beroende som bara behövs för dessa engångs-/verktygskörningar
-- inte för den körande webbapplikationen.
+Den befintliga vinsamlingen fanns i en Excel-fil som skulle importeras
+en gång, och en motsvarande exportmöjlighet önskades senare för
+redigering/backup. Biblioteket för att läsa/skriva Excel-filer är ett
+tungt beroende som bara behövs för dessa engångs-/verktygskörningar -
+inte för den körande webbapplikationen.
 
 ## Decision
 
-`tools/import-excel/` är en helt fristående Maven-modul: egen `pom.xml`,
-**inte** ett `<module>` av rot-`pom.xml` (skulle tvinga rotens
-packaging till "pom" och göra `clevercloud/maven.json`s
-`spring-boot:run`-mål meningslöst). POI och JDBC-drivrutinen är
-beroenden av den modulen, inte av den deployade jaren.
-
-Modulen beror på huvudprojektets egen `com.example:winecellar`-artefakt
-för att återanvända `Wine`/`WineType`/`Rating` (rena domänobjekt)
-istället för att duplicera betygslistan och mappningslogiken. Roten
-måste vara `mvn install`-ad lokalt innan importmodulen byggs.
-
-`ImportExcel`/`ExportExcel` skriver/läser direkt via JDBC mot
-`wines`-tabellen, inte via `WineService`/HTTP - fristående skript som
-körs manuellt mot en redan existerande databas.
+Import-/exportverktyget byggdes som en helt fristående modul, separat
+byggd från huvudapplikationen, så att dess beroenden inte följde med i
+den körande appen. Modulen återanvände huvudapplikationens egna
+domänobjekt (vintyp, betyg) istället för att duplicera regler och
+mappningslogik, men skrev/läste direkt mot databasen - ett fristående
+skript som kördes manuellt mot en redan existerande databas, inte via
+applikationens vanliga tjänstelager.
 
 ## Consequences
 
-- Rotens `spring-boot-maven-plugin` fick `<classifier>exec</classifier>`
-  - utan den skriver `repackage` (körs alltid före `install`) över den
-  vanliga jaren med en Boot-fatjar, som inte går att bero på som ett
-  vanligt Maven-bibliotek. Klassificeraren påverkar inte
-  `spring-boot:run` (körs mot `target/classes`), så Clever
-  Cloud-deployen är opåverkad.
-- Ingen Gherkin-täckning för den här modulen (dess JDBC-integration
-  testas inte av Cucumber-suiten) - verifiering av den fulla
-  import-/exportflödet sker manuellt mot en riktig databas, medan
-  radmappningslogiken (`WineRowParser`/`WineRowWriter`) har vanliga
-  JUnit-enhetstester.
-- Kolumnlayouten (A-V) delas mellan `WineRowParser` (läsning) och
-  `WineRowWriter` (skrivning) via paketsynliga `COL_*`-konstanter i
-  `WineRowParser` - en delad källa till sanning istället för att
-  duplicera kolumnindexen i två klasser.
-- Verktygen körs lokalt och pratar med Postgres-tillägget över
-  nätverket när de riktas mot produktion - Clever Cloud har inget
-  CLI/konsol att köra verktyget *på*, men det behövs inte heller.
+- Huvudapplikationens byggkonfiguration behövde en mindre justering
+  för att kunna paketeras på ett sätt som gick att bero på som ett
+  vanligt bibliotek, utan att påverka hur den vanliga driftmiljön
+  startar appen.
+- Ingen Gherkin-täckning för verktyget - verifiering av det fulla
+  import-/exportflödet skedde manuellt mot en riktig databas, medan
+  radmappningslogiken hade egna, vanliga enhetstester.
+- Kolumnlayouten delades mellan läsningen och skrivningen via en
+  gemensam källa till sanning istället för att duplicera kolumnindexen
+  i två klasser.
+- Verktygen kördes lokalt och pratade med produktionsdatabasen över
+  nätverket när de riktades mot produktion - driftmiljön har inget
+  sätt att köra ett sådant verktyg *på plats*, men det behövdes inte
+  heller.

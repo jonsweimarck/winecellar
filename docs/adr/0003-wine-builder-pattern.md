@@ -1,4 +1,4 @@
-# 0003: `Wine` byggs med Builder-mönster, inte positionell konstruktor
+# 0003: Domänobjekt byggs med ett namngivet konstruktionsmönster, inte en positionell konstruktor
 
 ## Status
 
@@ -6,27 +6,28 @@ Accepted (2026-07-17)
 
 ## Context
 
-`Wine` växte från sju fält till 23 i takt med att Excel-importen (se
-[0010](0010-excel-tool-standalone-module.md)) krävde att hela
-`Vinlista.xlsx`s kolumnuppsättning fick plats i domänmodellen. En
-positionell record-konstruktor med 23 parametrar är oläsbar på
-anropsplatsen och lätt att kasta om av misstag (två intilliggande
-`String`-fält i fel ordning ger inget kompilatorfel).
+Vinets datamodell växte från sju fält till 23 i takt med att
+Excel-importen (se [0010](0010-excel-tool-standalone-module.md))
+krävde att hela källfilens kolumnuppsättning fick plats i
+domänmodellen. En konstruktor med så många positionella parametrar är
+oläsbar på anropsplatsen och lätt att kasta om av misstag - två fält
+av samma typ i fel ordning ger inget fel vid kompilering.
 
 ## Decision
 
-`Wine` är fortfarande en Java `record`, men all konstruktion sker via
-`Wine.builder()...build()` (och `vin.toBuilder()...build()` för
-with-liknande ändringar), inte `new Wine(...)` direkt. Motsvarande
-mönster tillämpas på `WineEntity` (no-arg-konstruktor + paketprivata
-settrar istället för en lika lång positionell konstruktor).
+Domänobjektet är fortfarande en oföränderlig datatyp, men all
+konstruktion sker via ett namngivet, stegvis byggmönster (Builder) -
+varje fält sätts med sitt namn på anropsplatsen, inte via en lång
+parameterlista i en bestämd ordning. Ändring av ett redan byggt objekt
+sker genom att utgå från det befintliga objektets värden och bara
+ändra det som faktiskt ska ändras. Motsvarande mönster tillämpas i
+persistenslagrets motsvarande representation.
 
 ## Consequences
 
-- Varje fält sätts med namn på anropsplatsen (`.wineType(...)`,
-  `.vintage(...)` osv.), vilket gör både produktionskod och tester
-  läsbara trots antalet fält.
-- Ett nytt fält kräver en ny builder-metod, inte en ändring av alla
+- Varje fält namnges på anropsplatsen, vilket gör både produktionskod
+  och tester läsbara trots antalet fält.
+- Ett nytt fält kräver en ny byggmetod, inte en ändring av alla
   positionella anropsplatser i hela kodbasen.
-- `new Wine(...)` används medvetet ingenstans - konsekvent mönster,
-  inte en blandning av båda stilarna.
+- Mönstret tillämpas konsekvent - en blandning av byggmönster och
+  direkt konstruktion undviks medvetet.

@@ -1,58 +1,58 @@
-# 0009: Hela appen bakom HTTP Basic, med ett delat läsbehörighetskonto
+# 0009: Hela appen bakom inloggning, med ett delat läsbehörighetskonto
 
 ## Status
 
-Superseded av [0013](0013-multi-user-accounts.md) (2026-07-25, WINE-15) -
-HTTP Basic och de hårdkodade admin/readonly-kontona är borttagna till
-förmån för formulärbaserad inloggning med riktiga, självregistrerade
-konton. Kvar nedan som historik för varför den ursprungliga modellen såg
-ut som den gjorde.
+Superseded av [0013](0013-multi-user-accounts.md) (2026-07-25,
+WINE-15) - den ursprungliga inloggningsmodellen och de hårdkodade
+kontona är borttagna till förmån för formulärbaserad inloggning med
+riktiga, självregistrerade konton. Kvar nedan som historik för varför
+den ursprungliga modellen såg ut som den gjorde.
 
-Accepted (2026-07-12, readonly-kontot tillagt 2026-07-19)
+Accepted (2026-07-12, läskontot tillagt 2026-07-19)
 
 ## Context
 
-`roombooking` skyddade bara `/admin/**` och hade ett legitimt anonymt
-läsläge. `winecellar` har ingen separat publik läsvy - varje route låter
-i grunden en besökare ändra vinsamlingen, och appen var redan nåbar
-från det öppna nätet innan detta beslut togs.
+Systerprojektet `roombooking` skyddade bara en administrativ del av
+appen och hade ett legitimt anonymt läsläge. `winecellar` har ingen
+separat publik läsvy - varje del av appen låter i grunden en besökare
+ändra vinsamlingen, och appen var redan nåbar från det öppna nätet
+innan detta beslut togs.
 
 Ett behov uppstod senare av att kunna dela en "titta men inte
 ändra"-åtkomst utan att lämna ut adminlösenordet.
 
 ## Decision
 
-`SecurityConfig` kräver autentisering på **allt** (`.anyRequest().
-authenticated()` som fallback), inte bara en admin-del. Två konton:
+Appen kräver autentisering på allt, inte bara en administrativ del.
+Två konton fanns:
 
-- `admin`, lösenord från `WINECELLAR_ADMIN_PASSWORD` (miljövariabel i
-  produktion, `admin` bara som lokal default) - full åtkomst.
-- `readonly`/`readonly`, **hårdkodat** i `SecurityConfig` (inte en
-  miljövariabel) eftersom kontot medvetet är tänkt att vara ett känt,
-  delbart konto - inte en hemlighet. Får GET `/` och GET
-  `/wines/{id}/bild`, nekas allt annat (formulärsidornas GET-routes
-  inkluderat, inte bara POST/DELETE - annars går det att komma åt
-  "lägg till"/"redigera" genom att gissa på URL:en även om länken är
-  dold i UI:t).
+- Ett administratörskonto med fullständig åtkomst, med lösenord satt
+  via en miljövariabel i produktion.
+- Ett läskonto med ett känt, delbart lösenord (medvetet inte hemligt)
+  som bara fick titta på listan och se bilder, och nekades allt som
+  ändrar data - inklusive formulärsidorna för att lägga till/redigera,
+  inte bara själva sparandet, så att en besökare inte kunde komma åt
+  dem genom att gissa en webbadress även om länkarna var dolda i
+  gränssnittet.
 
-CSRF är avstängt globalt - htmx-formulären skickar ingen CSRF-token, och
-autentiseringen är stateless Basic-auth per anrop, inte en inloggad
-session CSRF-skyddet är till för.
+Skydd mot obehöriga tvärsideförfrågningar var avstängt globalt - det
+fanns ingen inloggad session av det slag ett sådant skydd är till för
+att skydda, bara en autentiseringsmetod som skickar med
+användaruppgifterna vid varje enskild förfrågan.
 
 ## Consequences
 
-- Ingen legitim anonym åtkomst finns eller behövs - varje avvikelse från
-  "kräv autentisering" måste motiveras explicit.
-- `WineController` sätter en `kanRedigera`-modellattribut som mallen
-  använder för att dölja adminfunktioner för READONLY - bara ett
-  UI-lager; den faktiska åtkomstkontrollen sitter i `SecurityConfig`
-  och gäller oavsett vad UI:t visar.
-- `@WebMvcTest`-slice-tester ser inte `SecurityConfig` automatiskt -
-  varje ny testklass måste importera den explicit
-  (`@Import(SecurityConfig.class)`), annars slår Spring Boots egen
-  slumpade standardsäkerhet in istället och redan gröna tester börjar
-  få 401.
-- Clever Cloud injicerar apparens miljövariabler även i byggsteget -
-  `@WebMvcTest`-klasser som hårdkodar testinloggning måste pinna
-  lösenordet explicit (`@TestPropertySource`) för att inte plocka upp
-  det riktiga produktionslösenordet under bygget.
+- Ingen legitim anonym åtkomst finns eller behövs - varje avvikelse
+  från "kräv autentisering" måste motiveras explicit.
+- Gränssnittet döljer adminfunktioner för läskontot - bara ett
+  visuellt lager; den faktiska åtkomstkontrollen sitter i
+  säkerhetskonfigurationen och gäller oavsett vad gränssnittet visar.
+- Webblagrets isolerade tester ser inte säkerhetskonfigurationen
+  automatiskt om den inte uttryckligen kopplas in - annars slår en
+  annan, oavsiktlig standardsäkerhet in istället och tester som borde
+  vara gröna börjar oväntat nekas.
+- Driftmiljön injicerar produktionens miljövariabler även i
+  byggsteget, inte bara vid körning - tester som hårdkodar
+  inloggningsuppgifter måste pinna sina egna testvärden explicit för
+  att inte råka plocka upp det riktiga produktionslösenordet under
+  bygget.

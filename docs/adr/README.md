@@ -26,18 +26,18 @@ Varje post följer samma enkla mall:
 |---|---|---|
 | [0001](0001-thin-domain-layer.md) | Tunt domänlager - ingen roombooking-stil skyddslogik | Accepted |
 | [0002](0002-responsive-list-dual-layout.md) | Responsiv vinlista via två layouter bakom en CSS-brytpunkt | Accepted |
-| [0003](0003-wine-builder-pattern.md) | `Wine` byggs med Builder-mönster, inte positionell konstruktor | Accepted |
-| [0004](0004-images-in-bytea.md) | Bilder lagras som `bytea` i Postgres, inte i objektlagring | Accepted |
+| [0003](0003-wine-builder-pattern.md) | Domänobjekt byggs med ett namngivet konstruktionsmönster, inte en positionell konstruktor | Accepted |
+| [0004](0004-images-in-bytea.md) | Bilder lagras i databasen, inte i extern objektlagring | Accepted |
 | [0005](0005-only-name-required.md) | Bara vinets namn är obligatoriskt | Superseded av [0016](0016-quantity-also-mandatory.md) |
-| [0006](0006-search-orchestration-in-application-layer.md) | Filtrering/sökning/sortering orkestreras i `WineService`, inte i controllern | Accepted |
-| [0007](0007-fulltext-search-tsvector.md) | Fritextsökning via en genererad `tsvector`-kolumn i Postgres | Accepted |
-| [0008](0008-filter-chips-plain-links.md) | Filterchips är vanliga länkar, inte htmx | Accepted |
-| [0009](0009-whole-app-http-basic-auth.md) | Hela appen bakom HTTP Basic, med ett delat läsbehörighetskonto | Superseded av [0013](0013-multi-user-accounts.md) |
-| [0010](0010-excel-tool-standalone-module.md) | Excel-import/export som en fristående Maven-modul | Superseded av [0014](0014-web-based-excel-import-export.md) |
+| [0006](0006-search-orchestration-in-application-layer.md) | Filtrering/sökning/sortering orkestreras i applikationslagret, inte i controllern | Accepted |
+| [0007](0007-fulltext-search-tsvector.md) | Fritextsökning via en beräknad sökkolumn i databasen | Accepted |
+| [0008](0008-filter-chips-plain-links.md) | Filterchips är vanliga länkar, inte dynamiskt uppdaterande | Accepted |
+| [0009](0009-whole-app-http-basic-auth.md) | Hela appen bakom inloggning, med ett delat läsbehörighetskonto | Superseded av [0013](0013-multi-user-accounts.md) |
+| [0010](0010-excel-tool-standalone-module.md) | Excel-import/export som ett fristående, separat verktyg | Superseded av [0014](0014-web-based-excel-import-export.md) |
 | [0011](0011-excel-image-roundtrip-dual-mechanism.md) | Excel-bildrundtripp via två oberoende mekanismer | Deprecated (WINE-32) |
-| [0012](0012-label-scanning-llm-integration.md) | Etikettskanning via Anthropic-API, port/adapter + RestClient | Accepted |
+| [0012](0012-label-scanning-llm-integration.md) | Etikettskanning via en extern LLM-tjänst, port/adapter + direkt REST-anrop | Accepted |
 | [0013](0013-multi-user-accounts.md) | Flera användare med egna, privata vinlistor | Accepted |
 | [0014](0014-web-based-excel-import-export.md) | Webbaserad Excel-import/export, scopead till inloggad användare | Accepted |
-| [0015](0015-bulk-import-images-lossy-jpeg.md) | Bulkimportens bilder skalas ned och komprimeras (JPEG, eller WebP/PNG vid transparens) - ingen bit-exakt rundtripp | Accepted |
+| [0015](0015-bulk-import-images-lossy-jpeg.md) | Bulkimportens bilder skalas ned och komprimeras - ingen bit-exakt rundtripp | Accepted |
 | [0016](0016-quantity-also-mandatory.md) | Antal flaskor blir obligatoriskt, precis som namnet | Accepted |
 | [0017](0017-login-triggered-temp-import-cleanup.md) | Övergivna temp-importmappar städas vid inloggning, inte via ett schema | Accepted |
