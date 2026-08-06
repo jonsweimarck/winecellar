@@ -20,6 +20,16 @@ Varje post följer samma enkla mall:
 - **Consequences** - vad beslutet faktiskt kostar/ger, inklusive
   avstådda alternativ.
 
+**Undvik rena programreferenser** (citerade metod-/klassnamn, exakta
+felmeddelanden, kod-/SQL-snuttar, filsökvägar) - beskriv resonemanget
+och avvägningen i ord istället för att peka ut en specifik rad kod som
+bevis. Arkitektur-/domänvokabulär som är själva sakfrågan i beslutet
+(t.ex. "en beräknad kolumn i databasen", "en ägarreferens per rad") är
+inte samma sak och får finnas kvar - det är skillnaden mellan att
+beskriva VAD som beslutades och att dokumentera HUR koden råkar se ut
+just nu (det senare hör hemma i `../devlog.md` eller i koden själv, se
+WINE-36).
+
 ## Register
 
 | ADR | Titel | Status |
