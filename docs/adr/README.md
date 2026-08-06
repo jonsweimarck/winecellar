@@ -4,10 +4,10 @@ Den här mappen samlar de arkitektur- och designbeslut som formar
 `winecellar` men som inte hör hemma i huvud-`README.md` (som beskriver
 nuläget, inte historiken bakom det). Varje ADR fångar **ett** beslut:
 vilket problem det löste, vad som valdes, vilka alternativ som
-övervägdes och vad valet kostar/ger. `CLAUDE.md` har en mer detaljerad,
-kronologisk logg (inklusive CSS-finjustering, enskilda buggfixar och
-annat som inte är arkitekturellt) - ADR:erna här är ett kurerat urval av
-det som faktiskt påverkar hur projektet är byggt.
+övervägdes och vad valet kostar/ger. `../devlog.md` har en mer
+detaljerad, kronologisk logg (inklusive CSS-finjustering, enskilda
+buggfixar och annat som inte är arkitekturellt) - ADR:erna här är ett
+kurerat urval av det som faktiskt påverkar hur projektet är byggt.
 
 ## Format
 
