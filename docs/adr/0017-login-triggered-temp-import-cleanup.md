@@ -8,30 +8,29 @@ Accepted (2026-07-28)
 
 WINE-24 (se [0014](0014-web-based-excel-import-export.md)) sparar en
 påbörjad imports uppladdade filer i en temporär mapp på disk mellan
-torrkörningen och commit-steget - bara en sökväg hålls i HTTP-sessionen,
-för att inte belasta serverminnet. Mappen städas idag bara om
-användaren faktiskt fullföljer importen (commit). En användare som
-aldrig bekräftar (stänger fliken, sessionen går ut) lämnar mappen
-kvarglömd på disk för alltid - ingen mekanism städar bort den.
+torrkörningen och commit-steget - bara en sökväg hålls i den
+tillfälliga sessionen, för att inte belasta serverminnet. Mappen
+städas idag bara om användaren faktiskt fullföljer importen (commit).
+En användare som aldrig bekräftar (stänger fliken, sessionen går ut)
+lämnar mappen kvarglömd på disk för alltid - ingen mekanism städar
+bort den.
 
 Två sätt att trigga en städning diskuterades:
 
-1. En schemalagd bakgrundsuppgift (t.ex. `@Scheduled`) som periodiskt
-   svepar igenom och tar bort gamla mappar, oavsett vad som händer i
-   övrigt i appen.
+1. En schemalagd bakgrundsuppgift som periodiskt svepar igenom och tar
+   bort gamla mappar, oavsett vad som händer i övrigt i appen.
 2. Piggyback på ett existerande, redan återkommande händelseflöde i
    appen - en inloggning - och låta DEN trigga samma svep.
 
 ## Decision
 
-Städningen triggas av en lyckad inloggning (via Spring Securitys
-publicerade autentiseringshändelse), inte av en egen schemalagd
-bakgrundsuppgift.
+Städningen triggas av en lyckad inloggning, inte av en egen
+schemalagd bakgrundsuppgift.
 
 Motivering: appen har redan ett naturligt, återkommande tillfälle där
 kod exekveras utan användarens aktiva medverkan i just det ögonblicket
-- en inloggning. Att haka på det tillfället undviker att introducera en
-helt ny sorts mekanism (bakgrundstråd med egen livscykel, eget
+- en inloggning. Att haka på det tillfället undviker att introducera
+en helt ny sorts mekanism (bakgrundstråd med egen livscykel, eget
 schema/intervall att underhålla) för ett lågriskproblem som bara
 handlar om diskstädning, inte korrekthet. Mapparna är inte knutna till
 en specifik användare, så en städning som triggas av VILKEN SOM HELST
