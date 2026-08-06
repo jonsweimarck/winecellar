@@ -8,6 +8,25 @@ kronologin (hur vi kom hit, inklusive avslutade återvändsgränder och
 verifieringssteg för enskilda YouTrack-stories) finns i @docs/devlog.md
 - den laddas inte automatiskt i en session, läs den vid behov.
 
+## Dokumentation
+
+Repot har fyra dokumentationslager med olika syften - blanda inte ihop
+dem:
+
+- **`README.md`** - nuläget för en människa som vill förstå/köra
+  projektet. Ingen historik.
+- **`CLAUDE.md`** (den här filen) - konventioner, nuläge per delsystem,
+  kända fällor. Laddas automatiskt i varje session.
+- **`docs/adr/`** - bindande arkitektur-/designbeslut, en fil per
+  beslut. Mall och skrivregler (bl.a. att undvika citerade metod-/
+  klassnamn, felmeddelanden och kodsnuttar i löptexten - tillagt
+  WINE-36, 2026-08-06, efter att ADR:erna hade driftat mot att bli
+  kod-dokumentation) finns i `docs/adr/README.md` - läs den innan du
+  skriver en ny ADR eller ändrar en befintlig.
+- **`docs/devlog.md`** - fullständig, kronologisk story-för-story-logg,
+  utbruten ur den här filen 2026-08-06. Laddas INTE automatiskt - läs
+  vid behov.
+
 ## Konventioner
 
 - Hexagonal lagerindelning (`domain/`, `application/`, `infrastructure/`,
