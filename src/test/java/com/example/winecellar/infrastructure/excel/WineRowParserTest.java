@@ -89,7 +89,8 @@ class WineRowParserTest {
         // Ingen namn-cell (kolumn 6) - motsvarar en ofullständig utkastrad i kalkylen.
 
         assertThatThrownBy(() -> parser.parse(row))
-                .isInstanceOf(WineRowParser.RowMissingRequiredFieldsException.class);
+                .isInstanceOf(WineRowParser.RowMissingRequiredFieldsException.class)
+                .hasMessage("Rad 2: Vinet måste ha ett namn");
     }
 
     @Test
@@ -101,7 +102,44 @@ class WineRowParserTest {
         // precis som namnet.
 
         assertThatThrownBy(() -> parser.parse(row))
-                .isInstanceOf(WineRowParser.RowMissingRequiredFieldsException.class);
+                .isInstanceOf(WineRowParser.RowMissingRequiredFieldsException.class)
+                .hasMessage("Rad 2: Vinet måste ha antal flaskor angivet");
+    }
+
+    @Test
+    void skaHoppaÖverRadSomSaknarBådeNamnOchAntal() {
+        Row row = rowWith(sheet -> {
+        });
+        writeCell(row, 0, "Rött");
+        writeCell(row, 1, "Frankrike");
+        writeCell(row, 5, "Domaine Fond Moiroux");
+        // Varken namn-cell (kolumn 6) eller antal-cell (kolumn 10) är ifylld.
+
+        assertThatThrownBy(() -> parser.parse(row))
+                .isInstanceOf(WineRowParser.RowMissingRequiredFieldsException.class)
+                .hasMessage("Rad 2: Vinet måste ha ett namn och antal flaskor angivet");
+    }
+
+    @Test
+    void skaKastaTydligtFelOmÅrgångInteKanTolkasSomTal() {
+        Row row = minimalRow();
+        writeCell(row, 7, "okänt");
+
+        assertThatThrownBy(() -> parser.parse(row))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Rad 2: kunde inte tolka årgång ur \"okänt\"");
+    }
+
+    @Test
+    void skaKastaTydligtFelOmAntalInteKanTolkasSomTal() {
+        Row row = rowWith(sheet -> {
+        });
+        writeCell(row, 6, "Ett vin");
+        writeCell(row, 10, "flera");
+
+        assertThatThrownBy(() -> parser.parse(row))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Rad 2: kunde inte tolka antal flaskor ur \"flera\"");
     }
 
     @Test

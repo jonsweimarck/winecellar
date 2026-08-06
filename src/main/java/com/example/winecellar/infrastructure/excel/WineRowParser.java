@@ -93,9 +93,9 @@ public final class WineRowParser {
      */
     public Wine parse(Row row) {
         String name = text(row, COL_NAME);
-        Integer quantity = integer(row, COL_QUANTITY);
+        Integer quantity = integer(row, COL_QUANTITY, "antal flaskor");
         if (name == null || quantity == null) {
-            throw new RowMissingRequiredFieldsException(row.getRowNum() + 1);
+            throw new RowMissingRequiredFieldsException(row.getRowNum() + 1, name == null, quantity == null);
         }
         String wineTypeText = text(row, COL_WINE_TYPE);
 
@@ -107,7 +107,7 @@ public final class WineRowParser {
                 .grapes(text(row, COL_GRAPES))
                 .producer(text(row, COL_PRODUCER))
                 .name(name)
-                .vintage(integer(row, COL_VINTAGE))
+                .vintage(integer(row, COL_VINTAGE, "årgång"))
                 .purchaseDate(date(row, COL_PURCHASE_DATE))
                 .price(price(row, COL_PRICE))
                 .quantity(quantity)
@@ -187,7 +187,7 @@ public final class WineRowParser {
         return dateTime.toLocalDate();
     }
 
-    private Integer integer(Row row, int col) {
+    private Integer integer(Row row, int col, String fieldName) {
         Cell cell = row.getCell(col);
         if (cell == null) {
             return null;
@@ -196,7 +196,15 @@ public final class WineRowParser {
             return (int) Math.round(cell.getNumericCellValue());
         }
         String text = dataFormatter.formatCellValue(cell).trim();
-        return text.isEmpty() ? null : Integer.parseInt(text);
+        if (text.isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(text);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "Rad " + (row.getRowNum() + 1) + ": kunde inte tolka " + fieldName + " ur \"" + text + "\"", e);
+        }
     }
 
     private String text(Row row, int col) {
@@ -209,8 +217,18 @@ public final class WineRowParser {
     }
 
     public static final class RowMissingRequiredFieldsException extends RuntimeException {
-        public RowMissingRequiredFieldsException(int rowNumber) {
-            super("Rad " + rowNumber + ": saknar namn och/eller antal flaskor - hoppas över");
+        public RowMissingRequiredFieldsException(int rowNumber, boolean missingName, boolean missingQuantity) {
+            super("Rad " + rowNumber + ": " + message(missingName, missingQuantity));
+        }
+
+        private static String message(boolean missingName, boolean missingQuantity) {
+            if (missingName && missingQuantity) {
+                return "Vinet måste ha ett namn och antal flaskor angivet";
+            }
+            if (missingName) {
+                return "Vinet måste ha ett namn";
+            }
+            return "Vinet måste ha antal flaskor angivet";
         }
     }
 }

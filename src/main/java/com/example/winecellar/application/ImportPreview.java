@@ -1,5 +1,7 @@
 package com.example.winecellar.application;
 
+import java.util.List;
+
 /**
  * Sammanfattningen av en torrkörning (WINE-24, se ADR 0014) - hur många
  * rader i den uppladdade filen som hoppas över (saknar namn, eller på
@@ -10,7 +12,7 @@ package com.example.winecellar.application;
  */
 public record ImportPreview(
         int totalRows,
-        int skippedRows,
+        List<RowIssue> issues,
         int fullDuplicates,
         int partialDuplicates,
         int clean) {

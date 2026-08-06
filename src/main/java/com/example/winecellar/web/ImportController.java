@@ -3,6 +3,8 @@ package com.example.winecellar.web;
 import com.example.winecellar.application.DuplicateCheck;
 import com.example.winecellar.application.ImportPreview;
 import com.example.winecellar.application.ImportPreviewService;
+import com.example.winecellar.application.RowCandidate;
+import com.example.winecellar.application.RowIssue;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.User.UserId;
@@ -81,17 +83,17 @@ public class ImportController {
             Model model, Authentication authentication, HttpServletRequest request) throws IOException {
         UserId owner = CurrentUser.owner(authentication, userRepository);
 
-        List<Wine> candidates = new ArrayList<>();
-        int skippedRows;
+        List<RowCandidate> candidates = new ArrayList<>();
+        List<RowIssue> issues = new ArrayList<>();
         try {
-            skippedRows = parseRows(fil.getInputStream(), candidates);
+            parseRows(fil.getInputStream(), candidates, issues);
         } catch (Exception e) {
             model.addAttribute("error", "Kunde inte tolka filen som en Excel-fil (\"" + WineRowWriter.SHEET_NAME
                     + "\"-fliken saknas, eller filen är skadad).");
             return "import";
         }
 
-        ImportPreview preview = importPreviewService.preview(candidates, skippedRows, owner);
+        ImportPreview preview = importPreviewService.preview(candidates, issues, owner);
 
         // En tidigare, aldrig committerad torrkörning i samma session (t.ex.
         // användaren laddade upp fel fil och försöker igen) får annars sin
@@ -131,17 +133,18 @@ public class ImportController {
         }
         Path tempDir = Path.of(pendingPath);
 
-        List<Wine> candidates = new ArrayList<>();
-        int skippedRows;
+        List<RowCandidate> candidates = new ArrayList<>();
+        List<RowIssue> issues = new ArrayList<>();
         try (InputStream in = Files.newInputStream(tempDir.resolve("data.xlsx"))) {
-            skippedRows = parseRows(in, candidates);
+            parseRows(in, candidates, issues);
         }
 
         Path imagesDir = tempDir.resolve("bilder");
         ImageMatcher imageMatcher = Files.isDirectory(imagesDir) ? new ImageMatcher(imagesDir) : null;
 
+        List<RowCandidate> unique = importPreviewService.excludeFileDuplicates(candidates, issues);
         ImportResult result = applyStrategyAndSave(
-                candidates, skippedRows, owner, fullDuplicateStrategy, partialDuplicateStrategy, imageMatcher);
+                unique, issues.size(), owner, fullDuplicateStrategy, partialDuplicateStrategy, imageMatcher);
 
         deleteRecursively(tempDir);
         request.getSession().removeAttribute(SESSION_KEY_PENDING_IMPORT_PATH);
@@ -151,22 +154,22 @@ public class ImportController {
     }
 
     private ImportResult applyStrategyAndSave(
-            List<Wine> candidates, int skippedRows, UserId owner,
+            List<RowCandidate> candidates, int skippedRows, UserId owner,
             FullDuplicateStrategy fullDuplicateStrategy, PartialDuplicateStrategy partialDuplicateStrategy,
             ImageMatcher imageMatcher) throws IOException {
         int imported = 0;
         int increased = 0;
         int skipped = skippedRows;
 
-        for (Wine candidate : candidates) {
-            DuplicateCheck check = wineService.checkForDuplicate(candidate, owner);
+        for (RowCandidate candidate : candidates) {
+            DuplicateCheck check = wineService.checkForDuplicate(candidate.wine(), owner);
             if (check instanceof DuplicateCheck.FullDuplicate full) {
                 if (fullDuplicateStrategy == FullDuplicateStrategy.OKA_ANTAL) {
                     // WINE-28: lägg till radens EGET antal, inte en hårdkodad
                     // +1 (som increaseQuantity ensam hade gett) - annars blir
                     // sluttalet fel så fort den importerade raden anger fler
                     // än en flaska.
-                    wineService.increaseQuantityBy(full.existing().id(), owner, candidate.quantity());
+                    wineService.increaseQuantityBy(full.existing().id(), owner, candidate.wine().quantity());
                     increased++;
                 } else {
                     skipped++;
@@ -174,17 +177,17 @@ public class ImportController {
             } else if (check instanceof DuplicateCheck.PartialDuplicate partial) {
                 switch (partialDuplicateStrategy) {
                     case OKA_ANTAL -> {
-                        wineService.increaseQuantityBy(partial.existing().id(), owner, candidate.quantity());
+                        wineService.increaseQuantityBy(partial.existing().id(), owner, candidate.wine().quantity());
                         increased++;
                     }
                     case LAGG_TILL_SOM_NYTT -> {
-                        saveWithImage(candidate, owner, imageMatcher);
+                        saveWithImage(candidate.wine(), owner, imageMatcher);
                         imported++;
                     }
                     case HOPPA_OVER -> skipped++;
                 }
             } else {
-                saveWithImage(candidate, owner, imageMatcher);
+                saveWithImage(candidate.wine(), owner, imageMatcher);
                 imported++;
             }
         }
@@ -211,10 +214,13 @@ public class ImportController {
      * mellan torrkörningen (läser från den uppladdade `MultipartFile`)
      * och commit-steget (läser samma fil tillbaka från temp-mappen) -
      * exakt samma tolkning måste ske båda gångerna.
+     *
+     * WINE-34: varje överhoppad rad sparas som ett {@link RowIssue} med
+     * det ursprungliga felmeddelandet, så att användaren ser exakt varför
+     * raden inte kunde importeras.
      */
-    private int parseRows(InputStream in, List<Wine> candidates) throws IOException {
+    private void parseRows(InputStream in, List<RowCandidate> candidates, List<RowIssue> issues) throws IOException {
         WineRowParser parser = new WineRowParser();
-        int skipped = 0;
         try (Workbook workbook = WorkbookFactory.create(in)) {
             Sheet sheet = workbook.getSheet(WineRowWriter.SHEET_NAME);
             if (sheet == null) {
@@ -224,14 +230,19 @@ public class ImportController {
                 if (row.getRowNum() == 0) {
                     continue;
                 }
+                int rowNumber = row.getRowNum() + 1;
                 try {
-                    candidates.add(parser.parse(row));
+                    Wine wine = parser.parse(row);
+                    candidates.add(new RowCandidate(rowNumber, wine));
                 } catch (RuntimeException e) {
-                    skipped++;
+                    String message = e.getMessage();
+                    if (message == null || message.isBlank()) {
+                        message = "Rad " + rowNumber + ": Raden gick inte att tolka. Kontrollera att kolumnerna stämmer.";
+                    }
+                    issues.add(new RowIssue(rowNumber, message));
                 }
             }
         }
-        return skipped;
     }
 
     private void deletePreviousPendingImport(HttpServletRequest request) throws IOException {
