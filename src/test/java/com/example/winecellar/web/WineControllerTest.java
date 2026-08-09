@@ -53,6 +53,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -253,6 +254,82 @@ class WineControllerTest {
     @Nested
     @DisplayName("startsidan")
     class Startsidan {
+
+        /**
+         * Källaren innehåller något som utgångsläge. Behövs sedan
+         * verktygsraden (sök/sortering/filter) döljs helt i en TOM
+         * källare - utan den här stubbningen returnerar listWines en tom
+         * lista, sidan renderar sitt tomma läge, och varje test som letar
+         * efter en kontroll i verktygsraden faller på något som egentligen
+         * bara var en ofullständig stubbning. Enskilda test som vill testa
+         * det tomma läget stubbar om metoden själva.
+         */
+        @BeforeEach
+        void källarenInnehållerViner() {
+            when(wineService.listWines(any())).thenReturn(List.of(BAROLO));
+        }
+
+        /**
+         * De två tomma lägena är HELT olika situationer och får därför
+         * inte visa samma text: en tom källare behöver en väg IN i appen,
+         * ett sökresultat utan träffar en väg TILLBAKA till hela listan.
+         */
+        @Test
+        @DisplayName("ska bjuda in till att lägga till det första vinet när källaren är tom")
+        void skaVisaInbjudandeTomtLägeNärKällarenÄrTom() throws Exception {
+            when(wineService.listWines(any())).thenReturn(List.of());
+            when(wineService.search(any(), any())).thenReturn(List.of());
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Källaren är tom"),
+                            containsString("href=\"/wines/nytt\""),
+                            containsString("href=\"/import\""),
+                            // Sök/sortering/filter är meningslösa utan data.
+                            not(containsString("name=\"search\"")),
+                            not(containsString("id=\"sort\""))
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska erbjuda att rensa filtren när sökningen inte gav några träffar")
+        void skaVisaIngaTräffarNärFiltretTömmerEnIckeTomKällare() throws Exception {
+            when(wineService.listWines(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of());
+
+            mockMvc.perform(get("/?search=finnsinte").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Inga viner matchar"),
+                            not(containsString("Källaren är tom")),
+                            // Verktygsraden MÅSTE finnas kvar här - annars
+                            // går sökningen inte att ta bort igen.
+                            containsString("name=\"search\"")
+                    )));
+        }
+
+        /**
+         * Simulerar EXAKT det läge sidan är i precis efter en redirect
+         * från "Lägg till"/"Spara" - flashAttr() lägger värdet i samma
+         * FlashMap-mekanism som RedirectAttributes.addFlashAttribute()
+         * skriver till, som Spring sedan automatiskt speglar in i
+         * Model:en för den här requesten. Utan det här testet bevisar
+         * ingenting att mallens `${feedback}` faktiskt renderar värdet -
+         * de två flash-testen ovan (i NärEttVinLäggsTill/NärEttVinRedigeras)
+         * bevisar bara att controllern SÄTTER attributet, inte att GET /
+         * visar det.
+         */
+        @Test
+        @DisplayName("ska visa återkopplingsmeddelandet som kom med via en redirect")
+        void skaVisaÅterkopplingsmeddelandeFrånRedirect() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .flashAttr("feedback", "Vin tillagt"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Vin tillagt")));
+        }
 
         @Test
         @DisplayName("ska lista befintliga viner och länka till formuläret för ett nytt vin")
@@ -870,6 +947,25 @@ class WineControllerTest {
                     .build());
         }
 
+        /**
+         * Måste vara ett FLASH-attribut, inte ett vanligt model-attribut:
+         * metoden redirectar till GET /, en helt ny request som inte ser
+         * det ursprungliga anropets Model. addFlashAttribute sparar värdet
+         * över redirecten (en request) och Spring lägger automatiskt in
+         * det i Model:en för nästa request - det är den mekanism
+         * vinkallare.html:s `${feedback}` förlitar sig på.
+         */
+        @Test
+        @DisplayName("ska sätta ett flash-meddelande som visas efter omdirigeringen")
+        void skaSättaFlashMeddelande() throws Exception {
+            mockMvc.perform(post("/wines")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "Barolo")
+                            .param("quantity", "3"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(flash().attribute("feedback", "Vin tillagt"));
+        }
+
         @Test
         @DisplayName("ska gå att lägga till ett vin med bara namnet ifyllt - antal faller tillbaka till 1, övriga fält blir null")
         void skaGåAttLäggaTillMedBaraNamnet() throws Exception {
@@ -1028,6 +1124,23 @@ class WineControllerTest {
                     .wineTypes(Set.of(WineType.RED))
                     .build(), null);
         }
+
+        /**
+         * Ingen redirect här (till skillnad från lägg till/redigera) -
+         * borttagningen renderar samma request direkt, så meddelandet är
+         * ett vanligt Model-attribut, inte ett flash-attribut. Verifierar
+         * mot det RENDERADE fragmentet, inte bara att metoden anropades -
+         * en trasig th:if i mallen hade annars inte upptäckts.
+         */
+        @Test
+        @DisplayName("ska visa ett bekräftelsemeddelande i det returnerade fragmentet")
+        void skaVisaBekräftelsemeddelande() throws Exception {
+            when(wineService.listWines(any())).thenReturn(List.of());
+
+            mockMvc.perform(delete("/wines/1").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("Vin borttaget")));
+        }
     }
 
     @Nested
@@ -1129,6 +1242,19 @@ class WineControllerTest {
                     .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
                     .location("Låda 2")
                     .build());
+        }
+
+        @Test
+        @DisplayName("ska sätta ett flash-meddelande som visas efter omdirigeringen")
+        void skaSättaFlashMeddelande() throws Exception {
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(BAROLO));
+
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "Barolo")
+                            .param("quantity", "3"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(flash().attribute("feedback", "Ändringar sparade"));
         }
 
         @Test

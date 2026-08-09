@@ -19,11 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import com.example.winecellar.support.SharedPostgres;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
@@ -35,18 +31,7 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
  * verifieras här mot en riktigt renderad sida i två viewport-bredder.
  */
 @SpringBootTest(webEnvironment = RANDOM_PORT)
-@Testcontainers
-class WineListResponsiveIT {
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
+class WineListResponsiveIT extends SharedPostgres {
 
     @LocalServerPort
     private int port;
@@ -185,6 +170,121 @@ class WineListResponsiveIT {
             assertThat(kort.locator("text=Redigera").isVisible()).isTrue();
             assertThat(kort.locator("text=Ta bort").isVisible()).isTrue();
         }
+    }
+
+    /**
+     * WINE-38: "Lägg till vin" som flytande rund knapp (FAB) på mobil
+     * istället för den vanliga radknappen som visas på desktop - se
+     * kommentaren vid `.knapp-lagg-till-fab` i vinkallare.html.
+     */
+    @Test
+    void skaVisaFabKnappenPåMobilOchDöljaDenVanligaKnappen() {
+        try (BrowserContext context = nyKontext(375, 667, true)) {
+            Page page = öppnaVinkällaren(context);
+
+            assertThat(page.locator(".knapp-lagg-till-fab").isVisible()).isTrue();
+            assertThat(page.locator(".knapp-lagg-till-desktop").isVisible()).isFalse();
+        }
+    }
+
+    @Test
+    void skaVisaDenVanligaKnappenPåDesktopOchDöljaFabKnappen() {
+        try (BrowserContext context = nyKontext(1280, 800, false)) {
+            Page page = öppnaVinkällaren(context);
+
+            assertThat(page.locator(".knapp-lagg-till-desktop").isVisible()).isTrue();
+            assertThat(page.locator(".knapp-lagg-till-fab").isVisible()).isFalse();
+        }
+    }
+
+    /**
+     * WINE-42: borttagning går en HELT ANNAN väg än lägg till/redigera -
+     * ingen redirect, htmx byter bara ut #vinlista-fragmentet direkt.
+     * Meddelandet är alltså ett vanligt Model-attribut, inte ett
+     * flash-attribut, och tonas bort via htmx:afterSwap-lyssnaren i
+     * stället för DOMContentLoaded. Ingen av de två mekanismerna
+     * verifieras av VinFormularITs motsvarande test (som bara täcker
+     * lägg-till-vägen) - de kan gå sönder oberoende av varandra.
+     */
+    @Test
+    void skaVisaOchTonaBortEnBekräftelseEfterAttEttVinTagitsBort() {
+        try (BrowserContext context = nyKontext(1280, 800, false)) {
+            Page page = öppnaVinkällaren(context);
+
+            page.locator("#vinlista-tabell").locator("text=Ta bort").click();
+            page.waitForSelector(".toast");
+
+            // trim(): textContent() tar med whitespacen runt ikon-SVG:n
+            // och textspannet i markupen, se motsvarande kommentar i
+            // VinFormularIT.
+            assertThat(page.locator(".toast").textContent().trim()).isEqualTo("Vin borttaget");
+            assertThat(page.locator(".toast").getAttribute("class")).doesNotContain("toast-dold");
+
+            page.waitForTimeout(3300);
+            assertThat(page.locator(".toast").getAttribute("class")).contains("toast-dold");
+        }
+    }
+
+    /**
+     * WINE-41: verktygsraden tog 217px på en 812px-skärm innan första
+     * vinet syntes. Testet låser inte en exakt höjd (det skulle gå sönder
+     * vid varje smärre justering) utan de två strukturella besluten som
+     * ger komprimeringen: sökfältet får en egen full rad, och sortering
+     * och riktning delar den nästa. Faller något av dem tillbaka till
+     * staplade helbreddskontroller växer raden igen utan att någon
+     * märker det.
+     */
+    @Test
+    void skaHållaVerktygsradenKompaktPåMobil() {
+        try (BrowserContext context = nyKontext(375, 812, true)) {
+            Page page = öppnaVinkällaren(context);
+
+            assertThat(bredd(page, "#search")).isGreaterThan(300);
+            assertThat(överkant(page, "#sort")).isEqualTo(överkant(page, "#direction"));
+            assertThat(överkant(page, "#sort")).isGreaterThan(överkant(page, "#search"));
+
+            // Sökfältets etikett döljs visuellt men måste finnas kvar för
+            // skärmläsare - tas den bort helt blir fältet omärkt.
+            assertThat(page.locator(".sok-grupp label").textContent()).isNotBlank();
+        }
+    }
+
+    /**
+     * En tom källare och ett sökresultat utan träffar är HELT skilda
+     * situationer: den första behöver en väg in i appen, den andra en väg
+     * tillbaka till hela listan. Verktygsraden döljs bara i det första
+     * fallet - göms den i det andra går sökningen inte att ta bort igen.
+     */
+    @Test
+    void skaVisaEnInbjudanIStalletForVerktygsradNarKallarenArTom() {
+        wineService.listWines(testkontoId).forEach(vin -> wineService.removeWine(vin.id(), testkontoId));
+
+        try (BrowserContext context = nyKontext(375, 812, true)) {
+            Page page = öppnaVinkällaren(context);
+
+            assertThat(page.locator(".tomt-lage").textContent()).contains("Källaren är tom");
+            assertThat(page.locator("form[hx-get]").count()).isZero();
+            assertThat(page.locator(".tomt-lage a[href='/wines/nytt']").isVisible()).isTrue();
+        }
+    }
+
+    @Test
+    void skaBehållaVerktygsradenNärSökningenSaknarTräffar() {
+        try (BrowserContext context = nyKontext(375, 812, true)) {
+            Page page = context.newPage();
+            page.navigate("http://localhost:" + port + "/?search=finnsdefinitivtinte");
+
+            assertThat(page.locator(".tomt-lage").textContent()).contains("Inga viner matchar");
+            assertThat(page.locator("form[hx-get]").count()).isOne();
+        }
+    }
+
+    private int bredd(Page page, String väljare) {
+        return (int) page.locator(väljare).boundingBox().width;
+    }
+
+    private int överkant(Page page, String väljare) {
+        return (int) page.locator(väljare).boundingBox().y;
     }
 
     /**

@@ -44,6 +44,13 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(requests -> requests
+                        // Statiska resurser måste vara öppna: de behövs av
+                        // login- och registreringssidan, som per definition
+                        // renderas för en ANONYM besökare. Utan den här raden
+                        // träffas de av anyRequest().authenticated() nedan och
+                        // omdirigeras till /login - inloggningssidan hade då
+                        // renderats helt ostylad (WINE-39).
+                        .requestMatchers("/css/**", "/js/**").permitAll()
                         .requestMatchers("/registrera").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(form -> form

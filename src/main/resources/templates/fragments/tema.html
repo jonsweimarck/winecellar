@@ -1,0 +1,31 @@
+<!--
+    Delat <head>-innehåll för temat (WINE-39): stilmallen plus det lilla
+    skript som sätter valt tema.
+
+    Skriptet MÅSTE ligga i <head>, före sidans innehåll, och köras
+    synkront (inget defer/async): det sätter `data-tema` på <html> INNAN
+    webbläsaren målar första bildrutan. Läggs det i slutet av <body>
+    hinner sidan målas i ljust läge först och blinkar sedan om till
+    mörkt vid varje sidladdning ("flash of unstyled theme").
+
+    Tre lägen: "ljust", "mork" och "auto" (följer operativsystemets
+    inställning via prefers-color-scheme, se tema.css). Saknas ett sparat
+    val gäller "auto" - appen ska följa systemet tills användaren
+    uttryckligen väljer något annat i Inställningar.
+-->
+<th:block th:fragment="tema">
+    <link rel="stylesheet" th:href="@{/css/tema.css}">
+    <script th:inline="none">
+        (function () {
+            var valt = null;
+            try {
+                valt = localStorage.getItem('winecellar-tema');
+            } catch (e) {
+                // localStorage kan kasta i privat läge/med blockerade
+                // cookies - då gäller "auto", inte ett kraschat skript
+                // som lämnar sidan helt otemad.
+            }
+            document.documentElement.setAttribute('data-tema', valt || 'auto');
+        })();
+    </script>
+</th:block>

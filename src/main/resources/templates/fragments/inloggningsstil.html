@@ -1,0 +1,20 @@
+<!--
+    Delad stil för de två anonyma sidorna (inloggning och registrering).
+    De är varandras spegelbild - samma centrerade kort, samma apptitel,
+    samma fullbreddsknapp - och hade annars behövt exakt samma regler
+    kopierade i båda filerna.
+
+    Ligger som ett fragment i stället för i tema.css eftersom det bara
+    är de här två sidorna som har den här layouten; tema.css bär det som
+    delas av HELA appen.
+-->
+<th:block th:fragment="inloggningsstil">
+    <style>
+        .inloggningssida { max-width: 22rem; margin: 15vh auto 3rem; padding: 0 1rem; }
+        .apptitel { text-align: center; margin: 0 0 1.5rem; }
+        .knapp-bred { width: 100%; }
+        .fel { color: var(--fel); margin-top: 1rem; text-align: center; }
+        .info { color: var(--text-dampad); margin-top: 1rem; text-align: center; }
+        .lank { margin-top: 1.5rem; text-align: center; font-size: 0.9rem; }
+    </style>
+</th:block>

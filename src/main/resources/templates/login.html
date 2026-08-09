@@ -4,32 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Logga in - Vinkällaren</title>
-    <style>
-        body { font-family: sans-serif; max-width: 24rem; margin: 6rem auto; padding: 0 1rem; }
-        label { display: block; margin-top: 0.75rem; }
-        input { width: 100%; padding: 0.4rem; box-sizing: border-box; }
-        button { margin-top: 1.25rem; padding: 0.5rem 1rem; }
-        .fel { color: #a4262c; margin-top: 1rem; }
-        .info { color: #333; margin-top: 1rem; }
-        .lank { margin-top: 1.5rem; }
-    </style>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <th:block th:replace="~{fragments/inloggningsstil :: inloggningsstil}"></th:block>
 </head>
 <body>
-    <h1>Logga in</h1>
+    <main class="inloggningssida">
+        <h1 class="apptitel">Vinkällaren</h1>
 
-    <p class="fel" th:if="${param.error}">Fel användarnamn eller lösenord.</p>
-    <p class="info" th:if="${param.logout}">Du är utloggad.</p>
+        <!-- Formuläret ligger UTANFÖR kortet, inte inuti: fältens
+             skiljelinjer styrs av att de är kortets direkta barn (se
+             .kort > .falt i tema.css), och ett mellanliggande <form>
+             hade brutit den relationen. Samma struktur som
+             vinformuläret. -->
+        <form method="post" th:action="@{/login}">
+            <div class="kort">
+                <label class="falt"><span>Användarnamn</span>
+                    <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus">
+                </label>
+                <label class="falt"><span>Lösenord</span>
+                    <input type="password" id="password" name="password" autocomplete="current-password">
+                </label>
+                <div class="falt">
+                    <button type="submit" class="knapp-bred">Logga in</button>
+                </div>
+            </div>
+        </form>
 
-    <form method="post" th:action="@{/login}">
-        <label for="username">Användarnamn</label>
-        <input type="text" id="username" name="username" autofocus="autofocus">
+        <p class="fel" th:if="${param.error}">Fel användarnamn eller lösenord.</p>
+        <p class="info" th:if="${param.logout}">Du är utloggad.</p>
 
-        <label for="password">Lösenord</label>
-        <input type="password" id="password" name="password">
-
-        <button type="submit">Logga in</button>
-    </form>
-
-    <p class="lank"><a th:href="@{/registrera}">Inget konto än? Registrera dig</a></p>
+        <p class="lank"><a th:href="@{/registrera}">Inget konto än? Registrera dig</a></p>
+    </main>
 </body>
 </html>

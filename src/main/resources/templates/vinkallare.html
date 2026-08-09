@@ -6,6 +6,7 @@
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
     <script src="https://unpkg.com/htmx.org@2.0.2"></script>
     <script>
         // CSRF slogs på igen i samband med WINE-12 (formulärinloggning med
@@ -19,49 +20,86 @@
             const header = document.querySelector('meta[name="_csrf_header"]').content;
             event.detail.headers[header] = token;
         });
+
+        // Tonar bort återkopplingsbrickan (Vin tillagt/sparat/borttaget)
+        // efter några sekunder. Måste triggas explicit efter en htmx-swap,
+        // inte bara vid sidladdning - htmx exekverar inte nya
+        // <script>-taggar i utbytt innehåll, så ett inline-skript i
+        // fragmentet hade aldrig körts efter "Ta bort". Ett kvarglömt
+        // element (JS avstängt) är ofarligt - det försvinner vid nästa
+        // render ändå.
+        //
+        // Söker alltid i HELA document, inte i event.detail.target:
+        // hx-swap="outerHTML" ersätter target-elementet självt, och
+        // event.detail.target är då inte en pålitlig referens till det
+        // NYA innehållet som faktiskt sitter i DOM:en (verifierat - gav
+        // en toast som aldrig tonades bort). .toast finns bara inuti
+        // #vinlista-fragmentet ändå, så en dokumentbred sökning är
+        // ofarlig.
+        function tonaBortToast() {
+            const toast = document.querySelector('.toast');
+            if (toast) {
+                setTimeout(() => toast.classList.add('toast-dold'), 3000);
+            }
+        }
+        // document, inte document.body: skriptet körs synkront i <head>,
+        // innan <body> finns i DOM:en - ett direkt anrop på body hade
+        // kastat ett fel redan vid sidladdning. htmx:afterSwap bubblar
+        // upp till document precis som configRequest ovan gör.
+        document.addEventListener('DOMContentLoaded', tonaBortToast);
+        document.addEventListener('htmx:afterSwap', tonaBortToast);
     </script>
     <style>
-        body { font-family: sans-serif; max-width: 70rem; margin: 3rem auto; }
+        body { max-width: 70rem; margin: 3rem auto; }
         label { display: block; margin-top: 0.75rem; }
-        input, select { width: 100%; padding: 0.4rem; box-sizing: border-box; }
-        button { padding: 0.4rem 0.8rem; }
-        .knapp { display: inline-block; text-decoration: none; color: inherit; border: 1px solid #999; border-radius: 0.25rem; padding: 0.6rem 1rem; }
+        input, select { width: 100%; }
+
+        .topprad { justify-content: space-between; gap: 1rem; }
 
         .verktygsrad { display: flex; gap: 1.5rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1.25rem; }
         .falt-grupp { display: flex; flex-direction: column; gap: 0.3rem; }
-        .falt-grupp label { margin: 0; font-size: 0.85rem; color: #767676; }
+        .falt-grupp label { margin: 0; font-size: 0.85rem; color: var(--text-dampad); }
         .falt-grupp select { width: auto; padding: 0.4rem 0.5rem; }
         .sok-grupp { flex: 1 1 20rem; }
         .sok-grupp input { padding: 0.4rem 0.6rem; }
 
-        .filterpanel { margin-top: 1rem; border: 1px solid #ddd; border-radius: 0.5rem; }
-        .filterpanel > summary { cursor: pointer; padding: 0.75rem 1rem; font-weight: bold; list-style: none; }
+        .filterpanel { margin-top: 1rem; border: 1px solid var(--ram); border-radius: var(--radie-stor); }
+        .filterpanel > summary { cursor: pointer; padding: 0.75rem 1rem; font-weight: 600; list-style: none; }
         .filterpanel > summary::-webkit-details-marker { display: none; }
         .filterpanel > summary::before { content: "▸ "; }
         .filterpanel[open] > summary::before { content: "▾ "; }
-        .antal-badge { background: #333; color: #fff; font-size: 0.75rem; border-radius: 1rem; padding: 0.1rem 0.5rem; margin-left: 0.3rem; }
+        .antal-badge { background: var(--accent); color: var(--pa-accent); font-size: 0.75rem; border-radius: 1rem; padding: 0.1rem 0.5rem; margin-left: 0.3rem; }
 
         .filterinnehall { padding: 0 1rem 1rem; display: flex; gap: 2.5rem; flex-wrap: wrap; }
         .filterinnehall fieldset { border: none; padding: 0; margin: 0; min-width: 10rem; }
-        .filterinnehall legend { font-weight: bold; font-size: 0.85rem; padding: 0 0 0.5rem; }
+        .filterinnehall legend { font-weight: 600; font-size: 0.85rem; padding: 0 0 0.5rem; }
         .kryssrad { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.3rem; font-weight: normal; cursor: pointer; }
         .kryssrad input { width: auto; margin: 0; }
 
         .ursprung-tree, .ursprung-tree ul { list-style: none; margin: 0; padding: 0; }
-        .ursprung-tree ul { padding-left: 1.25rem; margin-top: 0.3rem; margin-left: 0.4rem; border-left: 1px dashed #ddd; }
+        .ursprung-tree ul { padding-left: 1.25rem; margin-top: 0.3rem; margin-left: 0.4rem; border-left: 1px dashed var(--ram); }
         .ursprung-tree details { margin-top: 0.2rem; }
-        .ursprung-tree details > summary { cursor: pointer; font-size: 0.8rem; color: #767676; list-style: none; }
+        .ursprung-tree details > summary { cursor: pointer; font-size: 0.8rem; color: var(--text-dampad); list-style: none; }
         .ursprung-tree details > summary::-webkit-details-marker { display: none; }
         .ursprung-tree details > summary::before { content: "▸ "; }
         .ursprung-tree details[open] > summary::before { content: "▾ "; }
 
-        .filter-atgarder { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid #eee; }
+        .filter-atgarder { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid var(--ram-svag); }
 
-        .traffrad { color: #767676; font-size: 0.9rem; margin: 0.75rem 0.1rem 0; }
+        .traffrad { color: var(--text-dampad); font-size: 0.9rem; margin: 0.75rem 0.1rem 0; }
+
+        /* Tomt läge: centrerat, luftigt och med en väg vidare - inte en
+           ursäkt. Ikonen är dämpad så den inte konkurrerar med knappen,
+           som är det användaren faktiskt ska göra härnäst. */
+        .tomt-lage { text-align: center; padding: 3.5rem 1rem; color: var(--text-dampad); }
+        .tomt-lage svg { color: var(--text-svag); }
+        .tomt-lage h2 { margin: 1rem 0 0.35rem; color: var(--text); }
+        .tomt-lage p { margin: 0; }
+        .tomt-lage-atgarder { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem; }
 
         .chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0.1rem 0; }
-        .chip { display: inline-block; background: #f0f0f0; border: 1px solid #ddd; border-radius: 1rem; padding: 0.2rem 0.65rem; font-size: 0.8rem; color: #333; text-decoration: none; }
-        .chip:hover { background: #e5e5e5; }
+        .chip { display: inline-block; background: var(--yta-3); border: 1px solid var(--ram); border-radius: 1rem; padding: 0.2rem 0.65rem; font-size: 0.8rem; color: var(--text); text-decoration: none; }
+        .chip:hover { background: var(--yta-hover); }
 
         /* Breda kort på desktop, smala kort på mobil - #vinlista-tabell
            heter fortfarande "tabell" av historiska skäl (det var en
@@ -74,6 +112,7 @@
            skärmar utan att svämma över. Se WineListResponsiveIT som
            verifierar att bara en av vyerna är synlig åt gången. */
         .vinlista-kort { display: none; }
+        .knapp-lagg-till-fab { display: none; }
         @media (max-width: 960px) {
             .vinlista-tabell { display: none; }
             .vinlista-kort { display: block; }
@@ -88,10 +127,73 @@
                innanför max-width och riskerat att de fasta
                18rem-betygskolumnerna inte längre får plats. */
             body { padding: 0 1rem; }
+
+            /* Verktygsraden tog 217px (46% av en 812px-skärm) innan
+               första vinet syntes - uppmätt, inte uppskattat. Tre saker
+               krymper den utan att någon kontroll försvinner:
+               sökfältets etikett döljs (platshållaren säger redan samma
+               sak, etiketten finns kvar för skärmläsare), sorterings-
+               etiketterna flyttar från ovanför till bredvid sin
+               kontroll, och avstånden dras in.
+
+               Kontrollerna FLYTTAS medvetet inte in i filterpanelen:
+               ett fält kan bara ligga på ett ställe i DOM:en - två
+               kopior med samma `name` hade skickat två värden - och en
+               JS-lösning som flyttar noden vid brytpunkten gör layouten
+               beroende av att skriptet hinner köra. */
+            .verktygsrad { gap: 0.6rem 0.75rem; margin-top: 1rem; align-items: center; }
+            /* min-width: 0 behövs på SJÄLVA gruppen, inte bara på select:en
+               inuti: ett flex-item har min-width: auto som standard och
+               vägrar krympa under sitt innehålls naturliga bredd. En
+               <select> är så bred som sitt längsta alternativ
+               ("Munskänkarnas betyg"), vilket annars tvingar de två
+               grupperna till var sin rad. */
+            .falt-grupp { flex: 1 1 0; min-width: 0; flex-direction: row; align-items: center; gap: 0.4rem; }
+            .falt-grupp label { font-size: 0.8rem; white-space: nowrap; }
+            .falt-grupp select { flex: 1; min-width: 0; }
+            /* MÅSTE stå efter .falt-grupp: sökfältet bär BÅDA klasserna
+               (falt-grupp sok-grupp) och reglerna har samma specificitet,
+               så den sist deklarerade vinner. Med omvänd ordning kramas
+               sökfältet ihop till en tumnagel av .falt-grupps flex-basis. */
+            .sok-grupp { flex: 1 1 100%; }
+            .sok-grupp label {
+                position: absolute; width: 1px; height: 1px;
+                overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap;
+            }
+            .filterpanel { margin-top: 0.75rem; }
+            .filterpanel > summary { padding: 0.6rem 0.85rem; }
+
+            /* Samma "Lägg till vin"-handling, men som en flytande
+               rund knapp (FAB) nere till höger på mobil istället för en
+               vanlig radknapp - ett bekant native-mönster (jämför iOS/
+               Android) för appens vanligaste handling, och kräver ingen
+               plats i den redan trånga mobila verktygsraden. Två skilda
+               element (som vinlista-tabell/vinlista-kort ovan) istället
+               för att omforma EN länk via brytpunkten - enklare att
+               resonera om och att verifiera separat i
+               WineListResponsiveIT. Färgen är designsystemets accent
+               (--accent, se tema.css) - samma som flaskbadgen. */
+            .knapp-lagg-till-desktop { display: none; }
+            .knapp-lagg-till-fab {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: fixed;
+                right: 1.25rem;
+                bottom: 1.25rem;
+                width: 3.5rem;
+                height: 3.5rem;
+                border-radius: 50%;
+                background: var(--accent);
+                color: var(--pa-accent);
+                box-shadow: 0 2px 6px var(--skugga);
+                z-index: 10;
+            }
         }
         .vinkort {
             position: relative;
-            border: 1px solid #ddd;
+            border: 1px solid var(--ram);
+            background: var(--yta-2);
             border-radius: 0.5rem;
             padding: 1rem;
             margin-top: 1rem;
@@ -110,8 +212,8 @@
         /* Samma dämpade label-stil som de breda korten (.vk-label/
            .vk-value nedan) - inte fetstil/vanlig text som tidigare,
            så båda vyerna ser likadana ut oavsett skärmstorlek. */
-        .vinkort-betyg .betyg-label { display: block; font-size: 0.78rem; color: #767676; font-weight: 400; margin-bottom: 0.15rem; }
-        .vinkort-betyg .betyg-varde { display: block; font-size: 0.95rem; color: #1a1a1a; line-height: 1.4; }
+        .vinkort-betyg .betyg-label { display: block; font-size: 0.78rem; color: var(--text-dampad); font-weight: 400; margin-bottom: 0.15rem; }
+        .vinkort-betyg .betyg-varde { display: block; font-size: 0.95rem; color: var(--text); line-height: 1.4; }
         .vinkort details { margin-top: 0.75rem; }
         .vinkort summary { text-decoration: underline; font-weight: normal; cursor: pointer; }
         .vinkort dl {
@@ -120,8 +222,8 @@
             gap: 0.25rem 1rem;
             margin: 0.5rem 0;
         }
-        .vinkort dt { font-size: 0.78rem; color: #767676; font-weight: 400; }
-        .vinkort dd { margin: 0; font-size: 0.95rem; color: #1a1a1a; line-height: 1.4; }
+        .vinkort dt { font-size: 0.78rem; color: var(--text-dampad); font-weight: 400; }
+        .vinkort dd { margin: 0; font-size: 0.95rem; color: var(--text); line-height: 1.4; }
 
         /* Ordningen på Detaljer-fälten och "etikett ovanför värde" för de
            tre sista gäller bara kortvyn (liten skärm) - satt via CSS
@@ -141,6 +243,19 @@
         .vinkort dl .fd-annan-referens { order: 90; grid-column: 1 / -1; }
 
         .detalj-atgarder { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
+        /* "Ta bort" ska INTE ärva den fyllda accentknappen från tema.css:
+           dels är accenten reserverad för den primära handlingen (Lägg
+           till vin), dels upprepas den här knappen en gång per vinkort -
+           en vägg av fyllda knappar drar blicken till just det man minst
+           vill råka klicka på. Dämpad ram + felfärgad text i stället. */
+        .detalj-atgarder button {
+            background: transparent;
+            border: 1px solid var(--ram);
+            color: var(--fel);
+            padding: 0.35rem 0.7rem;
+            font-size: 0.9rem;
+        }
+        .detalj-atgarder button:hover { background: var(--fel-yta); border-color: var(--fel-ram); }
 
         .flaskor-badge {
             position: absolute;
@@ -152,16 +267,16 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #333;
-            color: #fff;
+            background: var(--accent);
+            color: var(--pa-accent);
             font-weight: bold;
             font-size: 0.85rem;
             border-radius: 50%;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 1px 3px var(--skugga);
         }
 
-        .vinbild-kort { width: 100%; max-height: 12rem; object-fit: contain; background: #f0f0f0; border-radius: 0.5rem; display: block; }
-        .vinbild-saknas { color: #999; font-size: 0.85rem; }
+        .vinbild-kort { width: 100%; max-height: 12rem; object-fit: contain; background: var(--yta-3); border-radius: var(--radie-stor); display: block; }
+        .vinbild-saknas { color: var(--text-svag); font-size: 0.85rem; }
 
         /* Breda kort (desktop, >960px) - ersätter den tidigare
            tabell-layouten (se WineListResponsiveIT/CLAUDE.md för historiken).
@@ -186,8 +301,9 @@
            Inköpsdatums kolumn om Inköpsdatum råkar saknas för ett vin. */
         .vinkort-bred {
             position: relative;
-            border: 1px solid #ddd;
-            border-radius: 0.5rem;
+            border: 1px solid var(--ram);
+            background: var(--yta-2);
+            border-radius: var(--radie-stor);
             padding: 1.25rem 1.5rem 1.5rem;
             margin-top: 1rem;
         }
@@ -237,12 +353,12 @@
         .vk-bildyta img {
             position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
             object-position: center bottom;
-            border-radius: 0.25rem; background: #f0f0f0; display: block;
+            border-radius: var(--radie); background: var(--yta-3); display: block;
         }
         .vk-bildplatshallare {
-            position: absolute; inset: 0; border-radius: 0.25rem; background: #f0f0f0;
+            position: absolute; inset: 0; border-radius: var(--radie); background: var(--yta-3);
             display: flex; align-items: center; justify-content: center;
-            color: #999; font-size: 0.7rem; text-align: center; padding: 0 0.2rem;
+            color: var(--text-svag); font-size: 0.7rem; text-align: center; padding: 0 0.2rem;
         }
         .vk-text { grid-column: 2; grid-row: 1; }
         .vk-text p { margin: 0.15rem 0 0; }
@@ -253,11 +369,11 @@
         .vk-munskankarna { grid-column: 3; grid-row: 2; }
         .vk-egetbetyg { grid-column: 4; grid-row: 2; }
 
-        .vk-label { display: block; font-size: 0.78rem; color: #767676; font-weight: 400; margin-bottom: 0.15rem; }
-        .vk-value { display: block; font-size: 0.95rem; color: #1a1a1a; line-height: 1.4; }
+        .vk-label { display: block; font-size: 0.78rem; color: var(--text-dampad); font-weight: 400; margin-bottom: 0.15rem; }
+        .vk-value { display: block; font-size: 0.95rem; color: var(--text); line-height: 1.4; }
 
         .vk-info-rad, .vk-text-rad, .vk-referens-rad {
-            margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #eee;
+            margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--ram-svag);
         }
         .vk-inkopsdatum { grid-column: 1; }
         .vk-pris { grid-column: 2; }
@@ -269,18 +385,29 @@
     </style>
 </head>
 <body>
-    <h1>Vinkällaren</h1>
+    <div th:replace="~{fragments/topprad :: topprad('Vinkällaren', null)}"></div>
 
-    <a class="knapp" href="/wines/nytt">Lägg till vin</a>
-    <a class="knapp" href="/import">Importera från Excel</a>
-    <a class="knapp" href="/export/xlsx">Exportera till Excel</a>
-    <a class="knapp" href="/export/bilder.zip">Exportera bilder (zip)</a>
+    <a class="knapp knapp-lagg-till-desktop" href="/wines/nytt">Lägg till vin</a>
+    <a class="knapp-lagg-till-fab" href="/wines/nytt" aria-label="Lägg till vin" title="Lägg till vin">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.25"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+        </svg>
+    </a>
 
-    <form method="post" th:action="@{/logout}" style="display: inline">
-        <button type="submit" class="knapp">Logga ut</button>
-    </form>
+    <!-- Verktygsraden döljs helt i en tom källare: sökfält, sortering och
+         filter är meningslösa utan data, och en förstagångsanvändare möts
+         annars av sex kontroller innan hen har ett enda vin. Villkoret är
+         totalCount (ofiltrerat), inte wines - ett sökresultat utan träffar
+         MÅSTE behålla raden, annars går filtret inte att ta bort igen.
 
-    <form hx-get="/" hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
+         Ligger utanför htmx-fragmentet, så raden dyker upp/försvinner
+         först vid nästa hela sidladdning - inte direkt när det sista
+         vinet tas bort. Medveten avvägning: att swappa hela sidan för det
+         vore en klar överreaktion. -->
+    <form th:if="${totalCount > 0}"
+          hx-get="/" hx-target="#vinlista" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true">
         <div class="verktygsrad">
             <div class="falt-grupp sok-grupp">
                 <label for="search">Sök</label>
@@ -389,10 +516,61 @@
     </th:block>
 
     <div id="vinlista" th:fragment="lista">
-        <p class="traffrad">Visar <strong th:text="${wines.size()}"></strong> av <span th:text="${totalCount}"></span> viner</p>
+        <!-- Ett server-genererat, nytt element per render - inte en
+             JS-skapad toast. Fungerar därför identiskt oavsett om det
+             kommer via en hel sidladdning (Lägg till/Spara, som
+             redirectar hit) eller en htmx-swap av bara det här
+             fragmentet (Ta bort). "feedback" sätts av respektive
+             controllermetod - via addFlashAttribute för de två som
+             redirectar (annars vore attributet borta redan vid GET /:s
+             egen request), direkt på Model för Ta bort (samma request,
+             ingen redirect inblandad). -->
+        <p class="toast" th:if="${feedback != null}" role="status">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>
+            <span th:text="${feedback}"></span>
+        </p>
+
+        <p class="traffrad" th:if="${!wines.isEmpty()}">Visar <strong th:text="${wines.size()}"></strong> av <span th:text="${totalCount}"></span> viner</p>
 
         <div class="chips" th:if="${!chips.isEmpty()}">
             <a th:each="chip : ${chips}" th:href="${chip.removeUrl()}" class="chip" th:text="|${chip.label()} ×|"></a>
+        </div>
+
+        <!-- Två HELT skilda tomma tillstånd, inte ett gemensamt "inga
+             viner": en tom källare behöver en väg in i appen, medan ett
+             sökresultat utan träffar behöver en väg tillbaka till hela
+             listan. `totalCount` är ofiltrerad och skiljer dem åt. -->
+        <div class="tomt-lage" th:if="${wines.isEmpty() and totalCount == 0}">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 2h8"></path>
+                <path d="M10 2v5.5L6.5 12A3 3 0 0 0 6 13.7V20a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6.3a3 3 0 0 0-.5-1.7L14 7.5V2"></path>
+                <path d="M6.2 14h11.6"></path>
+            </svg>
+            <h2>Källaren är tom</h2>
+            <p>Lägg till ditt första vin! Importera från Excel eller fyll i för hand med fotostöd.</p>
+            <!-- Knappordningen speglar meningen ovanför ("Importera från
+                 Excel eller fyll i för hand"), och importen är därmed den
+                 fyllda primärknappen - det är den väg en ny användare med
+                 en befintlig vinlista faktiskt vill ta. -->
+            <div class="tomt-lage-atgarder">
+                <a class="knapp" href="/import">Importera från Excel</a>
+                <a class="knapp knapp-sekundar" href="/wines/nytt">Fyll i för hand</a>
+            </div>
+        </div>
+
+        <div class="tomt-lage" th:if="${wines.isEmpty() and totalCount > 0}">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="M20 20l-3.5-3.5"></path>
+            </svg>
+            <h2>Inga viner matchar</h2>
+            <p>Inget av dina <span th:text="${totalCount}"></span> viner passar sökningen eller filtren.</p>
+            <div class="tomt-lage-atgarder">
+                <a class="knapp knapp-sekundar" href="/">Rensa sökning och filter</a>
+            </div>
         </div>
 
         <div id="vinlista-tabell" class="vinlista-tabell">

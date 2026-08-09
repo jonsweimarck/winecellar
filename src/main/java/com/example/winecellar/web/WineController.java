@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
@@ -342,7 +343,7 @@ public class WineController {
             @RequestParam(required = false) String location,
             @RequestParam(value = "bild", required = false) MultipartFile image,
             @RequestParam(required = false) String confirmAdd,
-            Model model, Authentication authentication
+            Model model, Authentication authentication, RedirectAttributes redirectAttributes
     ) throws IOException {
         UserId owner = currentOwner(authentication);
         Wine.Builder builder = applyFormFields(Wine.builder(),
@@ -363,6 +364,7 @@ public class WineController {
             }
         }
         wineService.save(candidate);
+        redirectAttributes.addFlashAttribute("feedback", "Vin tillagt");
         return "redirect:/";
     }
 
@@ -390,8 +392,10 @@ public class WineController {
      * varningsdialog.
      */
     @PostMapping("/wines/{id}/dubblett-oka-antal")
-    public String increaseQuantityForDuplicate(@PathVariable Long id, Authentication authentication) {
+    public String increaseQuantityForDuplicate(
+            @PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
         wineService.increaseQuantity(new WineId(id), currentOwner(authentication));
+        redirectAttributes.addFlashAttribute("feedback", "Antalet ökat med 1");
         return "redirect:/";
     }
 
@@ -416,6 +420,7 @@ public class WineController {
             Model model, Authentication authentication) {
         wineService.removeWine(new WineId(id), currentOwner(authentication));
         populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, authentication);
+        model.addAttribute("feedback", "Vin borttaget");
         return "vinkallare :: lista";
     }
 
@@ -464,7 +469,7 @@ public class WineController {
             @RequestParam(required = false) String otherReference,
             @RequestParam(required = false) String location,
             @RequestParam(value = "bild", required = false) MultipartFile image,
-            Authentication authentication
+            Authentication authentication, RedirectAttributes redirectAttributes
     ) throws IOException {
         Wine existing = wineService.findById(new WineId(id), currentOwner(authentication))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -475,6 +480,7 @@ public class WineController {
                 munskankarnaRating, vivinoRating, otherReference, location
         );
         wineService.save(withImageIfProvided(wine, image).build());
+        redirectAttributes.addFlashAttribute("feedback", "Ändringar sparade");
         return "redirect:/";
     }
 

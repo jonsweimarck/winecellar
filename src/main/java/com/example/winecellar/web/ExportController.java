@@ -52,6 +52,18 @@ public class ExportController {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Landningssida för export (WINE-37) - samma mönster som
+     * {@code /import}: en sida med två länkar (xlsx/zip) istället för att
+     * de tidigare låg som direktnedladdningsknappar rakt på vinlistan.
+     * Själva nedladdningarna är oförändrade (exportXlsx/exportImagesZip
+     * nedan) - den här metoden bara renderar länkarna till dem.
+     */
+    @GetMapping("/export")
+    public String exportPage() {
+        return "export";
+    }
+
     @GetMapping("/export/xlsx")
     public ResponseEntity<byte[]> exportXlsx(Authentication authentication) throws IOException {
         UserId owner = CurrentUser.owner(authentication, userRepository);

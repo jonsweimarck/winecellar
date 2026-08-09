@@ -15,11 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import com.example.winecellar.support.SharedPostgres;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,18 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * jämföra dubbletter mot, så raden ska bli en ren, ny import).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class ImportExportFlowIT {
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
+class ImportExportFlowIT extends SharedPostgres {
 
     @LocalServerPort
     private int port;
@@ -253,9 +238,16 @@ class ImportExportFlowIT {
         sida.close();
     }
 
+    /**
+     * Klickar på nedladdningslänken där den faktiskt sitter i UI:t, i
+     * stället för att anropa `path` direkt - poängen med det här testet är
+     * att verifiera hela vägen genom ett riktigt UI. Länkarna flyttade från
+     * vinlistan till en egen exportsida under `/export` (WINE-37, samma
+     * omgång som inställningssidan), så navigeringen går dit numera.
+     */
     private Path ladda(BrowserContext context, String path, Path måldestination) {
         Page sida = context.newPage();
-        sida.navigate("http://localhost:" + port + "/");
+        sida.navigate("http://localhost:" + port + "/export");
         Download nedladdning = sida.waitForDownload(() -> sida.locator("a[href='" + path + "']").click());
         nedladdning.saveAs(måldestination);
         sida.close();
