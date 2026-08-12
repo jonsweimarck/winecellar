@@ -133,7 +133,7 @@ class ImportExportFlowIT {
                 sida.waitForURL("**/import");
 
                 assertThat(sida.locator(".sammanfattning").first().textContent()).contains("Nya viner");
-                assertThat(sida.locator("dd").nth(4).textContent()).isEqualTo("1");
+                assertThat(sida.locator("dd").nth(2).textContent()).isEqualTo("1");
 
                 sida.locator("button:has-text(\"Importera\")").click();
                 sida.waitForURL("**/import");

@@ -8,8 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * WINE-24 (se ADR 0014): kategoriserar redan tolkade rader (parsning av
- * själva xlsx-filen är {@link com.example.winecellar.infrastructure.excel.WineRowParser}s
+ * WINE-24/WINE-38 (se ADR 0014 och ADR 0018): kontrollerar redan tolkade
+ * rader (parsning av själva xlsx-filen är
+ * {@link com.example.winecellar.infrastructure.excel.WineRowParser}s
  * jobb, infrastrukturlagret - den här klassen tar bara emot redan tolkade
  * {@link RowCandidate}) mot dubblettkontrollen som redan finns i
  * {@link WineService} (WINE-6), utan att spara något. Orkestrering hör
@@ -19,6 +20,11 @@ import java.util.List;
  * WINE-34: innan databas-dubblettkontrollen körs en intern dubblettkontroll
  * rad-mot-rad inom samma fil. Alla rader i en sådan intern dubblettgrupp
  * räknas som felaktiga och rapporteras med radnummer till varandra.
+ *
+ * WINE-38: rader som är fullständiga eller möjliga dubbletter av
+ * befintliga viner räknas också som felaktiga och rapporteras med
+ * radnummer, istället för att kategoriseras separat och hanteras via
+ * strategier vid commit.
  */
 @Service
 public class ImportPreviewService {
@@ -39,20 +45,20 @@ public class ImportPreviewService {
         List<RowIssue> issues = new ArrayList<>(parseIssues);
         List<RowCandidate> unique = excludeFileDuplicates(candidates, issues);
 
-        int fullDuplicates = 0;
-        int partialDuplicates = 0;
         int clean = 0;
         for (RowCandidate candidate : unique) {
             DuplicateCheck check = wineService.checkForDuplicate(candidate.wine(), owner);
             if (check instanceof DuplicateCheck.FullDuplicate) {
-                fullDuplicates++;
+                issues.add(new RowIssue(candidate.rowNumber(),
+                        "Rad " + candidate.rowNumber() + ": Vinet är en fullständig dubblett till ett befintligt vin"));
             } else if (check instanceof DuplicateCheck.PartialDuplicate) {
-                partialDuplicates++;
+                issues.add(new RowIssue(candidate.rowNumber(),
+                        "Rad " + candidate.rowNumber() + ": Vinet är en möjlig dubblett till ett befintligt vin"));
             } else {
                 clean++;
             }
         }
-        return new ImportPreview(candidates.size() + parseIssues.size(), issues, fullDuplicates, partialDuplicates, clean);
+        return new ImportPreview(candidates.size() + parseIssues.size(), issues, clean);
     }
 
     /**
