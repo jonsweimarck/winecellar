@@ -36,9 +36,10 @@ import java.util.List;
 
 /**
  * Webbaserad import av vinlistan från en `.xlsx`-fil, i två steg
- * (WINE-24/WINE-25, se ADR 0014): en torrkörning/förhandsgranskning
- * (parsar och dubblettkontrollerar UTAN att spara något), och ett
- * commit-steg som faktiskt sparar enligt vald dubblettstrategi.
+ * (WINE-24/WINE-25/WINE-38, se ADR 0014 och ADR 0018): en
+ * torrkörning/förhandsgranskning (parsar och dubblettkontrollerar UTAN
+ * att spara något), och ett commit-steg som sparar de rader som är rena
+ * nya viner.
  *
  * Den uppladdade filen (och en valfri bildmapp, `webkitdirectory`)
  * skrivs till en temporär mapp på disk - bara sökvägen (inte bilddatan)
@@ -119,8 +120,6 @@ public class ImportController {
      */
     @PostMapping("/import/commit")
     public String commit(
-            @RequestParam FullDuplicateStrategy fullDuplicateStrategy,
-            @RequestParam PartialDuplicateStrategy partialDuplicateStrategy,
             Authentication authentication, HttpServletRequest request,
             RedirectAttributes redirectAttributes) throws IOException {
         UserId owner = CurrentUser.owner(authentication, userRepository);
@@ -143,8 +142,7 @@ public class ImportController {
         ImageMatcher imageMatcher = Files.isDirectory(imagesDir) ? new ImageMatcher(imagesDir) : null;
 
         List<RowCandidate> unique = importPreviewService.excludeFileDuplicates(candidates, issues);
-        ImportResult result = applyStrategyAndSave(
-                unique, issues.size(), owner, fullDuplicateStrategy, partialDuplicateStrategy, imageMatcher);
+        ImportResult result = saveCleanRows(unique, issues.size(), owner, imageMatcher);
 
         deleteRecursively(tempDir);
         request.getSession().removeAttribute(SESSION_KEY_PENDING_IMPORT_PATH);
@@ -153,45 +151,22 @@ public class ImportController {
         return "redirect:/import";
     }
 
-    private ImportResult applyStrategyAndSave(
+    private ImportResult saveCleanRows(
             List<RowCandidate> candidates, int skippedRows, UserId owner,
-            FullDuplicateStrategy fullDuplicateStrategy, PartialDuplicateStrategy partialDuplicateStrategy,
             ImageMatcher imageMatcher) throws IOException {
         int imported = 0;
-        int increased = 0;
         int skipped = skippedRows;
 
         for (RowCandidate candidate : candidates) {
             DuplicateCheck check = wineService.checkForDuplicate(candidate.wine(), owner);
-            if (check instanceof DuplicateCheck.FullDuplicate full) {
-                if (fullDuplicateStrategy == FullDuplicateStrategy.OKA_ANTAL) {
-                    // WINE-28: lägg till radens EGET antal, inte en hårdkodad
-                    // +1 (som increaseQuantity ensam hade gett) - annars blir
-                    // sluttalet fel så fort den importerade raden anger fler
-                    // än en flaska.
-                    wineService.increaseQuantityBy(full.existing().id(), owner, candidate.wine().quantity());
-                    increased++;
-                } else {
-                    skipped++;
-                }
-            } else if (check instanceof DuplicateCheck.PartialDuplicate partial) {
-                switch (partialDuplicateStrategy) {
-                    case OKA_ANTAL -> {
-                        wineService.increaseQuantityBy(partial.existing().id(), owner, candidate.wine().quantity());
-                        increased++;
-                    }
-                    case LAGG_TILL_SOM_NYTT -> {
-                        saveWithImage(candidate.wine(), owner, imageMatcher);
-                        imported++;
-                    }
-                    case HOPPA_OVER -> skipped++;
-                }
-            } else {
+            if (check instanceof DuplicateCheck.NoDuplicate) {
                 saveWithImage(candidate.wine(), owner, imageMatcher);
                 imported++;
+            } else {
+                skipped++;
             }
         }
-        return new ImportResult(imported, increased, skipped);
+        return new ImportResult(imported, skipped);
     }
 
     private void saveWithImage(Wine candidate, UserId owner, ImageMatcher imageMatcher) throws IOException {
@@ -288,11 +263,4 @@ public class ImportController {
         }
     }
 
-    enum FullDuplicateStrategy {
-        OKA_ANTAL, HOPPA_OVER
-    }
-
-    enum PartialDuplicateStrategy {
-        OKA_ANTAL, LAGG_TILL_SOM_NYTT, HOPPA_OVER
-    }
 }

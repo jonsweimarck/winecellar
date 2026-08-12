@@ -51,3 +51,4 @@ WINE-36).
 | [0015](0015-bulk-import-images-lossy-jpeg.md) | Bulkimportens bilder skalas ned och komprimeras - ingen bit-exakt rundtripp | Accepted |
 | [0016](0016-quantity-also-mandatory.md) | Antal flaskor blir obligatoriskt, precis som namnet | Accepted |
 | [0017](0017-login-triggered-temp-import-cleanup.md) | Övergivna temp-importmappar städas vid inloggning, inte via ett schema | Accepted |
+| [0018](0018-remove-import-duplicate-strategies.md) | Import av dubbletter betraktas som fel, inte som valbara strategier | Accepted |

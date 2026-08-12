@@ -1,10 +1,9 @@
 package com.example.winecellar.web;
 
 /**
- * Resultatet av ett faktiskt commit-steg (WINE-25) - hur många viner
- * som sparades som nya, hur många som bara fick antalet ökat (fullständig
- * eller partiell dubblett + "öka antal"-strategin), och hur många som
- * hoppades över (valt bort, eller inte kunde tolkas alls).
+ * Resultatet av ett faktiskt commit-steg (WINE-25/WINE-38) - hur många
+ * nya viner som sparades, och hur många rader som hoppades över
+ * (kunde inte tolkas, eller var dubbletter av befintliga viner).
  */
-record ImportResult(int imported, int increased, int skipped) {
+record ImportResult(int imported, int skipped) {
 }

@@ -55,13 +55,17 @@ precis som att lägga till ett vin manuellt redan fungerar.
    bekräftelsesteg körs det faktiska importet.
 
 4. **Dubblettstrategin är EN gemensam inställning för hela importen,
-   inte per rad** - två separata val, som speglar de val som redan
-   finns i formulärets dubblettvarning (WINE-6):
-   - **Fullständig dubblett:** "öka antal på befintligt" (default)
-     eller "hoppa över". Inget "lägg till ändå" här, precis som i
-     formuläret idag - det är per definition samma vin.
-   - **Partiell dubblett:** "öka antal på befintligt", "lägg till som
-     nytt vin ändå", eller "hoppa över".
+    inte per rad** - två separata val, som speglar de val som redan
+    finns i formulärets dubblettvarning (WINE-6):
+    - **Fullständig dubblett:** "öka antal på befintligt" (default)
+      eller "hoppa över". Inget "lägg till ändå" här, precis som i
+      formuläret idag - det är per definition samma vin.
+    - **Partiell dubblett:** "öka antal på befintligt", "lägg till som
+      nytt vin ändå", eller "hoppa över".
+
+    *Ersatt av [0018](0018-remove-import-duplicate-strategies.md)
+    (WINE-38): dubbletter betraktas numera som importeringsfel och
+    rapporteras i förhandsgranskningen, utan några valbara strategier.*
 
 5. **Bilder matchas EXAKT via ett filnamn byggt av vinets kända
    identitetsfält** (producent, namn, årgång, i en bestämd ordning) -
