@@ -53,8 +53,6 @@ class ImportPreviewServiceTest {
         assertThat(preview.issues()).extracting(RowIssue::message).containsExactlyInAnyOrder(
                 "Rad 2: Vinet är en dublett av ett annat vin (rad 3)",
                 "Rad 3: Vinet är en dublett av ett annat vin (rad 2)");
-        assertThat(preview.fullDuplicates()).isZero();
-        assertThat(preview.partialDuplicates()).isZero();
         assertThat(preview.clean()).isZero();
     }
 
@@ -102,7 +100,7 @@ class ImportPreviewServiceTest {
     }
 
     @Test
-    void skaRäknaUnikaKandidaterMotDatabasDubblettkontrollen() {
+    void skaRapporteraFullständigDubblettSomImporteringsfel() {
         List<RowCandidate> candidates = List.of(
                 candidate(2, "Barolo", "Pio Cesare", 2018));
         Wine existing = Wine.builder().id(new Wine.WineId(1L)).owner(OWNER).name("Barolo").producer("Pio Cesare").vintage(2018).quantity(1).build();
@@ -110,8 +108,23 @@ class ImportPreviewServiceTest {
 
         ImportPreview preview = service.preview(candidates, List.of(), OWNER);
 
-        assertThat(preview.issues()).isEmpty();
-        assertThat(preview.fullDuplicates()).isEqualTo(1);
+        assertThat(preview.issues()).extracting(RowIssue::message).containsExactly(
+                "Rad 2: Vinet är en fullständig dubblett till ett befintligt vin");
+        assertThat(preview.clean()).isZero();
+    }
+
+    @Test
+    void skaRapporteraMöjligDubblettSomImporteringsfel() {
+        List<RowCandidate> candidates = List.of(
+                candidate(2, "Barolo", "Pio Cesare", 2018));
+        Wine existing = Wine.builder().id(new Wine.WineId(1L)).owner(OWNER).name("Barolo").producer("Pio Cesare").vintage(2018).quantity(1).build();
+        when(wineService.checkForDuplicate(any(), eq(OWNER))).thenReturn(new DuplicateCheck.PartialDuplicate(existing));
+
+        ImportPreview preview = service.preview(candidates, List.of(), OWNER);
+
+        assertThat(preview.issues()).extracting(RowIssue::message).containsExactly(
+                "Rad 2: Vinet är en möjlig dubblett till ett befintligt vin");
+        assertThat(preview.clean()).isZero();
     }
 
     private RowCandidate candidate(int rowNumber, String name, String producer, int vintage) {

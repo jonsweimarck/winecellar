@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
 
 /**
- * Temaväxlingen (WINE-39, se ADR 0018) är helt CSS- och JS-driven -
+ * Temaväxlingen (WINE-39, se ADR 0019) är helt CSS- och JS-driven -
  * ingenting av den syns i renderad HTML, så varken MockMvc eller ett
  * @WebMvcTest kan verifiera den. Testas därför mot en riktig webbläsare,
  * av samma skäl som `WineListResponsiveIT` finns.
@@ -124,7 +124,7 @@ class TemaIT extends SharedPostgres {
     }
 
     /**
-     * Temat är inte kontobundet utan webbläsarbundet (se ADR 0018), så
+     * Temat är inte kontobundet utan webbläsarbundet (se ADR 0019), så
      * det måste gälla även på de utloggade sidorna - annars blinkar
      * appen vitt vid varje utloggning för den som valt mörkt läge.
      */

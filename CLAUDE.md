@@ -203,7 +203,7 @@ dem:
 
 ## Designsystem och navigation - nuläge
 
-Se [ADR 0018](docs/adr/0018-shared-theme-css-variables.md).
+Se [ADR 0019](docs/adr/0019-shared-theme-css-variables.md).
 
 - **`static/css/tema.css` är den delade stilmallen** - färg, typografi
   och delade komponenter (`.knapp`/`.knapp-sekundar`, `.topprad`,

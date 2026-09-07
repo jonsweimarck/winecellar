@@ -264,12 +264,14 @@ steg:
    dubblettkontrollerar varje rad mot den inloggade användarens egna
    viner (samma identitet - namn/producent/årgång - som
    dubblettvarningen vid manuellt tillägg av ett enskilt vin), UTAN
-   att spara något. Visar en sammanfattning: rader totalt, överhoppade,
-   fullständiga/partiella dubbletter, rena nya viner.
-2. **Commit** (`POST /import/commit`) - efter att ha valt en
-   dubblettstrategi (öka antal / lägg till som nytt / hoppa över -
-   separata val för fullständiga och partiella dubbletter) sparas
-   raderna faktiskt.
+   att spara något. Visar en sammanfattning: rader totalt, rader som
+   inte kan importeras (saknar namn, kan inte tolkas, eller är
+   fullständiga/möjliga dubbletter av befintliga viner), och rena nya
+   viner.
+2. **Commit** (`POST /import/commit`) - sparar de rader som är rena nya
+   viner. Dubbletter sparas inte; användaren får rätta källfilen och
+   importera på nytt istället, se
+   [ADR 0018](docs/adr/0018-remove-import-duplicate-strategies.md).
 
 **Bilder i den uppladdade mappen skalas ned och konverteras till JPEG
 i webbläsaren innan uppladdning** - annars hade en mapp med många

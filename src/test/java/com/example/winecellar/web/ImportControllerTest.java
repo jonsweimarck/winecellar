@@ -35,7 +35,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -167,6 +166,8 @@ class ImportControllerTest {
         mockMvc.perform(multipart("/import").file(fil).with(user("testperson")).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Rader totalt")))
+                .andExpect(content().string(containsString("Rad 2: Vinet är en fullständig dubblett till ett befintligt vin")))
+                .andExpect(content().string(containsString("Rad 3: Vinet är en möjlig dubblett till ett befintligt vin")))
                 .andExpect(content().string(containsString("Rad 5: Vinet måste ha ett namn")));
 
         verify(wineService, never()).save(any());
@@ -189,8 +190,6 @@ class ImportControllerTest {
 
         mockMvc.perform(post("/import/commit")
                         .session(session)
-                        .param("fullDuplicateStrategy", "HOPPA_OVER")
-                        .param("partialDuplicateStrategy", "HOPPA_OVER")
                         .with(user("testperson")).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
@@ -219,124 +218,22 @@ class ImportControllerTest {
     }
 
     /**
-     * Reproducerar WINE-28 exakt: Barolo finns med 2 flaskor
-     * (BAROLO_EXISTING_QUANTITY), importraden anger också 2
-     * (BAROLO_ROW_QUANTITY). Den gamla buggen anropade increaseQuantity
-     * (alltid +1) rakt av, vilket hade gett 2+1=3 - rätt anrop är
-     * increaseQuantityBy(..., 2), vilket (verifierat separat i
-     * WineService-nivåns Cucumber-scenario) faktiskt ger 2+2=4.
+     * WINE-38: dubbletter betraktas som importeringsfel och sparas inte.
+     * Bara den rena "Rioja"-raden sparas; Barolo (fullständig dubblett) och
+     * Chianti (möjlig dubblett) hoppas över.
      */
     @Test
-    void skaOkaAntalVidFullständigDubblettMedStrategiÖkaAntal() throws Exception {
+    void skaBaraSparaRenaRaderVidCommit() throws Exception {
         stubbaDubblettkontroll();
         MockHttpSession session = körTorrkörning();
 
         mockMvc.perform(post("/import/commit")
                         .session(session)
-                        .param("fullDuplicateStrategy", "OKA_ANTAL")
-                        .param("partialDuplicateStrategy", "HOPPA_OVER")
                         .with(user("testperson")).with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/import"));
 
-        verify(wineService).increaseQuantityBy(eq(EXISTING_BAROLO.id()), eq(MIN_ANVÄNDARE_ID), eq(BAROLO_ROW_QUANTITY));
-        // "Rioja" är en ren rad (ingen dubblett) i testfilen - sparas alltid,
-        // oavsett vilken dubblettstrategi som väljs för de andra raderna.
-        ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
-        verify(wineService).save(captor.capture());
-        assertThat(captor.getValue().name()).isEqualTo("Rioja");
-    }
-
-    @Test
-    void skaSkapaNyttVinVidPartiellDubblettMedStrategiLäggTillSomNytt() throws Exception {
-        stubbaDubblettkontroll();
-        MockHttpSession session = körTorrkörning();
-
-        mockMvc.perform(post("/import/commit")
-                        .session(session)
-                        .param("fullDuplicateStrategy", "HOPPA_OVER")
-                        .param("partialDuplicateStrategy", "LAGG_TILL_SOM_NYTT")
-                        .with(user("testperson")).with(csrf()))
-                .andExpect(status().is3xxRedirection());
-
-        ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
-        verify(wineService, never()).increaseQuantityBy(eq(EXISTING_CHIANTI.id()), any(), anyInt());
-        // Två sparade: "Chianti" (partiell dubblett, lägg till som nytt) och
-        // "Rioja" (ren rad, sparas alltid oavsett strategi).
-        verify(wineService, times(2)).save(captor.capture());
-        assertThat(captor.getAllValues()).extracting(Wine::name).containsExactlyInAnyOrder("Chianti", "Rioja");
-        assertThat(captor.getAllValues()).allSatisfy(saved -> assertThat(saved.owner()).isEqualTo(MIN_ANVÄNDARE_ID));
-    }
-
-    /**
-     * De tre återstående dubblettstrategi-kombinationerna (WINE-26) - inte
-     * täckta av WINE-25s egna två tester ovan. Ligger som MockMvc-tester,
-     * inte ett Cucumber-scenario mot applikationslagret: själva
-     * strategivalet (vilken WineService-metod som anropas för respektive
-     * dubbletttyp) är webblagrets orkestrering, inte en applikationslagers-
-     * regel - `ImportController` gör medvetet samma sak som `WineController`
-     * redan gör för den enskilda dubblettvarningen (ADR-mönstret från
-     * WINE-25: ingen egen application-tjänst för commit-strategin).
-     */
-    @Test
-    void skaHoppaÖverVidFullständigDubblettMedStrategiHoppaÖver() throws Exception {
-        stubbaDubblettkontroll();
-        MockHttpSession session = körTorrkörning();
-
-        mockMvc.perform(post("/import/commit")
-                        .session(session)
-                        .param("fullDuplicateStrategy", "HOPPA_OVER")
-                        .param("partialDuplicateStrategy", "HOPPA_OVER")
-                        .with(user("testperson")).with(csrf()))
-                .andExpect(status().is3xxRedirection());
-
-        verify(wineService, never()).increaseQuantityBy(eq(EXISTING_BAROLO.id()), any(), anyInt());
-        // Bara "Rioja" (ren rad) sparas - Barolo (full dubblett) och
-        // Chianti (partiell dubblett) hoppas båda över.
-        ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
-        verify(wineService).save(captor.capture());
-        assertThat(captor.getValue().name()).isEqualTo("Rioja");
-    }
-
-    @Test
-    void skaOkaAntalVidPartiellDubblettMedStrategiÖkaAntal() throws Exception {
-        stubbaDubblettkontroll();
-        MockHttpSession session = körTorrkörning();
-
-        mockMvc.perform(post("/import/commit")
-                        .session(session)
-                        .param("fullDuplicateStrategy", "HOPPA_OVER")
-                        .param("partialDuplicateStrategy", "OKA_ANTAL")
-                        .with(user("testperson")).with(csrf()))
-                .andExpect(status().is3xxRedirection());
-
-        verify(wineService).increaseQuantityBy(eq(EXISTING_CHIANTI.id()), eq(MIN_ANVÄNDARE_ID), eq(CHIANTI_ROW_QUANTITY));
-        ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
-        verify(wineService).save(captor.capture());
-        assertThat(captor.getValue().name()).isEqualTo("Rioja");
-    }
-
-    /**
-     * Isolerar partiell-hoppa-över från fullständig-hoppa-över (till
-     * skillnad från det första testet ovan, som råkar sätta båda
-     * strategierna till HOPPA_OVER samtidigt) - full dubblett väljer HÄR
-     * "öka antal" medan partiell väljer "hoppa över", för att bekräfta att
-     * de två inställningarna verkligen är oberoende av varandra.
-     */
-    @Test
-    void skaHoppaÖverVidPartiellDubblettMedStrategiHoppaÖver() throws Exception {
-        stubbaDubblettkontroll();
-        MockHttpSession session = körTorrkörning();
-
-        mockMvc.perform(post("/import/commit")
-                        .session(session)
-                        .param("fullDuplicateStrategy", "OKA_ANTAL")
-                        .param("partialDuplicateStrategy", "HOPPA_OVER")
-                        .with(user("testperson")).with(csrf()))
-                .andExpect(status().is3xxRedirection());
-
-        verify(wineService).increaseQuantityBy(eq(EXISTING_BAROLO.id()), eq(MIN_ANVÄNDARE_ID), eq(BAROLO_ROW_QUANTITY));
-        verify(wineService, never()).increaseQuantityBy(eq(EXISTING_CHIANTI.id()), any(), anyInt());
+        verify(wineService, never()).increaseQuantityBy(any(), any(), anyInt());
         ArgumentCaptor<Wine> captor = ArgumentCaptor.forClass(Wine.class);
         verify(wineService).save(captor.capture());
         assertThat(captor.getValue().name()).isEqualTo("Rioja");
@@ -351,8 +248,6 @@ class ImportControllerTest {
 
         mockMvc.perform(post("/import/commit")
                         .session(session)
-                        .param("fullDuplicateStrategy", "HOPPA_OVER")
-                        .param("partialDuplicateStrategy", "HOPPA_OVER")
                         .with(user("testperson")).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
@@ -380,8 +275,6 @@ class ImportControllerTest {
 
         mockMvc.perform(post("/import/commit")
                         .session(session)
-                        .param("fullDuplicateStrategy", "HOPPA_OVER")
-                        .param("partialDuplicateStrategy", "HOPPA_OVER")
                         .with(user("testperson")).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
@@ -410,8 +303,6 @@ class ImportControllerTest {
 
         mockMvc.perform(post("/import/commit")
                         .session(session)
-                        .param("fullDuplicateStrategy", "HOPPA_OVER")
-                        .param("partialDuplicateStrategy", "HOPPA_OVER")
                         .with(user("testperson")).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 

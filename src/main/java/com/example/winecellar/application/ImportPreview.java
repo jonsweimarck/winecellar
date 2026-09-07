@@ -13,7 +13,5 @@ import java.util.List;
 public record ImportPreview(
         int totalRows,
         List<RowIssue> issues,
-        int fullDuplicates,
-        int partialDuplicates,
         int clean) {
 }
