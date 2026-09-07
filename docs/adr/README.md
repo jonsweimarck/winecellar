@@ -52,3 +52,4 @@ WINE-36).
 | [0016](0016-quantity-also-mandatory.md) | Antal flaskor blir obligatoriskt, precis som namnet | Accepted |
 | [0017](0017-login-triggered-temp-import-cleanup.md) | Övergivna temp-importmappar städas vid inloggning, inte via ett schema | Accepted |
 | [0018](0018-remove-import-duplicate-strategies.md) | Import av dubbletter betraktas som fel, inte som valbara strategier | Accepted |
+| [0019](0019-shared-theme-css-variables.md) | Gemensamt designsystem i en delad stilmall, byggt på CSS-variabler | Accepted |

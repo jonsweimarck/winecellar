@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inställningar - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <style>
+        body { max-width: 32rem; margin: 3rem auto; padding: 0 1rem; }
+
+        /* .sektionsrubrik och .kort ligger i tema.css - delas numera med
+           vinformuläret. */
+
+        /* Raderna är antingen <a> eller en <button> i ett <form> (logga
+           ut) - därav återställningen av knappens egna standardstilar
+           (background/border/width), så att båda ser identiska ut trots
+           olika element. Åsidosätter medvetet tema.css:s fyllda
+           knappstil: här är knappen en listrad, inte en handlingsknapp. */
+        .installningsrad { display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 1rem;
+            border: none; border-top: 1px solid var(--ram-svag); color: var(--text); text-decoration: none;
+            background: none; width: 100%; box-sizing: border-box; text-align: left; border-radius: 0; cursor: pointer; }
+        .installningsrad:first-child { border-top: none; }
+        a.installningsrad:hover, button.installningsrad:hover { background: var(--yta-hover); }
+        .installningsrad-ikon { flex-shrink: 0; display: flex; color: var(--text-dampad); }
+        .installningsrad-text { flex: 1; }
+        .installningsrad-pil { flex-shrink: 0; color: var(--text-svag); }
+        .installningsrad-farlig, .installningsrad-farlig .installningsrad-ikon { color: var(--fel); }
+
+        /* Temaväxlarens tre lägen som en segmenterad kontroll (Auto/
+           Ljust/Mörkt) i stället för en enkel av/på-knapp: "auto" är ett
+           eget, meningsfullt läge (följ systemet) som en boolean inte kan
+           uttrycka. */
+        .temaval { display: flex; gap: 0.25rem; flex-shrink: 0; }
+        .temaval button { padding: 0.3rem 0.6rem; font-size: 0.8rem; background: transparent;
+            border: 1px solid var(--ram); color: var(--text-dampad); border-radius: var(--radie); }
+        .temaval button:hover { background: var(--yta-hover); }
+        .temaval button[aria-pressed="true"] { background: var(--accent); color: var(--pa-accent);
+            border-color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/topprad :: topprad('Inställningar', '/')}"></div>
+
+    <p class="sektionsrubrik">Data</p>
+    <div class="kort">
+        <a class="installningsrad" href="/import">
+            <span class="installningsrad-ikon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path>
+                    <path d="M5 21h14"></path></svg>
+            </span>
+            <span class="installningsrad-text">Importera från Excel</span>
+            <span class="installningsrad-pil" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+            </span>
+        </a>
+        <a class="installningsrad" href="/export">
+            <span class="installningsrad-ikon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"></path><path d="M7 14l5-5 5 5"></path>
+                    <path d="M5 3h14"></path></svg>
+            </span>
+            <span class="installningsrad-text">Exportera</span>
+            <span class="installningsrad-pil" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+            </span>
+        </a>
+    </div>
+
+    <p class="sektionsrubrik">Utseende</p>
+    <div class="kort">
+        <div class="installningsrad">
+            <span class="installningsrad-ikon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"></path></svg>
+            </span>
+            <span class="installningsrad-text" id="temaetikett">Tema</span>
+            <span class="temaval" role="group" aria-labelledby="temaetikett">
+                <button type="button" data-tema-val="auto" aria-pressed="false">Auto</button>
+                <button type="button" data-tema-val="ljust" aria-pressed="false">Ljust</button>
+                <button type="button" data-tema-val="mork" aria-pressed="false">Mörkt</button>
+            </span>
+        </div>
+    </div>
+
+    <p class="sektionsrubrik">Konto</p>
+    <div class="kort">
+        <form method="post" th:action="@{/logout}">
+            <button type="submit" class="installningsrad installningsrad-farlig">
+                <span class="installningsrad-ikon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
+                </span>
+                <span class="installningsrad-text">Logga ut</span>
+            </button>
+        </form>
+    </div>
+
+    <script th:inline="none">
+        // Temavalet skrivs till localStorage och appliceras direkt på
+        // <html> - ingen omladdning behövs, eftersom hela temat är
+        // CSS-variabler under :root[data-tema] (se tema.css). Samma
+        // nyckel som fragments/tema.html läser vid varje sidladdning.
+        (function () {
+            var knappar = document.querySelectorAll('[data-tema-val]');
+
+            function markeraAktiv(valt) {
+                knappar.forEach(function (knapp) {
+                    knapp.setAttribute('aria-pressed', String(knapp.dataset.temaVal === valt));
+                });
+            }
+
+            var nuvarande = document.documentElement.getAttribute('data-tema') || 'auto';
+            markeraAktiv(nuvarande);
+
+            knappar.forEach(function (knapp) {
+                knapp.addEventListener('click', function () {
+                    var valt = knapp.dataset.temaVal;
+                    document.documentElement.setAttribute('data-tema', valt);
+                    markeraAktiv(valt);
+                    try {
+                        localStorage.setItem('winecellar-tema', valt);
+                    } catch (e) {
+                        // Valet gäller för den här sidan även om det inte
+                        // gick att spara (privat läge) - bättre än att
+                        // inte reagera alls på klicket.
+                    }
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

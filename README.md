@@ -250,7 +250,8 @@ tolkas hoppas över, utan att stoppa resten av importen.
   bevaras; endast separatorn mellan fälten är understreck. Samma
   konvention som importen matchar bilder mot.
 
-Båda länkarna finns direkt i vinlistan. Exporten är byte-exakt -
+Båda länkarna finns på exportsidan (`GET /export`), som nås via
+Inställningar. Exporten är byte-exakt -
 bilderna som laddas ner är identiska med det som en gång laddades upp.
 
 ### Import

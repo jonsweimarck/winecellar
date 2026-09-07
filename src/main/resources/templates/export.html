@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Exportera vinlista - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <style>
+        body { max-width: 32rem; margin: 3rem auto; padding: 0 1rem; }
+        .knapp { margin-top: 1.5rem; margin-right: 0.75rem; }
+        p.beskrivning { color: var(--text-dampad); margin-top: 0.75rem; }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/topprad :: topprad('Exportera', '/installningar')}"></div>
+
+    <p class="beskrivning">Ladda ner din vinlista, antingen som ett Excel-kalkylblad eller som en zip med
+        etikettbilderna.</p>
+
+    <a class="knapp" th:href="@{/export/xlsx}">Exportera till Excel</a>
+    <a class="knapp" th:href="@{/export/bilder.zip}">Exportera bilder (zip)</a>
+</body>
+</html>

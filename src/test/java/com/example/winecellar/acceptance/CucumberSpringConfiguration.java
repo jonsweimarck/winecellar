@@ -1,12 +1,12 @@
 package com.example.winecellar.acceptance;
 
+import com.example.winecellar.support.SharedPostgres;
 import io.cucumber.spring.CucumberContextConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
-import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
  * Delad Spring-kontext för alla Cucumber-scenarier. Persistensscenariot
@@ -20,13 +20,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @CucumberContextConfiguration
 @SpringBootTest
 @ContextConfiguration(initializers = CucumberSpringConfiguration.Initializer.class)
-public class CucumberSpringConfiguration {
-
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
-
-    static {
-        POSTGRES.start();
-    }
+public class CucumberSpringConfiguration extends SharedPostgres {
 
     static class Initializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
         @Override

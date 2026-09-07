@@ -4,48 +4,72 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Importera vinlista - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <script th:src="@{/js/validering.js}" defer></script>
     <style>
-        body { font-family: sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem; }
-        label { display: block; margin-top: 1rem; font-weight: bold; }
-        input[type="file"] { margin-top: 0.4rem; }
-        button { margin-top: 1.5rem; padding: 0.5rem 1rem; }
-        .fel { color: #a4262c; margin-top: 1rem; }
-        .status { color: #555; margin-top: 0.5rem; font-size: 0.9rem; }
-        .sammanfattning { margin-top: 1.5rem; border: 1px solid #ccc; border-radius: 0.25rem; padding: 1rem; }
-        .sammanfattning dt { font-weight: bold; }
-        .sammanfattning dd { margin: 0 0 0.5rem 0; }
+        body { max-width: 32rem; margin: 4rem auto; padding: 0 1rem; }
+        .fel { color: var(--fel); margin-top: 1rem; }
+        .status { color: var(--text-dampad); margin-top: 0.5rem; font-size: 0.9rem; }
+        .sammanfattning { margin-top: 1.5rem; border: 1px solid var(--ram); border-radius: var(--radie);
+            padding: 1rem; background: var(--yta-2); }
+        /* Etikett och siffra som EN textrad ("Rader totalt: 8"), inte
+           en tvåkolumnstabell - enklare att läsa i ett litet
+           sammandrag som bara har tre rader. */
+        .sammanfattning p { margin: 0 0 0.4rem; }
+        .sammanfattning p:last-of-type { margin-bottom: 0; }
+        /* Rubriken över fellistan är villkorlig (th:if) - visas bara
+           när det faktiskt finns fel. .sektionsrubrik är samma
+           dämpade, versala stil som Inställningar redan använder för
+           sina sektionsrubriker (Data/Utseende/Konto) - ingen ny
+           rubrikstil uppfunnen för det här enda stället. */
+        .sammanfattning .sektionsrubrik { margin-top: 1.25rem; }
         select { margin-top: 0.3rem; }
         .lank { margin-top: 1.5rem; }
     </style>
 </head>
 <body>
-    <h1>Importera vinlista</h1>
+    <div th:replace="~{fragments/topprad :: topprad('Importera vinlista', '/installningar')}"></div>
 
     <p class="fel" th:if="${error}" th:text="${error}"></p>
 
     <div th:if="${preview == null and result == null}">
         <form method="post" th:action="@{/import}" enctype="multipart/form-data">
-            <label for="fil-input">Excel-fil (.xlsx)</label>
-            <input type="file" id="fil-input" name="fil" accept=".xlsx" required="required">
+            <div class="kort">
+                <!-- <div>, inte <label>: knapparna nedan ÄR <label>, och
+                     en label får inte ligga inuti en annan. Samma
+                     mönster som etikettfältet i vin-formular.html. -->
+                <div class="falt"><span>Excel-fil (.xlsx)</span>
+                    <div class="filval">
+                        <input type="file" id="fil-input" name="fil" accept=".xlsx" required="required">
+                        <label for="fil-input" class="knapp knapp-sekundar">Välj fil</label>
+                        <span class="filval-namn" id="fil-namn">Ingen fil vald</span>
+                    </div>
+                </div>
+                <div class="falt"><span>Bildmapp (valfri)</span>
+                    <div class="filval">
+                        <input type="file" id="bilder-input" name="bilder"
+                               webkitdirectory="webkitdirectory" multiple="multiple">
+                        <label for="bilder-input" class="knapp knapp-sekundar">Välj mapp</label>
+                        <span class="filval-namn" id="bilder-namn">Ingen mapp vald</span>
+                    </div>
+                    <p class="status" id="bilder-status"></p>
+                </div>
+            </div>
 
-            <label for="bilder-input">Bildmapp (valfri)</label>
-            <input type="file" id="bilder-input" name="bilder" webkitdirectory="webkitdirectory" multiple="multiple">
-            <p class="status" id="bilder-status"></p>
-
-            <button type="submit" id="import-submit">Förhandsgranska</button>
+            <div class="atgardsrad">
+                <button type="submit" id="import-submit">Förhandsgranska</button>
+            </div>
         </form>
     </div>
 
     <div class="sammanfattning" th:if="${preview != null}">
-        <dl>
-            <dt>Rader totalt</dt>
-            <dd th:text="${preview.totalRows()}"></dd>
-            <dt>Rader som inte kan importeras</dt>
-            <dd th:text="${preview.issues().size()}"></dd>
-            <dt>Nya viner</dt>
-            <dd th:text="${preview.clean()}"></dd>
-        </dl>
+        <p th:text="|Rader totalt: ${preview.totalRows()}|"></p>
+        <p th:text="|Rader som inte kan importeras: ${preview.issues().size()}|"></p>
+        <p th:text="|Nya viner: ${preview.clean()}|"></p>
 
+        <!-- Rubriken visas bara när det faktiskt finns fel - en tom
+             lista renderar varken rubrik eller punktlista. -->
+        <p class="sektionsrubrik" th:if="${!preview.issues().isEmpty()}">Dessa fel hittades</p>
         <ul th:if="${!preview.issues().isEmpty()}">
             <li th:each="issue : ${preview.issues()}" th:text="${issue.message()}"></li>
         </ul>
@@ -56,17 +80,42 @@
     </div>
 
     <div class="sammanfattning" th:if="${result != null}">
-        <dl>
-            <dt>Importerade som nya viner</dt>
-            <dd th:text="${result.imported()}"></dd>
-            <dt>Överhoppade</dt>
-            <dd th:text="${result.skipped()}"></dd>
-        </dl>
+        <p th:text="|Importerade som nya viner: ${result.imported()}|"></p>
+        <p th:text="|Överhoppade: ${result.skipped()}|"></p>
     </div>
 
     <p class="lank"><a th:href="@{/}">Tillbaka till vinkällaren</a></p>
 
     <script th:inline="none">
+        // Skriver ut vad som valts bredvid respektive knapp - den dolda
+        // inputen tog med sig webbläsarens egen "ingen fil vald"-text när
+        // den doldes, så utan det här saknas all kvittens. Mappväljaren
+        // rapporterar antal filer, inte ett filnamn: den returnerar hela
+        // mappens innehåll, och mappnamnet självt finns bara som en
+        // sökvägsprefix på varje enskild fil.
+        (function () {
+            function visaVal(inputId, namnId, beskrivFiler) {
+                var input = document.getElementById(inputId);
+                var namnRad = document.getElementById(namnId);
+                if (!input || !namnRad) {
+                    return;
+                }
+                var ursprungsText = namnRad.textContent;
+                input.addEventListener('change', function () {
+                    namnRad.textContent = input.files.length
+                            ? beskrivFiler(input.files)
+                            : ursprungsText;
+                });
+            }
+
+            visaVal('fil-input', 'fil-namn', function (filer) {
+                return filer[0].name;
+            });
+            visaVal('bilder-input', 'bilder-namn', function (filer) {
+                return filer.length === 1 ? '1 fil vald' : filer.length + ' filer valda';
+            });
+        })();
+
         // Skalar ner varje vald bild i webbläsaren innan uppladdning -
         // samma Canvas-teknik som etikettskanningen (WINE-5,
         // vin-formular.html), men här över POTENTIELLT MÅNGA filer

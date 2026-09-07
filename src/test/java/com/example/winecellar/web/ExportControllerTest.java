@@ -29,11 +29,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -97,6 +99,25 @@ class ExportControllerTest {
     void stubbaInloggadAnvändare() {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
                 new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now())));
+    }
+
+    /**
+     * Landningssidan (WINE-37) - länkar till de två faktiska nedladdningarna
+     * nedan, samma mönster som `/import`s egen sida.
+     */
+    @Test
+    void skaVisaExportsidanMedLänkarTillBådaNedladdningarna() throws Exception {
+        mockMvc.perform(get("/export").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("href=\"/export/xlsx\"")))
+                .andExpect(content().string(containsString("href=\"/export/bilder.zip\"")));
+    }
+
+    @Test
+    void skaNekaExportsidanUtanInloggning() throws Exception {
+        mockMvc.perform(get("/export"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
     }
 
     @Test

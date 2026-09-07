@@ -1,0 +1,404 @@
+/*
+    Appens gemensamma designsystem (WINE-39): färg, typografi och de
+    baskomponenter som återkommer på flera sidor. Ersätter de tidigare
+    kopior av samma regler som låg i varje mallfils egna <style>-block
+    (.knapp/.topprad fanns t.ex. duplicerade i tre filer).
+
+    Sidspecifik layout (vinlistans kort/grid, formulärets fältgrupper)
+    ligger kvar i respektive mall - bara det som faktiskt DELAS finns här.
+
+    Färgerna är CSS-variabler under :root så att mörkt läge (nedan) bara
+    behöver skriva om variabelvärdena, inte varje enskild regel. En mall
+    ska aldrig hårdkoda ett färgvärde direkt - då följer den inte med i
+    temaväxlingen.
+*/
+
+:root {
+    /* Accent: vinrött. --accent är knapp-/badgeytan (mörk nog för vit
+       text ovanpå), --accent-lank är samma ton fast för text/länkar mot
+       sidbakgrunden. I mörkt läge byter båda till ljusare nyanser -
+       den mörka bordeauxen har alldeles för låg kontrast mot en mörk
+       bakgrund. */
+    --accent: #7B1E3A;
+    --accent-hover: #91264a;
+    --accent-lank: #7B1E3A;
+    --pa-accent: #ffffff;
+
+    /* Ytor och text. --yta-1 är sidbakgrunden, --yta-2 ligger ovanpå
+       den (kort, panelrader), --yta-3 är den dämpade "fyllnadsytan"
+       (bildplatshållare, chips). Sidbakgrunden är medvetet en aning
+       grå, inte vit: kort och fält ska läsas som en egen nivå ovanpå
+       sidan, precis som i mörkt läge - med båda vita syns de bara på
+       sin tunna ram. */
+    --yta-1: #f7f7f8;
+    --yta-2: #ffffff;
+    --yta-3: #ededf0;
+    --yta-hover: #f0f0f2;
+
+    --text: #1a1a1a;
+    --text-dampad: #767676;
+    --text-svag: #999999;
+
+    --ram: #dddddd;
+    --ram-stark: #999999;
+    --ram-svag: #eeeeee;
+
+    /* Semantiska tillstånd - fel/varning respektive lyckat resultat.
+       Används av dubblettvarningen och etikettskanningens statusrutor. */
+    --fel: #a4262c;
+    --fel-yta: #fdf2f2;
+    --fel-ram: #dd9999;
+    --lyckat-yta: #f2fdf5;
+    --lyckat-ram: #99cc99;
+    --markerat-yta: #eef6ff;
+    --markerat-ram: #6699cc;
+
+    /* Fylld variant av "lyckat" - samma mönster som --accent/--pa-accent
+       (mättad yta + ljus text ovanpå), använd av toasten (se längre ner).
+       Till skillnad från --lyckat-yta/-ram ovan (en BLEK ton, tänkt att
+       ligga bakom vanlig text i en ruta - etikettskanningens resultat)
+       är den här en solid, mättad yta - avsiktligt SAMMA värde i både
+       ljust och mörkt läge: den är helt ogenomskinlig och svävar fritt
+       ovanpå sidan (aldrig bakom text), så den behöver inte anpassas
+       efter sidans egen bakgrund som --lyckat-yta gör. */
+    --lyckat-fyllnad: #3b6d11;
+    --pa-lyckat: #eaf3de;
+
+    --skugga: rgba(0, 0, 0, 0.3);
+
+    /* Systemets eget UI-typsnitt, inte en laddad webbfont: varje OS
+       ritar sitt eget (San Francisco/Segoe UI/Roboto), vilket är både
+       snabbare (noll nätverksanrop) och mer "native" än en Google
+       Font som ser lika främmande ut överallt. */
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --radie: 0.375rem;
+    --radie-stor: 0.5rem;
+}
+
+/*
+    Mörkt läge sätts av en `data-tema="mork"` på <html> (se temaskriptet i
+    varje malls <head>), INTE bara av prefers-color-scheme: användaren ska
+    kunna välja explicit i Inställningar och få sitt val respekterat även
+    om systemet säger något annat. `prefers-color-scheme` nedan gäller
+    därför bara när inget eget val gjorts (`data-tema="auto"`).
+*/
+:root[data-tema="mork"] {
+    /* --accent var tidigare en ljus, rosa ton (#E27FA0) även för den
+       FYLLDA ytan (knappar/badges) - i praktiken onödigt: --accent
+       används ALDRIG som text direkt mot sidan (bara --accent-lank
+       gör det), utan alltid som en bakgrund med --pa-accent ovanpå.
+       Fyllda ytor behöver alltså inte vara ljusa för att synas - de
+       behöver bara skilja sig från sidbakgrunden, precis som ljust
+       lägets mörka bordeaux redan gör mot en vit sida. Bytt till en
+       djup, mättad vinröd (nästan samma mörker som ljust läge) med vit
+       text ovanpå i stället - användarens egen jämförelse mot en annan
+       apps mörka tema. --accent-lank (bar länktext mot sidan) är kvar
+       ljusare: DEN behöver fortfarande kontrast mot den mörka sidan. */
+    --accent: #96233F;
+    --accent-hover: #ad2b4c;
+    --accent-lank: #E8A5BC;
+    --pa-accent: #ffffff;
+
+    --yta-1: #1c1c1c;
+    --yta-2: #262626;
+    --yta-3: #333333;
+    --yta-hover: #303030;
+
+    --text: #e8e8e8;
+    --text-dampad: #a8a8a8;
+    --text-svag: #888888;
+
+    --ram: #3a3a3a;
+    --ram-stark: #555555;
+    --ram-svag: #2e2e2e;
+
+    --fel: #f08a8a;
+    --fel-yta: #3a1f1f;
+    --fel-ram: #7a3a3a;
+    --lyckat-yta: #1f3325;
+    --lyckat-ram: #3d6b4a;
+    --markerat-yta: #1f2c3a;
+    --markerat-ram: #4a6d94;
+
+    --skugga: rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root[data-tema="auto"] {
+        /* Samma värden som :root[data-tema="mork"] - se kommentaren där
+           för resonemanget. Måste hållas i synk manuellt: det finns
+           ingen CSS-mekanism för att låta ett @media-block ärva från en
+           vanlig regel. */
+        --accent: #96233F;
+        --accent-hover: #ad2b4c;
+        --accent-lank: #E8A5BC;
+        --pa-accent: #ffffff;
+
+        --yta-1: #1c1c1c;
+        --yta-2: #262626;
+        --yta-3: #333333;
+        --yta-hover: #303030;
+
+        --text: #e8e8e8;
+        --text-dampad: #a8a8a8;
+        --text-svag: #888888;
+
+        --ram: #3a3a3a;
+        --ram-stark: #555555;
+        --ram-svag: #2e2e2e;
+
+        --fel: #f08a8a;
+        --fel-yta: #3a1f1f;
+        --fel-ram: #7a3a3a;
+        --lyckat-yta: #1f3325;
+        --lyckat-ram: #3d6b4a;
+        --markerat-yta: #1f2c3a;
+        --markerat-ram: #4a6d94;
+
+        --skugga: rgba(0, 0, 0, 0.6);
+    }
+}
+
+body {
+    font-family: var(--font);
+    background: var(--yta-1);
+    color: var(--text);
+    line-height: 1.5;
+}
+
+h1 { font-size: 1.5rem; font-weight: 600; }
+h2 { font-size: 1.2rem; font-weight: 600; }
+
+a { color: var(--accent-lank); }
+
+/* Formulärkontroller ärver inte typsnitt automatiskt i alla webbläsare -
+   utan detta renderas inputs/knappar i webbläsarens eget defaulttypsnitt
+   medan resten av sidan följer --font. */
+input, select, textarea, button { font: inherit; color: inherit; }
+
+input, select, textarea {
+    background: var(--yta-2);
+    border: 1px solid var(--ram-stark);
+    border-radius: var(--radie);
+    padding: 0.4rem;
+    box-sizing: border-box;
+}
+
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Den primära knappstilen: fylld accentyta. Gäller både <button> och
+   länkar som ser ut som knappar (.knapp) - samma utseende oavsett
+   vilket element handlingen råkar behöva. */
+button, .knapp {
+    display: inline-block;
+    padding: 0.55rem 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--radie);
+    background: var(--accent);
+    color: var(--pa-accent);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+button:hover, .knapp:hover { background: var(--accent-hover); }
+
+/* Sekundär variant för handlingar som inte är sidans huvudsakliga -
+   samma form, men bara en ram istället för en fylld yta, så att den
+   primära knappen behåller sin tyngd. */
+.knapp-sekundar {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--ram-stark);
+}
+
+.knapp-sekundar:hover { background: var(--yta-hover); }
+
+/* Sektionsrubrik + kort: ett grupperat avsnitt med en dämpad etikett
+   ovanför. Infört på inställningssidan och återanvänt av formuläret -
+   ligger här, inte i en enskild mall, just för att det numera är
+   flera sidor som delar mönstret. */
+.sektionsrubrik {
+    font-size: 0.78rem;
+    color: var(--text-dampad);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 2rem 0 0.5rem;
+}
+
+.kort {
+    border: 1px solid var(--ram);
+    border-radius: var(--radie-stor);
+    background: var(--yta-2);
+    overflow: hidden;
+}
+
+/* Formulärfält: etiketten är dämpad och liten, värdet/kontrollen bär
+   tyngden - samma hierarki som vinlistan visar sparad data med
+   (etikett ovanför värde), så ett fält ser likadant ut oavsett om det
+   läses eller redigeras. */
+.falt { display: block; padding: 0.75rem 1rem; border-top: 1px solid var(--ram-svag); }
+/* Bara kortets allra första rad saknar skiljelinje - gäller både ett
+   ensamt fält och det första fältet i en delad rad. Skrivet mot kortets
+   FÖRSTA BARN, inte mot `.falt:first-child`, eftersom en delad rad
+   lägger en <div> mellan kortet och fälten: annars tappade varje delad
+   rads vänstra fält sin linje mitt i formuläret. */
+.kort > .falt:first-child,
+.kort > .faltrad:first-child > .falt { border-top: none; }
+.falt > span {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-dampad);
+    margin-bottom: 0.3rem;
+}
+
+/* Markerar de få obligatoriska fälten, i stället för att markera de
+   många valfria: bara två av vinformulärets ~20 fält måste fyllas i, så
+   markeringen syns bäst där den är sällsynt.
+
+   Formen är samma dämpade "bricka" som vinlistans filterchips - inte
+   accentfärgad, eftersom accenten är reserverad för sidans primära
+   handling. Ordet står utskrivet i stället för en asterisk: en asterisk
+   kräver en förklarande fotnot någonstans på sidan för att betyda
+   något.
+
+   Dolt för skärmläsare (aria-hidden) eftersom inputens `required`
+   redan meddelas av webbläsaren själv - annars läses fältet upp som
+   "Namn obligatoriskt, obligatoriskt". */
+.obligatoriskt {
+    font-style: normal;
+    font-size: 0.68rem;
+    color: var(--text-dampad);
+    background: var(--yta-3);
+    border-radius: 999px;
+    padding: 0.1rem 0.45rem;
+    margin-left: 0.4rem;
+    vertical-align: 0.05em;
+}
+
+/* Korta fält (årgång, antal, pris) delar rad på skärmar som rymmer det
+   - annars blir ett långt formulär onödigt högt av fält som bara
+   innehåller några tecken. Under brytpunkten staplas de i stället, och
+   är då vanliga rader som alla andra. */
+.faltrad { display: grid; grid-template-columns: 1fr; }
+@media (min-width: 32rem) {
+    .faltrad { grid-template-columns: 1fr 1fr; }
+    .faltrad > .falt + .falt { border-left: 1px solid var(--ram-svag); }
+}
+
+.atgardsrad { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 1.5rem; }
+
+/* Filväljare: webbläsarens egen knapp för <input type="file"> går
+   varken att styla eller översätta - texten ("Choose File", "No file
+   chosen") kommer från webbläsarens språk, inte sidans. Den enda vägen
+   runt det är att dölja inputen och låta en <label> som pekar på den
+   fungera som knapp, med filnamnet utskrivet bredvid.
+
+   Inputen döljs visuellt men finns kvar i dokumentet och är fortfarande
+   fokuserbar med tangentbord (därav den ärvda fokusmarkeringen på
+   labeln nedan) - `display: none` hade tagit bort den ur både
+   tabbordningen och formulärinskicket. */
+.filval { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.filval input[type="file"] {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+.filval input[type="file"]:focus-visible + .knapp { outline: 2px solid var(--accent); outline-offset: 1px; }
+.filval .knapp { flex-shrink: 0; }
+.filval-namn { font-size: 0.9rem; color: var(--text-dampad); min-width: 0; overflow-wrap: anywhere; }
+
+/* Återkoppling efter en handling (spara/ändra/ta bort ett vin) - i dag
+   händer allt tyst, man hamnar bara tillbaka på listan. Tonar bort sig
+   själv (se JS i vinkallare.html); stannar permanent om JS är avstängt,
+   vilket är ofarligt.
+
+   Flytande (position: fixed) och UTAN ram - en ram/bakgrund-yta med
+   knapp-radie är exakt vad en knapp också är, och brickan såg därför ut
+   som en tredje, obegriplig handling bredvid de riktiga. Positionerad
+   relativt VIEWPORTEN, inte body - body:s egen margin/padding (som
+   skiljer sig mellan bred och smal vy) påverkar den alltså inte.
+
+   Fylld, mättad grön (--lyckat-fyllnad/--pa-lyckat) - INTE den bleka
+   --lyckat-yta/-ram som etikettskanningens resultatruta använder.
+   Bleka tonen visade sig för lätt att missa i praktiken (användarens
+   egen återkoppling efter att ha testat lokalt) - samma princip som
+   knapparna (mättad yta + ljus text) i stället för en dämpad ruta.
+
+   Högst upp, centrerad - INTE mitt på skärmen (trots att det var det
+   som efterfrågades först): en centrerad, självförsvinnande bricka utan
+   krav på interaktion riskerar att läsas som en dialogruta man förväntas
+   kvittera, särskilt på mobil där mitten är precis där blicken redan är.
+   Högst upp/mitten är samma zon som mobila systemnotiser använder för
+   "lägg märke till det här" utan att täcka innehållet man tittar på.
+   z-index högre än FAB:ens (10), så en toast som råkar visas samtidigt
+   som FAB:en alltid hamnar överst - och eftersom den ligger OVANPÅ allt
+   (inte bakom) gör det inget att den periodvis överlappar toppraden
+   visuellt, till skillnad från förra placeringen (botten) vars hela
+   poäng var att undvika just den overlappen helt.
+
+   Elementet dyker upp och försvinner med hela sidladdningen/htmx-swapen
+   det hör till (server-genererat, inte JS-skapat) - se kommentaren vid
+   `.toast[th:if]` i vinkallare.html för var det renderas. */
+.toast {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: fixed;
+    /* Under toppraden, inte överlappande den - uppmätt ett verkligt
+       ~9px överlapp mot titeltexten "Vinkällaren" på en 375px mobilvy
+       med top: 1rem. z-index gör att toasten hade ritats OVANPÅ
+       titeln (inte gömts), men att periodvis skymma appens egen titel
+       är fult nog för att undvikas helt i stället för att finjustera
+       mot en specifik textbredd som ändå är skört om titeln någonsin
+       ändras. */
+    top: 4.5rem;
+    left: 50%;
+    /* Centreringen rörs ALDRIG av animation eller transition - bara
+       opacity animeras (se nedan). Ett tidigare försök lät samma
+       transform-egenskap skötas av både @keyframes och transition, vilket
+       gav ett kort men verkligt fellägen mitt emellan de två (uppmätt:
+       elementet hoppade till fel position exakt när in-animationen tog
+       slut, ett känt krångel när en @keyframes-övergång och en separat
+       transition delar samma CSS-egenskap med olika värdesyntax). */
+    transform: translateX(-50%);
+    background: var(--lyckat-fyllnad);
+    color: var(--pa-lyckat);
+    border-radius: 999px;
+    padding: 0.55rem 1.1rem 0.55rem 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 4px 14px var(--skugga);
+    z-index: 20;
+    animation: toast-in 0.25s ease-out;
+    transition: opacity 0.4s ease;
+}
+.toast svg { color: var(--pa-lyckat); flex-shrink: 0; }
+.toast-dold { opacity: 0; }
+@keyframes toast-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.topprad { display: flex; align-items: center; gap: 0.75rem; }
+.topprad-titel { margin: 0; flex: 1; }
+.topprad-ikonlank {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radie);
+    border: 1px solid var(--ram-stark);
+    color: var(--text);
+    text-decoration: none;
+    flex-shrink: 0;
+}
+.topprad-ikonlank:hover { background: var(--yta-hover); }

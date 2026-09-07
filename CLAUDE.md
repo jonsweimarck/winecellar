@@ -138,6 +138,33 @@ dem:
 - **`quantity`** är en enkel räknare som ändras direkt vid redigering.
   Inget förbrukningslogg (datum när en flaska dracks) - om det blir
   aktuellt är det en ny, separat tabell, inte en ombyggnad av `wines`.
+- **`target/` delas mellan Claude-sessioner som jobbar i samma
+  checkout**, oavsett vilken gren var och en står på - ett grenbyte
+  rensar bara `src/`, inte kompilerade klasser/resurser. En annan
+  sessions `mvn`-körning på sin egen gren kan lämna kvar en stale
+  `.feature`-fil (eller annan resurs) i `target/test-classes/` som
+  Cucumber sedan plockar upp som om den hörde till DIN gren - ett
+  `UndefinedStepException` för ett scenario som inte ens finns i `src/`
+  är ett tecken på just det här, inte ett kodfel. `mvn clean verify`
+  löser det.
+- **Alla IT-klasser delar EN Postgres-container** (`support/
+  SharedPostgres`, statiskt startad - inte `@Testcontainers`/`@Container`,
+  som ger en container per klass). Den större vinsten är att identiska
+  egenskapsvärden låter Spring återanvända testkontexten mellan klasser.
+  Konsekvens: databasen delas, så varje test måste sätta upp sina egna
+  data i `@BeforeEach` - lita inte på att något överlever mellan
+  testmetoder, och notera att `listWines(null)` returnerar SAMTLIGA
+  viner (används av en städmetod som alltså tömmer hela tabellen).
+- **Playwrights `isVisible()` är fel verktyg för `clip`-dolda element** -
+  en 1x1-pixel-input räknas som synlig. Mät den renderade ytan i stället.
+  `evaluate` returnerar dessutom `Integer` för hela tal och `Double`
+  annars; casta via `Number`.
+- **UI-testfälla att komma ihåg:** `WineListResponsiveIT`/
+  `ImportExportFlowIT` klickar länkar där de faktiskt sitter i UI:t.
+  Flyttas en länk till en annan sida (som export gjorde i WINE-37) går
+  testet i timeout, inte ett tydligt "hittade inte elementet" - och
+  Surefire-sviten ensam avslöjar det INTE. Kör `mvn verify`, inte bara
+  `mvn test`, efter varje ändring av navigationen.
 - **Bilder lagras direkt i `wines`-tabellen** (`image` bytea +
   `image_mime_type`) - se [ADR 0004](docs/adr/0004-images-in-bytea.md).
   `image_mime_type` sätts från `MultipartFile.getContentType()` vid
@@ -173,6 +200,104 @@ dem:
   finns inte längre (desktopvyn är kort-baserad, inte en `<table>`) -
   se Kända fällor nedan om `.vk-bildyta`s bildjustering om den CSS:en
   någonsin behöver röras igen.
+
+## Designsystem och navigation - nuläge
+
+Se [ADR 0019](docs/adr/0019-shared-theme-css-variables.md).
+
+- **`static/css/tema.css` är den delade stilmallen** - färg, typografi
+  och delade komponenter (`.knapp`/`.knapp-sekundar`, `.topprad`,
+  formulärkontroller). Sidspecifik layout ligger kvar i respektive mall.
+  **Hårdkoda aldrig ett färgvärde i en mall** - då följer den inte med i
+  temaväxlingen. Använd variablerna (`--accent`, `--yta-1/2/3`, `--text`,
+  `--ram`, `--fel` osv.).
+- **Formulär byggs av `.sektionsrubrik` + `.kort` + `.falt`** (alla i
+  tema.css), inte `<fieldset>`/`<legend>` - rubriken hamnar då utanför
+  ramen, som på inställningssidan. `.faltrad` lägger två korta fält på
+  samma rad över 32rem. **Fälten måste vara kortets DIREKTA barn** -
+  ett mellanliggande `<form>` bryter `.kort > .falt:first-child` och ger
+  en skiljelinje överst i kortet. Lägg `<form>` runt kortet i stället.
+- **Filväljare byggs med `.filval`** (tema.css): inputen döljs visuellt
+  och en `<label for=...>` fungerar som knapp. Webbläsarens egen
+  filknapp går varken att styla eller översätta - texten ("Choose File")
+  kommer från webbläsarens språk, inte sidans. Inputen döljs med
+  `clip`, INTE `display: none`, så den finns kvar i tabbordningen och i
+  formulärinskicket. En `<label class="falt">` kan inte innehålla
+  filväljaren (label i label) - använd `<div class="falt">` där.
+- **Accenten är reserverad för sidans primära handling.** "Ta bort" är
+  medvetet dämpad (ram + felfärgad text), inte en fylld accentknapp -
+  den upprepas en gång per vinkort.
+- **Mörkt läge** väljs i Inställningar (Auto/Ljust/Mörkt), sparas i
+  `localStorage` och sätts av skriptet i `fragments/tema.html`. Det
+  skriptet **måste ligga i `<head>` och köras synkront** - annars
+  blinkar sidan ljust innan den blir mörk vid varje sidladdning.
+- **`/css/**` och `/js/**` är `permitAll` i `SecurityConfig`** -
+  login/registrera är anonyma sidor och hade annars renderats helt
+  ostylade.
+- **Webbläsarens inbyggda valideringstexter är på webbläsarens språk,
+  inte sidans** ("Please fill out this field"). `static/js/validering.js`
+  ersätter dem via `setCustomValidity` och laddas av de sidor som har
+  obligatoriska fält. **Fälla:** ett fält med satt custom-validity
+  räknas som ogiltigt tills meddelandet nollställs - glöms det går
+  formuläret aldrig att skicka, ens när det är korrekt ifyllt. Filen
+  nollställer därför alltid först och sätter meddelandet efteråt.
+- **Mallar och `static/`-filer serveras från den BYGGDA kopian** när
+  appen körs via `spring-boot:run` (ingen devtools i projektet). En
+  ändring i `src/main/resources` syns inte i en redan startad app, hur
+  många gånger man än laddar om i webbläsaren - starta om servern.
+- **Navigationen:** kugghjul i toppraden → `/installningar`, som samlar
+  import (`/import`), export (`/export`) och Logga ut. Import/export
+  ligger alltså INTE längre som knappar på vinlistan. `fragments/
+  topprad.html` delas av alla inloggade sidor (kugghjul när
+  `tillbakaLank` är null, annars tillbaka-pil).
+- **`z-index` gör att ett `position: fixed`-element ritas OVANPÅ annat
+  innehåll, inte att det undviker det.** Toasten flyttades från botten
+  till högst upp/mitten (WINE-43, efter att bottenplaceringen visade sig
+  för lätt att missa) - ett första försök med `top: 1rem` gav ett
+  uppmätt ~9px 2D-överlapp mot toppradens titeltext ("Vinkällaren"), som
+  toasten då hade ritats rakt ovanpå i stället för bredvid. Lösningen är
+  att placera den under toppraden (`top: 4.5rem`), inte att finjustera
+  mot en specifik textbredd - särskilt eftersom `fragments/topprad.html`
+  delas av flera sidor med olika (och på formulärsidan dynamisk) titel.
+- **Blanda aldrig `animation` (`@keyframes`) och `transition` på SAMMA
+  CSS-egenskap på samma element.** `.toast` gjorde det först för
+  `transform` (in-animation via keyframes, uttoning via transition) -
+  gav ett kort men mätbart felläge exakt när animationen tog slut och
+  elementet föll tillbaka till basregelns värde, särskilt märkbart när
+  keyframes använde `translate(-50%, Ypx)` men basregeln `translateX(-50%)`
+  (två syntaktiskt olika sätt att uttrycka "samma" transform, som
+  webbläsaren inte alltid behandlar som likvärdiga vid övergången).
+  Lösning: låt `transform` (centrering) vara en helt konstant basregel
+  som varken animation eller transition rör - animera bara `opacity`.
+- **Återkoppling efter spara/redigera/ta bort** (`.toast` i tema.css,
+  `${feedback}` i vinkallare.html): lägg till/redigera redirectar, så
+  meddelandet MÅSTE sättas via `RedirectAttributes.addFlashAttribute`
+  (ett vanligt Model-attribut vore borta redan innan GET / körs). Ta
+  bort är en direkt htmx-render av samma request - där räcker ett
+  vanligt `model.addAttribute`. **`event.detail.target` i en
+  `htmx:afterSwap`-lyssnare är INTE en pålitlig referens till det nya
+  innehållet vid `hx-swap="outerHTML"`** - target-elementet ersätts ju
+  självt. Sök i `document` i stället för att lita på den referensen,
+  annars körs aldrig bortfoningen efter en htmx-swap (upptäcktes bara av
+  ett Playwright-test som faktiskt väntade ut hela 3-sekunderstimern,
+  inte av att toasten syntes - den syntes fint, den försvann bara aldrig).
+- **Vinlistan har två skilda tomma lägen**, styrda av `totalCount`
+  (ofiltrerad): tom källare (inbjudan att lägga till/importera, och
+  verktygsraden döljs HELT) kontra sökning utan träffar (verktygsraden
+  måste vara kvar, annars går filtret inte att ta bort). Verktygsraden
+  ligger utanför htmx-fragmentet, så den dyker upp/försvinner först vid
+  nästa hela sidladdning - medvetet.
+- **Två CSS-fällor som båda kostat tid i vinlistans mobilvy:** (1)
+  `.sok-grupp` och `.falt-grupp` sitter på SAMMA element med samma
+  specificitet - den sist deklarerade vinner, så ordningen i filen
+  avgör; (2) `min-width: 0` måste sättas på själva flex-itemet, inte
+  bara på kontrollen inuti - en `<select>` är annars så bred som sitt
+  längsta alternativ och tvingar fram radbrytning.
+- **"Lägg till vin" är två skilda element**, inte ett omformat: vanlig
+  knapp på desktop, flytande rund knapp (FAB) nere till höger på mobil.
+  Standardregeln `display: none` för FAB:en måste ligga FÖRE
+  media-queryn - samma specificitet gör annars att den sist deklarerade
+  regeln vinner och FAB:en förblir dold även på mobil.
 
 ## Säkerhet - nuläge
 

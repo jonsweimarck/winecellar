@@ -16,11 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import com.example.winecellar.support.SharedPostgres;
 
 import java.util.Base64;
 import java.util.Optional;
@@ -39,18 +35,7 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
  * FakeLabelInterpreter, se docs/adr/0012.
  */
 @SpringBootTest(webEnvironment = RANDOM_PORT)
-@Testcontainers
-class LabelScanFormIT {
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
+class LabelScanFormIT extends SharedPostgres {
 
     @LocalServerPort
     private int port;

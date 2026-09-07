@@ -4,36 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="${wine.id == null ? 'Lägg till vin' : 'Redigera vin'}"></title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <script th:src="@{/js/validering.js}" defer></script>
     <style>
-        body { font-family: sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
-        label { display: block; margin-top: 0.75rem; font-weight: bold; }
-        input, select, textarea { width: 100%; padding: 0.4rem; box-sizing: border-box; font: inherit; }
+        body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem 4rem; }
+        input, select, textarea { width: 100%; }
         textarea { min-height: 5rem; resize: vertical; }
-        button, .knapp { padding: 0.6rem 1rem; margin-top: 1.5rem; }
-        .knapp { display: inline-block; text-decoration: none; color: inherit; border: 1px solid #999; border-radius: 0.25rem; }
-        fieldset { margin-top: 1.5rem; border: 1px solid #ddd; border-radius: 0.25rem; }
-        legend { font-weight: bold; padding: 0 0.5rem; }
-        .vinbild-formular { max-width: 10rem; max-height: 12rem; display: block; margin-bottom: 0.5rem; border-radius: 0.25rem; }
-        .dubblettvarning { border: 1px solid #d99; background: #fdf2f2; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
+
+        /* Fälten sitter i kort (se .kort/.falt i tema.css) i stället för
+           i <fieldset>/<legend>: sektionsrubriken ligger då UTANFÖR
+           ramen, vilket ger samma gruppering som inställningssidan
+           använder - och slipper <legend>:s inbakade placering i
+           ramkanten, som inte går att få konsekvent mellan webbläsare. */
+        .kort { margin-bottom: 0.5rem; }
+        .vinbild-formular { max-width: 10rem; max-height: 12rem; display: block; margin-bottom: 0.5rem; border-radius: var(--radie); }
+        .dubblettvarning { border: 1px solid var(--fel-ram); background: var(--fel-yta); border-radius: var(--radie); padding: 1rem; margin-top: 1rem; }
         .dubblettvarning p { margin: 0; }
         .dubblettvarning form { display: inline-block; margin-top: 0.75rem; }
-        .etikettskanning { border: 1px solid #ddd; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
-        .etikettskanning input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
-        .etikettvarning { border: 1px solid #d99; background: #fdf2f2; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
+        .etikettskanning { border: 1px solid var(--ram); border-radius: var(--radie); padding: 1rem; margin-top: 1rem;
+            background: var(--yta-2); }
+        .etikettvarning { border: 1px solid var(--fel-ram); background: var(--fel-yta); border-radius: var(--radie); padding: 1rem; margin-top: 1rem; }
         .etikettvarning p { margin: 0; }
-        .etikettstatus { color: #666; font-style: italic; margin: 0.5rem 0 0; }
-        .etikettresultat { border: 1px solid #9c9; background: #f2fdf5; border-radius: 0.25rem; padding: 1rem; margin-top: 1rem; }
+        .etikettstatus { color: var(--text-dampad); font-style: italic; margin: 0.5rem 0 0; }
+        .etikettresultat { border: 1px solid var(--lyckat-ram); background: var(--lyckat-yta); border-radius: var(--radie); padding: 1rem; margin-top: 1rem; }
         .etikettresultat p { margin: 0; }
-        .tolkat-falt { background: #eef6ff; border-color: #6699cc; }
+        .tolkat-falt { background: var(--markerat-yta); border-color: var(--markerat-ram); }
     </style>
 </head>
 <body>
-    <h1 th:text="${wine.id == null ? 'Lägg till vin' : 'Redigera ' + wine.name}"></h1>
+    <div th:replace="~{fragments/topprad :: topprad(${wine.id == null ? 'Lägg till vin' : 'Redigera ' + wine.name}, '/')}"></div>
 
     <form method="post" enctype="multipart/form-data" th:action="@{/wines/tolka-etikett}"
           th:if="${wine.id == null}" class="etikettskanning">
-        <label for="etikett-input" class="knapp">Skanna med kameran</label>
-        <input type="file" name="bild" accept="image/*" capture="environment" id="etikett-input">
+        <div class="filval">
+            <input type="file" name="bild" accept="image/*" capture="environment" id="etikett-input">
+            <label for="etikett-input" class="knapp knapp-sekundar">Skanna med kameran</label>
+        </div>
         <p id="etikett-status" class="etikettstatus"></p>
     </form>
 
@@ -66,18 +72,26 @@
 
     <form method="post" enctype="multipart/form-data"
           th:action="${wine.id == null} ? @{/wines} : @{/wines/{id}/redigera(id=${wine.id.value})}">
-        <fieldset>
-            <legend>Grunduppgifter</legend>
-            <label>Namn
+        <p class="sektionsrubrik">Grunduppgifter</p>
+        <div class="kort">
+            <label class="falt"><span>Namn <em class="obligatoriskt" aria-hidden="true">Obligatoriskt</em></span>
                 <input type="text" name="name" th:value="${wine.name}" required
                        th:classappend="${interpretedFields != null and interpretedFields.contains('name')} ? 'tolkat-falt'">
             </label>
-            <label>Etikett
+            <!-- <div>, inte <label>, till skillnad från fälten omkring:
+                 knappen nedan ÄR en <label> (den enda vägen att styra en
+                 filväljare med egen text), och en label får inte ligga
+                 inuti en annan. -->
+            <div class="falt"><span>Etikett</span>
                 <img th:if="${wine.hasImage() and wine.id != null}" th:src="@{/wines/{id}/bild(id=${wine.id.value})}"
                      alt="Nuvarande etikett" class="vinbild-formular">
-                <input type="file" name="bild" accept="image/*">
-            </label>
-            <label>Typ
+                <div class="filval">
+                    <input type="file" name="bild" accept="image/*" id="bild-input">
+                    <label for="bild-input" class="knapp knapp-sekundar">Välj bild</label>
+                    <span class="filval-namn" id="bild-namn">Ingen bild vald</span>
+                </div>
+            </div>
+            <label class="falt"><span>Typ</span>
                 <select name="wineType">
                     <option value="" th:selected="${wine.wineType == null}">Ej valt</option>
                     <option value="RED" th:selected="${wine.wineType != null and wine.wineType.name() == 'RED'}">Rött</option>
@@ -87,93 +101,103 @@
                     <option value="FORTIFIED" th:selected="${wine.wineType != null and wine.wineType.name() == 'FORTIFIED'}">Starkvin</option>
                 </select>
             </label>
-            <label>Producent
+            <label class="falt"><span>Producent</span>
                 <input type="text" name="producer" th:value="${wine.producer}"
                        th:classappend="${interpretedFields != null and interpretedFields.contains('producer')} ? 'tolkat-falt'">
             </label>
-            <label>Land
+            <label class="falt"><span>Land</span>
                 <input type="text" name="country" th:value="${wine.country}"
                        th:classappend="${interpretedFields != null and interpretedFields.contains('country')} ? 'tolkat-falt'">
             </label>
-            <label>Region
-                <input type="text" name="region" th:value="${wine.region}"
-                       th:classappend="${interpretedFields != null and interpretedFields.contains('region')} ? 'tolkat-falt'">
-            </label>
-            <label>Underregion
-                <input type="text" name="subregion" th:value="${wine.subregion}">
-            </label>
-            <label>Druvor
+            <div class="faltrad">
+                <label class="falt"><span>Region</span>
+                    <input type="text" name="region" th:value="${wine.region}"
+                           th:classappend="${interpretedFields != null and interpretedFields.contains('region')} ? 'tolkat-falt'">
+                </label>
+                <label class="falt"><span>Underregion</span>
+                    <input type="text" name="subregion" th:value="${wine.subregion}">
+                </label>
+            </div>
+            <label class="falt"><span>Druvor</span>
                 <input type="text" name="grapes" th:value="${wine.grapes}">
             </label>
-            <label>Årgång
-                <input type="number" name="vintage" th:value="${wine.vintage}"
-                       th:classappend="${interpretedFields != null and interpretedFields.contains('vintage')} ? 'tolkat-falt'">
-            </label>
-            <label>Plats
+            <div class="faltrad">
+                <label class="falt"><span>Årgång</span>
+                    <input type="number" name="vintage" th:value="${wine.vintage}"
+                           th:classappend="${interpretedFields != null and interpretedFields.contains('vintage')} ? 'tolkat-falt'">
+                </label>
+                <label class="falt"><span>Antal flaskor <em class="obligatoriskt" aria-hidden="true">Obligatoriskt</em></span>
+                    <input type="number" name="quantity" min="0" th:value="${wine.quantity}" required>
+                </label>
+            </div>
+            <label class="falt"><span>Plats</span>
                 <input type="text" name="location" th:value="${wine.location}">
             </label>
-            <label>Antal flaskor
-                <input type="number" name="quantity" min="0" th:value="${wine.quantity}" required>
-            </label>
-        </fieldset>
+        </div>
 
-        <fieldset>
-            <legend>Inköp</legend>
-            <label>Inköpsdatum
-                <input type="date" name="purchaseDate" th:value="${wine.purchaseDate}">
-            </label>
-            <label>Pris
-                <input type="number" step="0.01" min="0" name="price" th:value="${wine.price}">
-            </label>
-            <label>Varför köpt
+        <p class="sektionsrubrik">Inköp</p>
+        <div class="kort">
+            <div class="faltrad">
+                <label class="falt"><span>Inköpsdatum</span>
+                    <input type="date" name="purchaseDate" th:value="${wine.purchaseDate}">
+                </label>
+                <label class="falt"><span>Pris</span>
+                    <input type="number" step="0.01" min="0" name="price" th:value="${wine.price}">
+                </label>
+            </div>
+            <label class="falt"><span>Varför köpt</span>
                 <textarea name="purchaseReason" th:text="${wine.purchaseReason}"></textarea>
             </label>
-        </fieldset>
+        </div>
 
-        <fieldset>
-            <legend>Eget intryck</legend>
-            <label>Tasting notes
+        <p class="sektionsrubrik">Eget intryck</p>
+        <div class="kort">
+            <label class="falt"><span>Tasting notes</span>
                 <textarea name="tastingNotes" th:text="${wine.tastingNotes}"></textarea>
             </label>
-            <label>Eget betyg
+            <label class="falt"><span>Eget betyg</span>
                 <select name="ownRating">
                     <option value="">Inget betyg</option>
                     <option th:each="r : ${ratings}" th:value="${r.name()}" th:text="${r.label()}"
                             th:selected="${wine.ownRating == r}"></option>
                 </select>
             </label>
-        </fieldset>
+        </div>
 
-        <fieldset>
-            <legend>Externa källor</legend>
-            <label>Systembolagets produktnummer
-                <input type="text" name="systembolagetProductNumber" th:value="${wine.systembolagetProductNumber}">
-            </label>
-            <label>Systembolagets beskrivning
+        <p class="sektionsrubrik">Externa källor</p>
+        <div class="kort">
+            <div class="faltrad">
+                <label class="falt"><span>Systembolagets produktnummer</span>
+                    <input type="text" name="systembolagetProductNumber" th:value="${wine.systembolagetProductNumber}">
+                </label>
+                <label class="falt"><span>Vivino-betyg</span>
+                    <input type="number" step="0.1" min="0" max="5" name="vivinoRating" th:value="${wine.vivinoRating}">
+                </label>
+            </div>
+            <label class="falt"><span>Systembolagets beskrivning</span>
                 <textarea name="systembolagetDescription" th:text="${wine.systembolagetDescription}"></textarea>
             </label>
-            <label>Munskänkarnas bedömning
+            <label class="falt"><span>Munskänkarnas bedömning</span>
                 <textarea name="munskankarnaReview" th:text="${wine.munskankarnaReview}"></textarea>
             </label>
-            <label>Munskänkarnas betyg
+            <label class="falt"><span>Munskänkarnas betyg</span>
                 <select name="munskankarnaRating">
                     <option value="">Inget betyg</option>
                     <option th:each="r : ${ratings}" th:value="${r.name()}" th:text="${r.label()}"
                             th:selected="${wine.munskankarnaRating == r}"></option>
                 </select>
             </label>
-            <label>Vivino-betyg
-                <input type="number" step="0.1" min="0" max="5" name="vivinoRating" th:value="${wine.vivinoRating}">
-            </label>
-            <label>Annan referens
+            <label class="falt"><span>Annan referens</span>
                 <textarea name="otherReference" th:text="${wine.otherReference}"></textarea>
             </label>
-        </fieldset>
+        </div>
 
-        <button type="submit" th:text="${wine.id == null ? 'Lägg till' : 'Spara'}"></button>
-        <button type="submit" name="confirmAdd" value="true"
-                th:if="${duplicateExisting != null and !duplicateIsFull}">Lägg till som nytt vin ändå</button>
-        <a class="knapp" href="/">Avbryt</a>
+        <div class="atgardsrad">
+            <button type="submit" th:text="${wine.id == null ? 'Lägg till' : 'Spara'}"></button>
+            <button type="submit" name="confirmAdd" value="true" class="knapp-sekundar"
+                    th:if="${duplicateExisting != null and !duplicateIsFull}">Lägg till som nytt vin ändå</button>
+            <a class="knapp knapp-sekundar" href="/">Avbryt</a>
+        </div>
     </form>
 
     <script>
@@ -221,6 +245,23 @@
                     bild.src = händelse.target.result;
                 };
                 läsare.readAsDataURL(vald);
+            });
+        })();
+
+        // Skriver ut namnet på den valda bildfilen bredvid knappen.
+        // Nödvändigt eftersom den dolda inputen tog med sig webbläsarens
+        // egen "ingen fil vald"-text när den doldes - utan det här får
+        // användaren ingen kvittens alls på att filen faktiskt valdes.
+        (function () {
+            var bildInput = document.getElementById('bild-input');
+            var namnRad = document.getElementById('bild-namn');
+            if (!bildInput || !namnRad) {
+                return;
+            }
+            var ursprungsText = namnRad.textContent;
+            bildInput.addEventListener('change', function () {
+                var vald = bildInput.files[0];
+                namnRad.textContent = vald ? vald.name : ursprungsText;
             });
         })();
 
