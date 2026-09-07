@@ -6,10 +6,8 @@
     använder samma fragment, så kugghjulet inte glöms bort på en enskild
     sida när fler sidor läggs till.
 
-    CSS:en för `.topprad*` duplicerar sig i varje anropande sidas egen
-    <style>-block (samma mönster som `.knapp` redan gör där) - det finns
-    ännu ingen delad static/css-fil i projektet. Känd förenkling, se
-    diskussionen om ett gemensamt designsystem i CLAUDE.md.
+    CSS:en för `.topprad*` ligger i static/css/tema.css (ADR 0019) -
+    delad av alla anropande sidor, inte duplicerad per sida.
 -->
 <div th:fragment="topprad(titel, tillbakaLank)" class="topprad">
     <a th:if="${tillbakaLank != null}" th:href="${tillbakaLank}" class="topprad-ikonlank" aria-label="Tillbaka" title="Tillbaka">

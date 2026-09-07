@@ -10,8 +10,13 @@ import org.springframework.web.bind.annotation.GetMapping;
  * Spring Securitys `/logout`, hanteras inte här). Ingen egen modell/data -
  * sidan är bara länkar, se {@code installningar.html}.
  *
- * Mörkt/ljust läge finns med som en inaktiv platshållare i markupen
- * (Utseende-sektionen) - inte kopplad till något ännu.
+ * Mörkt/ljust/auto-läge (Utseende-sektionen) är fullt fungerande, men
+ * helt klientsidan - växlingen sköts av installningar.html:s eget
+ * skript (sparar valet i localStorage) och läses av
+ * fragments/tema.html på varje sidladdning. Ingen serverlogik här:
+ * temat är en visningspreferens i webbläsaren, inte kontobunden data
+ * (se ADR 0019). Verifieras av TemaIT, inte av något test mot den här
+ * controllern.
  */
 @Controller
 public class SettingsController {
