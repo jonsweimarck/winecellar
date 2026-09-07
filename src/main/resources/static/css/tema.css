@@ -84,10 +84,21 @@
     därför bara när inget eget val gjorts (`data-tema="auto"`).
 */
 :root[data-tema="mork"] {
-    --accent: #E27FA0;
-    --accent-hover: #ea94b0;
+    /* --accent var tidigare en ljus, rosa ton (#E27FA0) även för den
+       FYLLDA ytan (knappar/badges) - i praktiken onödigt: --accent
+       används ALDRIG som text direkt mot sidan (bara --accent-lank
+       gör det), utan alltid som en bakgrund med --pa-accent ovanpå.
+       Fyllda ytor behöver alltså inte vara ljusa för att synas - de
+       behöver bara skilja sig från sidbakgrunden, precis som ljust
+       lägets mörka bordeaux redan gör mot en vit sida. Bytt till en
+       djup, mättad vinröd (nästan samma mörker som ljust läge) med vit
+       text ovanpå i stället - användarens egen jämförelse mot en annan
+       apps mörka tema. --accent-lank (bar länktext mot sidan) är kvar
+       ljusare: DEN behöver fortfarande kontrast mot den mörka sidan. */
+    --accent: #96233F;
+    --accent-hover: #ad2b4c;
     --accent-lank: #E8A5BC;
-    --pa-accent: #3a0f1e;
+    --pa-accent: #ffffff;
 
     --yta-1: #1c1c1c;
     --yta-2: #262626;
@@ -115,10 +126,14 @@
 
 @media (prefers-color-scheme: dark) {
     :root[data-tema="auto"] {
-        --accent: #E27FA0;
-        --accent-hover: #ea94b0;
+        /* Samma värden som :root[data-tema="mork"] - se kommentaren där
+           för resonemanget. Måste hållas i synk manuellt: det finns
+           ingen CSS-mekanism för att låta ett @media-block ärva från en
+           vanlig regel. */
+        --accent: #96233F;
+        --accent-hover: #ad2b4c;
         --accent-lank: #E8A5BC;
-        --pa-accent: #3a0f1e;
+        --pa-accent: #ffffff;
 
         --yta-1: #1c1c1c;
         --yta-2: #262626;

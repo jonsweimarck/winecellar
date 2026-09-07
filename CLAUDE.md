@@ -138,6 +138,15 @@ dem:
 - **`quantity`** är en enkel räknare som ändras direkt vid redigering.
   Inget förbrukningslogg (datum när en flaska dracks) - om det blir
   aktuellt är det en ny, separat tabell, inte en ombyggnad av `wines`.
+- **`target/` delas mellan Claude-sessioner som jobbar i samma
+  checkout**, oavsett vilken gren var och en står på - ett grenbyte
+  rensar bara `src/`, inte kompilerade klasser/resurser. En annan
+  sessions `mvn`-körning på sin egen gren kan lämna kvar en stale
+  `.feature`-fil (eller annan resurs) i `target/test-classes/` som
+  Cucumber sedan plockar upp som om den hörde till DIN gren - ett
+  `UndefinedStepException` för ett scenario som inte ens finns i `src/`
+  är ett tecken på just det här, inte ett kodfel. `mvn clean verify`
+  löser det.
 - **Alla IT-klasser delar EN Postgres-container** (`support/
   SharedPostgres`, statiskt startad - inte `@Testcontainers`/`@Container`,
   som ger en container per klass). Den större vinsten är att identiska
