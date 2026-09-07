@@ -117,8 +117,10 @@ class ImportExportFlowIT extends SharedPostgres {
                 sida.locator("#import-submit").click();
                 sida.waitForURL("**/import");
 
-                assertThat(sida.locator(".sammanfattning").first().textContent()).contains("Nya viner");
-                assertThat(sida.locator("dd").nth(2).textContent()).isEqualTo("1");
+                // "Nya viner" ligger nu som löptext ("Nya viner: 1"), inte
+                // ett eget <dd>-element - se WINE-37s omskrivning av
+                // sammanfattningsrutan.
+                assertThat(sida.locator(".sammanfattning").first().textContent()).contains("Nya viner: 1");
 
                 sida.locator("button:has-text(\"Importera\")").click();
                 sida.waitForURL("**/import");
