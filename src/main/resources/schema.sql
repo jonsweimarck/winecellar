@@ -122,3 +122,22 @@ ALTER TABLE wines ALTER COLUMN quantity SET NOT NULL;;
 -- migrering redan körts (alla rader har en ägare) - annars skulle den
 -- här satsen misslyckas mot kvarvarande NULL-rader.
 ALTER TABLE wines ALTER COLUMN owner_id SET NOT NULL;;
+
+-- WINE-41: vinlistans "Antal flaskor fler än"-filter kan sparas per
+-- användare (Inställningar) och används som GET /:s default när
+-- requesten inte har en explicit minQuantity-queryparameter (se
+-- WineController/CurrentUser). Kolumnen läggs medvetet till som
+-- NULLABLE i UserEntitys annotering och skärps till NOT NULL här i SQL
+-- i stället - samma mönster som owner_id/quantity ovan (se CLAUDE.md):
+-- Hibernates ddl-auto: update kan lägga till en helt ny NULLABLE
+-- kolumn utan problem, men skulle krascha mot redan existerande
+-- produktionsanvändare om den själv försökte lägga till kolumnen som
+-- NOT NULL (ingen DEFAULT-klausul härleds bara av annoteringen, så
+-- befintliga rader hade fått NULL och blockerat en efterföljande NOT
+-- NULL-begränsning). Idempotent: ADD COLUMN IF NOT EXISTS, backfillen
+-- av NULL-rader, och SET NOT NULL på en redan NOT NULL-kolumn är alla
+-- ofarliga no-op vid upprepad körning.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS default_min_quantity_filter integer;;
+UPDATE users SET default_min_quantity_filter = 0 WHERE default_min_quantity_filter IS NULL;;
+ALTER TABLE users ALTER COLUMN default_min_quantity_filter SET DEFAULT 0;;
+ALTER TABLE users ALTER COLUMN default_min_quantity_filter SET NOT NULL;;

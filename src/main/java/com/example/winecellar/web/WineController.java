@@ -10,6 +10,7 @@ import com.example.winecellar.application.SortField;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Rating;
+import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
@@ -39,6 +40,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -76,9 +78,11 @@ public class WineController {
             @RequestParam(required = false) Set<String> country,
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
+            @RequestParam(required = false) String minQuantity,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model, Authentication authentication) {
-        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, authentication);
+        Optional<User> currentUser = CurrentUser.find(authentication, userRepository);
+        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, minQuantity, currentUser);
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
 
@@ -88,16 +92,35 @@ public class WineController {
      * "Ta bort" skickade tidigare inget om aktivt tillstånd alls (fixat
      * 2026-07-22, se CLAUDE.md) - borttagningsknapparna postar nu med
      * exakt samma queryparametrar som verktygsraden, se vinkallare.html.
+     *
+     * Tar emot ett redan uppslaget {@code Optional<User>} istället för
+     * {@link Authentication} - båda anropsplatserna behöver ändå
+     * användarens hela post (id OCH sparat minQuantity-standardval), och
+     * ett gemensamt uppslag i anropande kod undviker flera separata
+     * {@code findByUsername}-frågor per request (WINE-41-granskning).
      */
     private void populateWineListModel(
             Model model, String search, SortField sort, SortDirection direction,
             Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion,
-            Authentication authentication) {
+            String minQuantity, Optional<User> currentUser) {
         Set<String> selectedWineTypes = emptyIfNull(wineType);
         Set<String> selectedCountries = emptyIfNull(country);
         Set<String> selectedRegions = emptyIfNull(region);
         Set<String> selectedSubregions = emptyIfNull(subregion);
-        UserId owner = currentOwner(authentication);
+        UserId owner = currentUser.map(User::id).orElse(null);
+
+        /*
+         * WINE-41: en explicit minQuantity-queryparameter (bokmärke, delad
+         * länk, eller ett aktivt val i filterpanelen för den här sessionen)
+         * åsidosätter alltid den inloggade användarens sparade default -
+         * samma princip som sort/direction redan följer. Utan parametern
+         * faller vyn tillbaka till användarens eget val från Inställningar
+         * (default 0 för ett nytt konto, se User.defaultMinQuantityFilter).
+         */
+        Integer explicitMinQuantity = parseIntegerOrNull(minQuantity);
+        int savedMinQuantity = currentUser.map(User::defaultMinQuantityFilter).orElse(0);
+        int effectiveMinQuantity = explicitMinQuantity != null ? explicitMinQuantity : savedMinQuantity;
+        boolean minQuantityFilterActive = effectiveMinQuantity != savedMinQuantity;
 
         SearchCriteria criteria = SearchCriteria.builder()
                 .searchTerm(search)
@@ -106,6 +129,7 @@ public class WineController {
                 .countries(selectedCountries)
                 .regions(selectedRegions)
                 .subregions(selectedSubregions)
+                .minQuantity(effectiveMinQuantity)
                 .build();
         List<Wine> result = wineService.search(criteria, owner);
         List<OriginNode> originTree = wineService.originTree(owner);
@@ -125,6 +149,8 @@ public class WineController {
         model.addAttribute("selectedSubregions", selectedSubregions);
         model.addAttribute("expandedCountries", expanded.countries());
         model.addAttribute("expandedRegions", expanded.regions());
+        model.addAttribute("minQuantity", effectiveMinQuantity);
+        model.addAttribute("minQuantityFilterActive", minQuantityFilterActive);
         model.addAttribute("chips", buildChips(searchView));
     }
 
@@ -417,9 +443,11 @@ public class WineController {
             @RequestParam(required = false) Set<String> country,
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
+            @RequestParam(required = false) String minQuantity,
             Model model, Authentication authentication) {
-        wineService.removeWine(new WineId(id), currentOwner(authentication));
-        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, authentication);
+        Optional<User> currentUser = CurrentUser.find(authentication, userRepository);
+        wineService.removeWine(new WineId(id), currentUser.map(User::id).orElse(null));
+        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, minQuantity, currentUser);
         model.addAttribute("feedback", "Vin borttaget");
         return "vinkallare :: lista";
     }
@@ -553,6 +581,24 @@ public class WineController {
 
     private static Integer parseInteger(String value) {
         return blankToNull(value) == null ? null : Integer.valueOf(value.trim());
+    }
+
+    /**
+     * WINE-41: `minQuantity` är en bokmärkbar/delbar queryparameter (samma
+     * princip som `sort`/`direction`) - en trasig eller manuellt redigerad
+     * länk (t.ex. `?minQuantity=abc`) ska degradera snyggt till "ingen
+     * explicit queryparameter", inte krascha med 500. Faller därför tillbaka
+     * på {@code null} (vilket i sin tur gör att den sparade defaulten
+     * används, se {@link #populateWineListModel}) istället för att låta
+     * {@link NumberFormatException} spridas vidare som {@link #parseInteger}
+     * gör för formulärfält.
+     */
+    private static Integer parseIntegerOrNull(String value) {
+        try {
+            return parseInteger(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**

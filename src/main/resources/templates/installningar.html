@@ -41,6 +41,34 @@
 <body>
     <div th:replace="~{fragments/topprad :: topprad('Inställningar', '/')}"></div>
 
+    <!-- Samma delade .toast-komponent (tema.css) som vinlistans
+         Lägg till/Spara/Ta bort-återkoppling - server-genererad, satt via
+         RedirectAttributes.addFlashAttribute i SettingsController eftersom
+         sparningen redirectar hit (ett vanligt Model-attribut vore borta
+         redan innan GET /installningar körs, se CLAUDE.md). -->
+    <p class="toast" th:if="${feedback != null}" role="status">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>
+        <span th:text="${feedback}"></span>
+    </p>
+
+    <p class="sektionsrubrik">Vinlista</p>
+    <form method="post" th:action="@{/installningar/antal-flaskor-filter}">
+        <!-- .falt måste vara .korts DIREKTA barn, inte formulärets - ett
+             mellanliggande element mellan .kort och dess första .falt
+             bryter .kort > .falt:first-child och ger en oönskad
+             skiljelinje överst i kortet (se CLAUDE.md). Formuläret läggs
+             därför RUNT kortet i stället för inuti det. -->
+        <div class="kort">
+            <label class="falt"><span>Antal flaskor fler än</span>
+                <input type="number" name="minQuantity" th:value="${minQuantityFilterDefault}">
+            </label>
+            <div class="falt">
+                <button type="submit">Spara</button>
+            </div>
+        </div>
+    </form>
+
     <p class="sektionsrubrik">Data</p>
     <div class="kort">
         <a class="installningsrad" href="/import">
@@ -131,6 +159,18 @@
                     }
                 });
             });
+        })();
+
+        // Tonar bort återkopplingsbrickan efter sparat standardfilter -
+        // samma .toast-mönster som vinlistan (se vinkallare.html), men
+        // utan htmx-swap-lyssnaren: hela sidan laddas alltid om via
+        // redirecten efter POST /installningar/antal-flaskor-filter, så
+        // DOMContentLoaded räcker.
+        (function () {
+            var toast = document.querySelector('.toast');
+            if (toast) {
+                setTimeout(function () { toast.classList.add('toast-dold'); }, 3000);
+            }
         })();
     </script>
 </body>

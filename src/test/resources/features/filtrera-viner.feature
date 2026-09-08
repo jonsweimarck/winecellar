@@ -64,3 +64,23 @@ Egenskap: Filtrera vinlistan
       | Chablis |
     När jag visar vinlistan utan filter
     Så ska vinlistan innehålla "Barolo, Chablis"
+
+  Scenario: Filtrera på fler än ett visst antal flaskor
+    Givet att källaren innehåller följande viner:
+      | namn    | antal |
+      | Barolo  | 3     |
+      | Chablis | 0     |
+    När jag filtrerar vinlistan på:
+      | minAntalFlaskor | 0 |
+    Så ska vinlistan innehålla "Barolo"
+    Och vinlistan ska inte innehålla "Chablis"
+
+  Scenario: Tröskelvärdet är strikt "fler än", inte "minst"
+    Givet att källaren innehåller följande viner:
+      | namn    | antal |
+      | Barolo  | 3     |
+      | Chianti | 1     |
+    När jag filtrerar vinlistan på:
+      | minAntalFlaskor | 1 |
+    Så ska vinlistan innehålla "Barolo"
+    Och vinlistan ska inte innehålla "Chianti"

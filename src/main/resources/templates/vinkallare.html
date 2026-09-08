@@ -434,8 +434,8 @@
 
         <details class="filterpanel">
             <summary>Filter <span class="antal-badge"
-                                   th:if="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size() > 0}"
-                                   th:text="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size()}"></span></summary>
+                                   th:if="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size() + (minQuantityFilterActive ? 1 : 0) > 0}"
+                                   th:text="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size() + (minQuantityFilterActive ? 1 : 0)}"></span></summary>
             <div class="filterinnehall">
                 <fieldset>
                     <legend>Vintyp</legend>
@@ -444,6 +444,12 @@
                     <label class="kryssrad"><input type="checkbox" name="wineType" value="ROSE" th:checked="${selectedWineTypes.contains('ROSE')}"> Rosé</label>
                     <label class="kryssrad"><input type="checkbox" name="wineType" value="SPARKLING" th:checked="${selectedWineTypes.contains('SPARKLING')}"> Mousserande</label>
                     <label class="kryssrad"><input type="checkbox" name="wineType" value="FORTIFIED" th:checked="${selectedWineTypes.contains('FORTIFIED')}"> Starkvin</label>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Antal</legend>
+                    <label for="minQuantity">Antal flaskor fler än</label>
+                    <input type="number" id="minQuantity" name="minQuantity" th:value="${minQuantity}">
                 </fieldset>
 
                 <fieldset>
@@ -653,7 +659,7 @@
                 <div class="detalj-atgarder">
                     <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                     <button type="button"
-                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions})}"
+                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions}, minQuantity=${minQuantity})}"
                             hx-target="#vinlista" hx-swap="outerHTML">
                         Ta bort
                     </button>
@@ -696,7 +702,7 @@
                     <div class="detalj-atgarder">
                         <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
                         <button type="button"
-                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions})}"
+                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions}, minQuantity=${minQuantity})}"
                                 hx-target="#vinlista" hx-swap="outerHTML">
                             Ta bort
                         </button>

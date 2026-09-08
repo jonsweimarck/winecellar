@@ -92,10 +92,13 @@ lagras i `bytea` och [ADR 0016](docs/adr/0016-quantity-also-mandatory.md)
 
 ### Flera användare
 
-Tabell `users` (`id`, `username` unik, `hashed_password`, `created_at`)
-- varje `wines`-rad har exakt en ägare (`owner_id`), och en inloggad
-användare ser och kan bara ändra sin egen lista. Se
-[ADR 0013](docs/adr/0013-multi-user-accounts.md).
+Tabell `users` (`id`, `username` unik, `hashed_password`, `created_at`,
+`default_min_quantity_filter`) - varje `wines`-rad har exakt en ägare
+(`owner_id`), och en inloggad användare ser och kan bara ändra sin egen
+lista. Se [ADR 0013](docs/adr/0013-multi-user-accounts.md).
+`default_min_quantity_filter` (default 0) är vinlistans sparade "Antal
+flaskor fler än"-standardval, satt i Inställningar - se "Filtrering,
+sökning och sortering" nedan.
 
 ## Vinlistan
 
@@ -124,18 +127,28 @@ Verktygsraden ovanför listan har:
   Årgång, Antal flaskor, Pris, Inköpsdatum, Eget betyg, Munskänkarnas
   betyg och Vivino-betyg. Viner utan värde för det sorterade fältet
   hamnar alltid sist, oavsett riktning.
-- En hopfällbar filterpanel med vintyp (fem kryssrutor) och ursprung
-  (land→region→underregion, nästlade kryssrutor). Facetter kombineras
-  med OCH sinsemellan, ELLER inom en facett. Panelen fälls automatiskt
-  ut runt redan valda filter.
+- En hopfällbar filterpanel med vintyp (fem kryssrutor), ett
+  "Antal flaskor fler än"-fält och ursprung (land→region→underregion,
+  nästlade kryssrutor). Facetter kombineras med OCH sinsemellan, ELLER
+  inom en facett. Panelen fälls automatiskt ut runt redan valda filter.
 - Chips som visar varje aktivt filter-/sökvärde, med en
   borttagningslänk per chip - se
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md).
 
+"Antal flaskor fler än" är ett tröskelvärde, inte en på/av-facett - ett
+vin visas bara om dess antal är STRIKT STÖRRE än värdet (inte "minst"),
+så default 0 döljer utdruckna viner utan att exkludera ett vin med
+exakt en kvarvarande flaska. Standardvärdet (default 0 för ett nytt
+konto) sparas per användare i Inställningar och används av `GET /` när
+requesten inte har en explicit `minQuantity`-queryparameter - en
+explicit parameter (bokmärke, delad länk, eller ett ändrat värde i
+filterpanelen för den aktuella sessionen) åsidosätter alltid det
+sparade valet, samma princip som `sort`/`direction`.
+
 Vald sortering/filtrering/sökning hamnar i URL:en
-(`?search=...&sort=...&direction=...&wineType=...`) - bokmärkbart och
-delbart. Orkestreringen ligger i `WineService.search(SearchCriteria)`,
-inte i controllern - se
+(`?search=...&sort=...&direction=...&wineType=...&minQuantity=...`) -
+bokmärkbart och delbart. Orkestreringen ligger i
+`WineService.search(SearchCriteria)`, inte i controllern - se
 [ADR 0006](docs/adr/0006-search-orchestration-in-application-layer.md).
 
 ## Säkerhet

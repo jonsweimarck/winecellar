@@ -62,7 +62,7 @@ public class SearchAndFilterSteps {
                     .subregion(blankToNull(row.get("underregion")))
                     .grapes(blankToNull(row.get("druvor")))
                     .vintage(integerOrDefault(row, "årgång", 2020))
-                    .quantity(1)
+                    .quantity(integerOrDefault(row, "antal", 1))
                     .location("Okänd plats")
                     .tastingNotes(blankToNull(row.get("tasting notes")))
                     .systembolagetDescription(blankToNull(row.get("systembolagets beskrivning")))
@@ -114,6 +114,9 @@ public class SearchAndFilterSteps {
         }
         if (criteriaRow.containsKey("underregion")) {
             builder.subregions(new HashSet<>(commaList(criteriaRow.get("underregion"))));
+        }
+        if (criteriaRow.containsKey("minAntalFlaskor")) {
+            builder.minQuantity(Integer.parseInt(criteriaRow.get("minAntalFlaskor")));
         }
         result = wineService.search(builder.build(), null);
     }

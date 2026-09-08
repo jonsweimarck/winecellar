@@ -22,7 +22,8 @@ public class InMemoryUserRepository implements UserRepository {
     public User save(User user) {
         User toStore = user.id() != null
                 ? user
-                : new User(new UserId(nextId.getAndIncrement()), user.username(), user.hashedPassword(), user.createdAt());
+                : new User(new UserId(nextId.getAndIncrement()), user.username(), user.hashedPassword(),
+                        user.createdAt(), user.defaultMinQuantityFilter());
         users.put(toStore.id().value(), toStore);
         return toStore;
     }

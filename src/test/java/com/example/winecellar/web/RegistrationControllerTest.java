@@ -70,7 +70,7 @@ class RegistrationControllerTest {
         @Test
         @DisplayName("ska ett lyckat konto logga in användaren direkt (sessionen satt) och omdirigera till startsidan")
         void skaLoggaInDirektOchOmdirigera() throws Exception {
-            User user = new User(new UserId(1L), "vinälskare", "hashat", Instant.now());
+            User user = new User(new UserId(1L), "vinälskare", "hashat", Instant.now(), 0);
             when(registrationService.register("vinälskare", "hemligt123"))
                     .thenReturn(new RegistrationResult.Registered(user));
 
