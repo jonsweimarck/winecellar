@@ -24,11 +24,12 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * (se ADR 0019). Verifieras av TemaIT, inte av något test mot den här
  * controllern.
  *
- * Vinlistans "Antal flaskor fler än"-standardval (WINE-41) är däremot
- * kontobunden data - lagras på {@code User.defaultMinQuantityFilter},
- * inte i localStorage, eftersom det ska gälla den inloggade användaren
- * oavsett vilken enhet hen loggar in från nästa gång (till skillnad
- * från temat, som medvetet är per webbläsare).
+ * Vinlistans "Antal flaskor minst"-standardval (WINE-41, semantiken
+ * ändrad från "fler än" till "minst" i WINE-42) är däremot kontobunden
+ * data - lagras på {@code User.defaultMinQuantityFilter}, inte i
+ * localStorage, eftersom det ska gälla den inloggade användaren oavsett
+ * vilken enhet hen loggar in från nästa gång (till skillnad från temat,
+ * som medvetet är per webbläsare).
  */
 @Controller
 public class SettingsController {
@@ -47,12 +48,12 @@ public class SettingsController {
     }
 
     /**
-     * Sparar vinlistans "Antal flaskor fler än"-standardval - läses av
+     * Sparar vinlistans "Antal flaskor minst"-standardval - läses av
      * `WineController.wineCellar(...)` som fallback när `GET /` saknar en
      * explicit `minQuantity`-queryparameter. Blankt/oparsbart fält faller
-     * tillbaka till 0, samma default som ett helt nytt konto får (se
+     * tillbaka till 1, samma default som ett helt nytt konto får (se
      * RegistrationService) - ingen anledning att kräva ett ifyllt fält
-     * här när "0" redan är den rimliga standarden.
+     * här när "1" redan är den rimliga standarden.
      */
     @PostMapping("/installningar/antal-flaskor-filter")
     public String saveDefaultMinQuantityFilter(
@@ -67,12 +68,12 @@ public class SettingsController {
 
     private static int parseMinQuantity(String value) {
         if (value == null || value.isBlank()) {
-            return 0;
+            return 1;
         }
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
-            return 0;
+            return 1;
         }
     }
 }

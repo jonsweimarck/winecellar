@@ -123,9 +123,10 @@ ALTER TABLE wines ALTER COLUMN quantity SET NOT NULL;;
 -- här satsen misslyckas mot kvarvarande NULL-rader.
 ALTER TABLE wines ALTER COLUMN owner_id SET NOT NULL;;
 
--- WINE-41: vinlistans "Antal flaskor fler än"-filter kan sparas per
--- användare (Inställningar) och används som GET /:s default när
--- requesten inte har en explicit minQuantity-queryparameter (se
+-- WINE-41: vinlistans "Antal flaskor minst"-filter (semantiken ändrad
+-- från "fler än" i WINE-42, se CLAUDE.md) kan sparas per användare
+-- (Inställningar) och används som GET /:s default när requesten inte
+-- har en explicit minQuantity-queryparameter (se
 -- WineController/CurrentUser). Kolumnen läggs medvetet till som
 -- NULLABLE i UserEntitys annotering och skärps till NOT NULL här i SQL
 -- i stället - samma mönster som owner_id/quantity ovan (se CLAUDE.md):
@@ -136,8 +137,14 @@ ALTER TABLE wines ALTER COLUMN owner_id SET NOT NULL;;
 -- befintliga rader hade fått NULL och blockerat en efterföljande NOT
 -- NULL-begränsning). Idempotent: ADD COLUMN IF NOT EXISTS, backfillen
 -- av NULL-rader, och SET NOT NULL på en redan NOT NULL-kolumn är alla
--- ofarliga no-op vid upprepad körning.
+-- ofarliga no-op vid upprepad körning. Backfillvärdet och DEFAULT-
+-- klausulen är 1 (WINE-42s nya default för nya konton, se
+-- RegistrationService) - gäller bara en kolumn som fortfarande är NULL,
+-- dvs. en miljö som aldrig kört WINE-41s ursprungliga migrering. En
+-- redan satt 0 (från WINE-41s ursprungliga backfill) rörs INTE här -
+-- den migreringen är en egen, engångskörd sats, se
+-- db/migrations/2026-09-08-bump-default-min-quantity-filter-to-one.sql.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS default_min_quantity_filter integer;;
-UPDATE users SET default_min_quantity_filter = 0 WHERE default_min_quantity_filter IS NULL;;
-ALTER TABLE users ALTER COLUMN default_min_quantity_filter SET DEFAULT 0;;
+UPDATE users SET default_min_quantity_filter = 1 WHERE default_min_quantity_filter IS NULL;;
+ALTER TABLE users ALTER COLUMN default_min_quantity_filter SET DEFAULT 1;;
 ALTER TABLE users ALTER COLUMN default_min_quantity_filter SET NOT NULL;;

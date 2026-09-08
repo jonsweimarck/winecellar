@@ -526,6 +526,7 @@ class WineControllerTest {
 
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(1)
                     .build(), null);
         }
 
@@ -542,6 +543,7 @@ class WineControllerTest {
 
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.OWN_RATING).sortDirection(SortDirection.DESCENDING)
+                    .minQuantity(1)
                     .build(), null);
         }
 
@@ -679,6 +681,7 @@ class WineControllerTest {
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .wineTypes(Set.of(WineType.RED, WineType.WHITE))
                     .countries(Set.of("Italien"))
+                    .minQuantity(1)
                     .build(), null);
         }
 
@@ -697,15 +700,16 @@ class WineControllerTest {
         }
 
         /**
-         * WINE-41: `minQuantity` följer samma "explicit queryparameter
-         * åsidosätter sparad default"-princip som sort/direction redan
-         * gör - utan en förvald `userRepository`-stubb (som i de flesta
-         * andra testerna här) faller den inloggade "admin"-användaren
-         * tillbaka på 0, samma default som ett nytt konto får.
+         * WINE-41/WINE-42: `minQuantity` följer samma "explicit
+         * queryparameter åsidosätter sparad default"-princip som
+         * sort/direction redan gör - utan en förvald `userRepository`-
+         * stubb (som i de flesta andra testerna här) faller den inloggade
+         * "admin"-användaren tillbaka på 1, samma default som ett nytt
+         * konto får (WINE-42 bytte defaulten från 0 till 1).
          */
         @Test
-        @DisplayName("ska falla tillbaka på 0 för minQuantity när ingen queryparameter eller sparad default finns")
-        void skaFallaTillbakaPåNollFörMinQuantity() throws Exception {
+        @DisplayName("ska falla tillbaka på 1 för minQuantity när ingen queryparameter eller sparad default finns")
+        void skaFallaTillbakaPåEttFörMinQuantity() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
             mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
@@ -713,7 +717,7 @@ class WineControllerTest {
 
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
-                    .minQuantity(0)
+                    .minQuantity(1)
                     .build(), null);
         }
 
@@ -827,6 +831,7 @@ class WineControllerTest {
             verify(wineService).search(SearchCriteria.builder()
                     .searchTerm("barolo")
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(1)
                     .build(), null);
         }
 
@@ -1237,6 +1242,7 @@ class WineControllerTest {
                     .searchTerm("barolo")
                     .sortField(SortField.VINTAGE).sortDirection(SortDirection.DESCENDING)
                     .wineTypes(Set.of(WineType.RED))
+                    .minQuantity(1)
                     .build(), null);
         }
 

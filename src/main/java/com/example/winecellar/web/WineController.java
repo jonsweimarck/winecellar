@@ -115,10 +115,10 @@ public class WineController {
          * åsidosätter alltid den inloggade användarens sparade default -
          * samma princip som sort/direction redan följer. Utan parametern
          * faller vyn tillbaka till användarens eget val från Inställningar
-         * (default 0 för ett nytt konto, se User.defaultMinQuantityFilter).
+         * (default 1 för ett nytt konto, se User.defaultMinQuantityFilter).
          */
         Integer explicitMinQuantity = parseIntegerOrNull(minQuantity);
-        int savedMinQuantity = currentUser.map(User::defaultMinQuantityFilter).orElse(0);
+        int savedMinQuantity = currentUser.map(User::defaultMinQuantityFilter).orElse(1);
         int effectiveMinQuantity = explicitMinQuantity != null ? explicitMinQuantity : savedMinQuantity;
         boolean minQuantityFilterActive = effectiveMinQuantity != savedMinQuantity;
 
