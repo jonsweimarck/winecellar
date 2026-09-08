@@ -66,6 +66,13 @@ public class SettingsController {
     }
 
     private static int parseMinQuantity(String value) {
-        return (value == null || value.isBlank()) ? 0 : Integer.parseInt(value.trim());
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

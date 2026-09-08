@@ -105,6 +105,27 @@ class SettingsControllerTest {
         verify(userRepository).save(argThat(saved -> saved.defaultMinQuantityFilter() == 0));
     }
 
+    /**
+     * Granskningsfynd (kodgranskning av PR #21): Javadoc:en på
+     * `saveDefaultMinQuantityFilter` lovar att "Blankt/oparsbart fält
+     * faller tillbaka till 0", men implementationen hanterade tidigare bara
+     * blankt/`null` - ett icke-blankt men icke-numeriskt värde kraschade
+     * okontrollerat med `NumberFormatException`.
+     */
+    @Test
+    void skaSparaNollOmFältetInteGårAttTolkaSomEttTal() throws Exception {
+        when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3)));
+
+        mockMvc.perform(post("/installningar/antal-flaskor-filter")
+                        .with(user("testperson")).with(csrf())
+                        .param("minQuantity", "abc"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/installningar"));
+
+        verify(userRepository).save(argThat(saved -> saved.defaultMinQuantityFilter() == 0));
+    }
+
     @Test
     void skaNekaSparningUtanInloggning() throws Exception {
         mockMvc.perform(post("/installningar/antal-flaskor-filter")

@@ -5,6 +5,8 @@ import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
 import org.springframework.security.core.Authentication;
 
+import java.util.Optional;
+
 /**
  * WINE-22: extraherad ur `WineController.currentOwner(...)` när
  * `ExportController` fick samma behov - andra verkliga anropsplatsen,
@@ -26,6 +28,16 @@ final class CurrentUser {
         return userRepository.findByUsername(authentication.getName())
                 .map(user -> user.id())
                 .orElse(null);
+    }
+
+    /**
+     * WINE-41: hämtar den inloggade användarens hela {@link User}-post EN
+     * gång - en anropsplats som behöver både ägar-id:t och det sparade
+     * standardfiltret (t.ex. `WineController.populateWineListModel`) slapp
+     * annars två separata `findByUsername`-uppslagningar per request.
+     */
+    static Optional<User> find(Authentication authentication, UserRepository userRepository) {
+        return userRepository.findByUsername(authentication.getName());
     }
 
     /**

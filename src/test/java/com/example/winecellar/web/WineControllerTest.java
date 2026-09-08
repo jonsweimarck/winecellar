@@ -754,6 +754,32 @@ class WineControllerTest {
         }
 
         /**
+         * Granskningsfynd (kodgranskning av PR #21): ett oparsbart
+         * `minQuantity`-värde (trasig/manuellt redigerad länk) fick tidigare
+         * `Integer.valueOf(...)` att kasta en ohanterad
+         * `NumberFormatException` - ett 500-svar istället för att degradera
+         * snyggt. Samma fallback-kedja som när parametern saknas helt: den
+         * sparade defaulten, inte hårdkodad 0.
+         */
+        @Test
+        @DisplayName("ska falla tillbaka på sparad default när minQuantity inte går att tolka som ett tal")
+        void skaFallaTillbakaPåSparadDefaultFörOparsbartMinQuantity() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+
+            mockMvc.perform(get("/")
+                            .with(user("testperson")).with(csrf())
+                            .param("minQuantity", "abc"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(2)
+                    .build(), new UserId(1L));
+        }
+
+        /**
          * Badgen ska bara räkna minQuantity-filtret som "aktivt" när det
          * faktiska värdet AVVIKER från användarens sparade default -
          * annars hade badgen alltid visat minst 1 för varje inloggad
