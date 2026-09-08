@@ -27,10 +27,11 @@ public class UserEntity {
     private Instant createdAt;
 
     /**
-     * WINE-41: sparat "Antal flaskor fler än"-standardval för vinlistan.
-     * Medvetet UTAN `nullable = false` här - kolumnen skärps till NOT
-     * NULL (med DEFAULT 0 och en engångsbackfill av redan existerande
-     * användare) i schema.sql i stället, samma mönster som
+     * WINE-41: sparat "Antal flaskor minst"-standardval för vinlistan
+     * (semantiken ändrad från "fler än" i WINE-42). Medvetet UTAN
+     * `nullable = false` här - kolumnen skärps till NOT NULL (med
+     * DEFAULT 1 och en engångsbackfill av redan existerande användare)
+     * i schema.sql i stället, samma mönster som
      * `wines.owner_id`/`wines.quantity` (se CLAUDE.md): Hibernates
      * `ddl-auto: update` kan lägga till en ny NULLABLE kolumn utan
      * problem, men skulle krascha mot redan existerande produktions-

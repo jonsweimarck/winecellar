@@ -368,8 +368,9 @@ en redigering (`existing.toBuilder()...`) bär automatiskt vidare rätt
 via `@JoinColumn(nullable = false)` - se Kända fällor om varför).
 `WineEntity.owner` är `FetchType.EAGER` (inte `LAZY`) - se Kända fällor.
 
-**`User.defaultMinQuantityFilter` (WINE-41)** är vinlistans sparade
-"Antal flaskor fler än"-standardval - default 0 för ett nytt konto (se
+**`User.defaultMinQuantityFilter` (WINE-41, semantiken ändrad från
+"fler än" till "minst" i WINE-42)** är vinlistans sparade "Antal flaskor
+minst"-standardval - default 1 för ett nytt konto (se
 `RegistrationService`), redigerbart i Inställningar
 (`SettingsController`/`installningar.html`, `POST /installningar/
 antal-flaskor-filter`). `WineController.wineCellar(...)` faller
@@ -377,13 +378,20 @@ tillbaka till det sparade värdet när `GET /` saknar en explicit
 `minQuantity`-queryparameter - en explicit parameter (bokmärke, delad
 länk, eller ett ändrat filterpanelsvärde för sessionen) åsidosätter
 alltid det sparade valet, samma princip som `sort`/`direction`.
-`SearchCriteria.minQuantity` är ett tröskelvärde (strikt "fler än", inte
-"minst" - `wine.quantity() > criteria.minQuantity()` i
-`WineService.search(...)`), inte en facett som de övriga fälten i
-recorden. Kolumnen `users.default_min_quantity_filter` lades till som
-NULLABLE i `UserEntity`s annotering och skärptes till NOT NULL DEFAULT 0
-i `schema.sql` i stället - samma mönster som `wines.owner_id`/
-`wines.quantity` (se Kända fällor om Hibernates `ddl-auto: update`).
+`SearchCriteria.minQuantity` är ett tröskelvärde (`wine.quantity() >=
+criteria.minQuantity()` i `WineService.search(...)`, inklusive
+tröskelvärdet självt - **ändrad från strikt "fler än" till "minst" i
+WINE-42** efter att ett negativt värde visade sig vara ett obekvämt sätt
+att se utdruckna viner igen; ett filter satt till 0 visar numera även
+0-antal-viner, vilket gjorde 0 till byggarens naturliga "ingen
+begränsning"-default), inte en facett som de övriga fälten i recorden.
+Kolumnen `users.default_min_quantity_filter` lades till som NULLABLE i
+`UserEntity`s annotering och skärptes till NOT NULL DEFAULT 1 (ändrad
+från 0 i WINE-42, se `db/migrations/2026-09-08-bump-default-min-
+quantity-filter-to-one.sql` för engångsmigreringen av redan existerande
+kontons sparade värde) i `schema.sql` i stället - samma mönster som
+`wines.owner_id`/`wines.quantity` (se Kända fällor om Hibernates
+`ddl-auto: update`).
 Filterpanelens "antal aktiva filter"-badge räknar bara med det här
 filtret när det faktiska värdet (URL-parameter eller sparad default)
 AVVIKER från användarens sparade default - annars hade badgen alltid

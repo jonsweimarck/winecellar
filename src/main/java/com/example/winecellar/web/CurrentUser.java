@@ -41,16 +41,16 @@ final class CurrentUser {
     }
 
     /**
-     * WINE-41: vinlistans sparade "Antal flaskor fler än"-standardval för
+     * WINE-41: vinlistans sparade "Antal flaskor minst"-standardval för
      * den inloggade användaren - GET /:s fallback när requesten saknar en
-     * explicit `minQuantity`-queryparameter. `0` (samma orelse-fallback
-     * som owner(...) ovan) om användaren av någon anledning inte skulle
-     * hittas - i praktiken bara det ofarliga skyddsnätet som redan gäller
-     * för owner(...).
+     * explicit `minQuantity`-queryparameter. `1` (samma default som ett
+     * nytt konto får, se RegistrationService) om användaren av någon
+     * anledning inte skulle hittas - i praktiken bara det ofarliga
+     * skyddsnätet som redan gäller för owner(...).
      */
     static int defaultMinQuantityFilter(Authentication authentication, UserRepository userRepository) {
         return userRepository.findByUsername(authentication.getName())
                 .map(User::defaultMinQuantityFilter)
-                .orElse(0);
+                .orElse(1);
     }
 }

@@ -10,12 +10,14 @@ import java.time.Instant;
  * infrastruktur-/webblagret via den befintliga `PasswordEncoder`-beanen
  * (se `SecurityConfig`), inte här.
  *
- * `defaultMinQuantityFilter` (WINE-41) är vinlistans förvalda
- * "Antal flaskor fler än"-filter för den här användaren - vad `GET /`
- * faller tillbaka till när requesten inte har en explicit
- * `minQuantity`-queryparameter (se WineController). Default 0 för nya
- * konton (se RegistrationService) - "fler än 0", dvs. utdruckna viner
- * (antal 0) döljs som standard.
+ * `defaultMinQuantityFilter` (WINE-41, semantiken ändrad från "fler än"
+ * till "minst" i WINE-42) är vinlistans förvalda "Antal flaskor minst"-
+ * filter för den här användaren - vad `GET /` faller tillbaka till när
+ * requesten inte har en explicit `minQuantity`-queryparameter (se
+ * WineController). Default 1 för nya konton (se RegistrationService) -
+ * "minst 1", dvs. utdruckna viner (antal 0) döljs som standard, utan att
+ * kräva ett obekvämt negativt värde för att visa dem igen (sätt filtret
+ * till 0 för det).
  */
 public record User(
         UserId id,

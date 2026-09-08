@@ -31,9 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Testar bara webblagret (ingen egen affärslogik utöver vinlistans
- * "Antal flaskor fler än"-standardval, WINE-41). Verifierar att sidan
- * faktiskt renderar länkarna till import/export och logga-ut-formuläret
- * (WINE-37), inte bara att anropet ger 200.
+ * "Antal flaskor minst"-standardval, WINE-41, semantiken ändrad från
+ * "fler än" i WINE-42). Verifierar att sidan faktiskt renderar länkarna
+ * till import/export och logga-ut-formuläret (WINE-37), inte bara att
+ * anropet ger 200.
  */
 @WebMvcTest(SettingsController.class)
 @Import(SecurityConfig.class)
@@ -71,7 +72,7 @@ class SettingsControllerTest {
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Antal flaskor fler än")))
+                .andExpect(content().string(containsString("Antal flaskor minst")))
                 .andExpect(content().string(containsString("name=\"minQuantity\"")))
                 .andExpect(content().string(containsString("value=\"2\"")));
     }
@@ -93,7 +94,7 @@ class SettingsControllerTest {
     }
 
     @Test
-    void skaSparaNollOmFältetLämnasTomt() throws Exception {
+    void skaSparaEttOmFältetLämnasTomt() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
                 new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3)));
 
@@ -102,18 +103,19 @@ class SettingsControllerTest {
                         .param("minQuantity", ""))
                 .andExpect(status().is3xxRedirection());
 
-        verify(userRepository).save(argThat(saved -> saved.defaultMinQuantityFilter() == 0));
+        verify(userRepository).save(argThat(saved -> saved.defaultMinQuantityFilter() == 1));
     }
 
     /**
      * Granskningsfynd (kodgranskning av PR #21): Javadoc:en på
      * `saveDefaultMinQuantityFilter` lovar att "Blankt/oparsbart fält
-     * faller tillbaka till 0", men implementationen hanterade tidigare bara
+     * faller tillbaka till" samma default som ett nytt konto får (1
+     * sedan WINE-42), men implementationen hanterade tidigare bara
      * blankt/`null` - ett icke-blankt men icke-numeriskt värde kraschade
      * okontrollerat med `NumberFormatException`.
      */
     @Test
-    void skaSparaNollOmFältetInteGårAttTolkaSomEttTal() throws Exception {
+    void skaSparaEttOmFältetInteGårAttTolkaSomEttTal() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
                 new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3)));
 
@@ -123,7 +125,7 @@ class SettingsControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/installningar"));
 
-        verify(userRepository).save(argThat(saved -> saved.defaultMinQuantityFilter() == 0));
+        verify(userRepository).save(argThat(saved -> saved.defaultMinQuantityFilter() == 1));
     }
 
     @Test

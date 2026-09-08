@@ -19,10 +19,12 @@ import java.util.Set;
  * och sorteringen appliceras sedan ovanpå den, i den ordningen, se
  * WineService.search(...).
  *
- * `minQuantity` (WINE-41) är ett tröskelvärde, inte en facett - ett vin
- * matchar bara om dess antal flaskor är STRIKT STÖRRE än värdet (inte
- * "minst"), så default 0 döljer utdruckna viner (antal 0) utan att
- * exkludera ett vin med exakt en kvarvarande flaska. Kombineras med
+ * `minQuantity` (WINE-41, semantiken ändrad från "fler än" till "minst"
+ * WINE-42 efter att -1 visade sig vara ett obekvämt sätt att se
+ * utdruckna viner) är ett tröskelvärde, inte en facett - ett vin matchar
+ * om dess antal flaskor är STÖRRE ÄN ELLER LIKA MED värdet, så 0 visar
+ * även utdruckna viner. Byggarens egen default (0) betyder alltså "ingen
+ * begränsning" - samma neutrala värde som en tom facett. Kombineras med
  * övriga facetter via OCH, precis som de andra fälten i den här
  * recorden.
  */
