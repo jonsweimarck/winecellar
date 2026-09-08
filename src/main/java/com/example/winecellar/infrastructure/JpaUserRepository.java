@@ -42,6 +42,7 @@ public class JpaUserRepository implements UserRepository {
         entity.setUsername(user.username());
         entity.setHashedPassword(user.hashedPassword());
         entity.setCreatedAt(user.createdAt());
+        entity.setDefaultMinQuantityFilter(user.defaultMinQuantityFilter());
         return entity;
     }
 
@@ -50,6 +51,7 @@ public class JpaUserRepository implements UserRepository {
                 new UserId(entity.getId()),
                 entity.getUsername(),
                 entity.getHashedPassword(),
-                entity.getCreatedAt());
+                entity.getCreatedAt(),
+                entity.getDefaultMinQuantityFilter() != null ? entity.getDefaultMinQuantityFilter() : 0);
     }
 }

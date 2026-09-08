@@ -18,6 +18,13 @@ import java.util.Set;
  * eller ett träffresultat från WineRepository.search(...)) - facetterna
  * och sorteringen appliceras sedan ovanpå den, i den ordningen, se
  * WineService.search(...).
+ *
+ * `minQuantity` (WINE-41) är ett tröskelvärde, inte en facett - ett vin
+ * matchar bara om dess antal flaskor är STRIKT STÖRRE än värdet (inte
+ * "minst"), så default 0 döljer utdruckna viner (antal 0) utan att
+ * exkludera ett vin med exakt en kvarvarande flaska. Kombineras med
+ * övriga facetter via OCH, precis som de andra fälten i den här
+ * recorden.
  */
 public record SearchCriteria(
         String searchTerm,
@@ -25,6 +32,7 @@ public record SearchCriteria(
         Set<String> countries,
         Set<String> regions,
         Set<String> subregions,
+        int minQuantity,
         SortField sortField,
         SortDirection sortDirection
 ) {
@@ -39,6 +47,7 @@ public record SearchCriteria(
         private Set<String> countries = Set.of();
         private Set<String> regions = Set.of();
         private Set<String> subregions = Set.of();
+        private int minQuantity = 0;
         private SortField sortField = SortField.NAME;
         private SortDirection sortDirection = SortDirection.ASCENDING;
 
@@ -67,6 +76,11 @@ public record SearchCriteria(
             return this;
         }
 
+        public Builder minQuantity(int minQuantity) {
+            this.minQuantity = minQuantity;
+            return this;
+        }
+
         public Builder sortField(SortField sortField) {
             this.sortField = sortField;
             return this;
@@ -78,7 +92,7 @@ public record SearchCriteria(
         }
 
         public SearchCriteria build() {
-            return new SearchCriteria(searchTerm, wineTypes, countries, regions, subregions, sortField, sortDirection);
+            return new SearchCriteria(searchTerm, wineTypes, countries, regions, subregions, minQuantity, sortField, sortDirection);
         }
     }
 }

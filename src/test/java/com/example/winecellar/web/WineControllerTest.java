@@ -212,7 +212,7 @@ class WineControllerTest {
         @BeforeEach
         void stubbaTestanvändare() {
             User testAnvändare = new User(
-                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now());
+                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0);
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
         }
 
@@ -694,6 +694,95 @@ class WineControllerTest {
                     .andExpect(content().string(
                             containsString("name=\"wineType\" value=\"RED\" checked")
                     ));
+        }
+
+        /**
+         * WINE-41: `minQuantity` följer samma "explicit queryparameter
+         * åsidosätter sparad default"-princip som sort/direction redan
+         * gör - utan en förvald `userRepository`-stubb (som i de flesta
+         * andra testerna här) faller den inloggade "admin"-användaren
+         * tillbaka på 0, samma default som ett nytt konto får.
+         */
+        @Test
+        @DisplayName("ska falla tillbaka på 0 för minQuantity när ingen queryparameter eller sparad default finns")
+        void skaFallaTillbakaPåNollFörMinQuantity() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(0)
+                    .build(), null);
+        }
+
+        @Test
+        @DisplayName("ska använda användarens sparade standardval för minQuantity när ingen queryparameter finns")
+        void skaAnvändaSparadDefaultFörMinQuantity() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+
+            mockMvc.perform(get("/").with(user("testperson")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("name=\"minQuantity\"")))
+                    .andExpect(content().string(containsString("value=\"2\"")));
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(2)
+                    .build(), new UserId(1L));
+        }
+
+        @Test
+        @DisplayName("ska låta en explicit minQuantity-queryparameter åsidosätta den sparade defaulten")
+        void skaLåtaExplicitMinQuantityÅsidosättaSparadDefault() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+
+            mockMvc.perform(get("/")
+                            .with(user("testperson")).with(csrf())
+                            .param("minQuantity", "5"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(5)
+                    .build(), new UserId(1L));
+        }
+
+        /**
+         * Badgen ska bara räkna minQuantity-filtret som "aktivt" när det
+         * faktiska värdet AVVIKER från användarens sparade default -
+         * annars hade badgen alltid visat minst 1 för varje inloggad
+         * användare, även utan något aktivt val i den aktuella sessionen.
+         */
+        @Test
+        @DisplayName("ska inte visa filterbadge när minQuantity bara motsvarar sparad default")
+        void skaInteVisaBadgeNärMinQuantityMotsvararSparadDefault() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+
+            mockMvc.perform(get("/").with(user("testperson")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(not(containsString("class=\"antal-badge\""))));
+        }
+
+        @Test
+        @DisplayName("ska visa filterbadge när minQuantity avviker från sparad default")
+        void skaVisaBadgeNärMinQuantityAvvikerFrånSparadDefault() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+
+            mockMvc.perform(get("/")
+                            .with(user("testperson")).with(csrf())
+                            .param("minQuantity", "5"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("class=\"antal-badge\"")));
         }
 
         @Test

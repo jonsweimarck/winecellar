@@ -26,6 +26,20 @@ public class UserEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * WINE-41: sparat "Antal flaskor fler än"-standardval för vinlistan.
+     * Medvetet UTAN `nullable = false` här - kolumnen skärps till NOT
+     * NULL (med DEFAULT 0 och en engångsbackfill av redan existerande
+     * användare) i schema.sql i stället, samma mönster som
+     * `wines.owner_id`/`wines.quantity` (se CLAUDE.md): Hibernates
+     * `ddl-auto: update` kan lägga till en ny NULLABLE kolumn utan
+     * problem, men skulle krascha mot redan existerande produktions-
+     * användare om den själv försökte lägga till kolumnen som NOT NULL
+     * (ingen DEFAULT-klausul härleds bara av annoteringen).
+     */
+    @Column(name = "default_min_quantity_filter")
+    private Integer defaultMinQuantityFilter;
+
     protected UserEntity() {
     }
 
@@ -59,5 +73,13 @@ public class UserEntity {
 
     void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    Integer getDefaultMinQuantityFilter() {
+        return defaultMinQuantityFilter;
+    }
+
+    void setDefaultMinQuantityFilter(Integer defaultMinQuantityFilter) {
+        this.defaultMinQuantityFilter = defaultMinQuantityFilter;
     }
 }

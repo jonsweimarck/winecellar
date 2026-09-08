@@ -76,9 +76,10 @@ public class WineController {
             @RequestParam(required = false) Set<String> country,
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
+            @RequestParam(required = false) String minQuantity,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model, Authentication authentication) {
-        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, authentication);
+        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, minQuantity, authentication);
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
 
@@ -92,12 +93,25 @@ public class WineController {
     private void populateWineListModel(
             Model model, String search, SortField sort, SortDirection direction,
             Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion,
-            Authentication authentication) {
+            String minQuantity, Authentication authentication) {
         Set<String> selectedWineTypes = emptyIfNull(wineType);
         Set<String> selectedCountries = emptyIfNull(country);
         Set<String> selectedRegions = emptyIfNull(region);
         Set<String> selectedSubregions = emptyIfNull(subregion);
         UserId owner = currentOwner(authentication);
+
+        /*
+         * WINE-41: en explicit minQuantity-queryparameter (bokmärke, delad
+         * länk, eller ett aktivt val i filterpanelen för den här sessionen)
+         * åsidosätter alltid den inloggade användarens sparade default -
+         * samma princip som sort/direction redan följer. Utan parametern
+         * faller vyn tillbaka till användarens eget val från Inställningar
+         * (default 0 för ett nytt konto, se User.defaultMinQuantityFilter).
+         */
+        Integer explicitMinQuantity = parseInteger(minQuantity);
+        int savedMinQuantity = CurrentUser.defaultMinQuantityFilter(authentication, userRepository);
+        int effectiveMinQuantity = explicitMinQuantity != null ? explicitMinQuantity : savedMinQuantity;
+        boolean minQuantityFilterActive = effectiveMinQuantity != savedMinQuantity;
 
         SearchCriteria criteria = SearchCriteria.builder()
                 .searchTerm(search)
@@ -106,6 +120,7 @@ public class WineController {
                 .countries(selectedCountries)
                 .regions(selectedRegions)
                 .subregions(selectedSubregions)
+                .minQuantity(effectiveMinQuantity)
                 .build();
         List<Wine> result = wineService.search(criteria, owner);
         List<OriginNode> originTree = wineService.originTree(owner);
@@ -125,6 +140,8 @@ public class WineController {
         model.addAttribute("selectedSubregions", selectedSubregions);
         model.addAttribute("expandedCountries", expanded.countries());
         model.addAttribute("expandedRegions", expanded.regions());
+        model.addAttribute("minQuantity", effectiveMinQuantity);
+        model.addAttribute("minQuantityFilterActive", minQuantityFilterActive);
         model.addAttribute("chips", buildChips(searchView));
     }
 
@@ -417,9 +434,10 @@ public class WineController {
             @RequestParam(required = false) Set<String> country,
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
+            @RequestParam(required = false) String minQuantity,
             Model model, Authentication authentication) {
         wineService.removeWine(new WineId(id), currentOwner(authentication));
-        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, authentication);
+        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, minQuantity, authentication);
         model.addAttribute("feedback", "Vin borttaget");
         return "vinkallare :: lista";
     }
