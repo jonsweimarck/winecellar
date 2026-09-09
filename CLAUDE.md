@@ -252,7 +252,7 @@ Se [ADR 0019](docs/adr/0019-shared-theme-css-variables.md).
   `tillbakaLank` är null, annars tillbaka-pil).
 - **`z-index` gör att ett `position: fixed`-element ritas OVANPÅ annat
   innehåll, inte att det undviker det.** Toasten flyttades från botten
-  till högst upp/mitten (WINE-43, efter att bottenplaceringen visade sig
+  till högst upp/mitten (WINE-37, efter att bottenplaceringen visade sig
   för lätt att missa) - ett första försök med `top: 1rem` gav ett
   uppmätt ~9px 2D-överlapp mot toppradens titeltext ("Vinkällaren"), som
   toasten då hade ritats rakt ovanpå i stället för bredvid. Lösningen är
