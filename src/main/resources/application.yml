@@ -51,6 +51,24 @@ spring:
 
 server:
   port: 8080
+  # Clever Cloud terminerar TLS i en framförliggande reverse proxy/load
+  # balancer och skickar vanlig HTTP internt till appen, med det ursprungliga
+  # protokollet signalerat via X-Forwarded-Proto (bekräftat av Clever Clouds
+  # egen dokumentation, se ADR 0020 och CLAUDE.md, Kända fällor - WINE-43).
+  # Utan detta uppfattar appen aldrig anropet som krypterat, så Spring
+  # Securitys Secure-cookieflagga sätts aldrig trots att den faktiska
+  # besökaren använder HTTPS. "framework" använder Spring Framework/
+  # spring-webs ForwardedHeaderFilter (inte Spring Security, trots
+  # namnlikheten). Bekräftat via automatiskt test (ForwardedHeadersIT,
+  # WINE-43) att detta räcker för remember-me-cookien - men INTE för den
+  # vanliga sessionscookien (JSESSIONID), som Tomcat skriver via sin egen,
+  # interna request-hantering, utanför ForwardedHeaderFilter-wrappern.
+  # Sessionscookien tvingas därför säker separat, bara i produktion, via
+  # application-prod.yml - se den filen och CLAUDE.md, Kända fällor.
+  # Samma filter läser även X-Forwarded-Host/-Port/-Prefix utan
+  # källbegränsning, vilket i teorin kan påverka omdirigeringsmålet efter
+  # inloggning - en separat, medvetet accepterad risk, se ADR 0020.
+  forward-headers-strategy: framework
 
 winecellar:
   anthropic:

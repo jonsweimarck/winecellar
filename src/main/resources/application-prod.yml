@@ -1,0 +1,16 @@
+server:
+  servlet:
+    session:
+      cookie:
+        # Tvingar den vanliga sessionscookien (JSESSIONID) att sättas med
+        # Secure, oavsett vad forward-headers-strategy/ForwardedHeaderFilter
+        # råkar avslöja om requesten (se application.yml och ADR 0020,
+        # WINE-43) - Tomcats egen sessionscookie-generering ligger utanför
+        # det lagret och skyddas alltså inte av den mekanismen. Denna profil
+        # ska BARA vara aktiv i produktion (aktiveras via miljövariabeln
+        # SPRING_PROFILES_ACTIVE=prod i Clever Cloud-konsolen) - satt
+        # ovillkorligt i huvudkonfigurationen hade gjort en vanlig lokal
+        # `mvn spring-boot:run` över HTTP obrukbar (webbläsaren skickar då
+        # aldrig med en Secure-flaggad cookie tillbaka, så inloggningen hade
+        # sett ut att fungera men aldrig hållit i sig).
+        secure: true

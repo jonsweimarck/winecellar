@@ -57,13 +57,57 @@ utfärdade cookies på en gång, inte en i taget.
   behov av enhetsspecifik återkallning uppstår senare är en migrering
   till det persistenta läget ett rimligt nästa steg - inget i det här
   beslutet stänger den vägen.
-- **Känd, obekräftad begränsning (upptäckt vid kodgranskning):**
-  webbläsarens säkra cookie-flagga sätts av ramverket bara när appen
-  själv uppfattar anropet som krypterat. Om driftmiljön terminerar TLS
-  i en framförliggande proxy krävs att appen är konfigurerad att lita
-  på proxyns signal om det, annars riskerar cookien (liksom den
-  vanliga inloggningssessionens) att sakna den skyddet i praktiken -
-  30 dagars livslängd gör konsekvensen värre för remember-me än för en
-  vanlig session. Om detta faktiskt gäller den nuvarande driftmiljön är
-  inte verifierat; ingen kodändring är gjord i väntan på det. Uppföljs
-  i en separat story.
+- **Begränsning upptäckt vid kodgranskning, löst i två steg (WINE-43).**
+  Webbläsarens säkra cookie-flagga sätts av ramverket bara när appen
+  själv uppfattar anropet som krypterat. Driftmiljön terminerar TLS i
+  en framförliggande proxy, bekräftat av driftplattformens egen
+  dokumentation - appen är därför konfigurerad att lita på proxyns
+  signal om det ursprungliga protokollet. Ett automatiskt test skrivet
+  i samma story visade dock att den konfigurationen bara löste hälften
+  av problemet i ett första steg: den säkra flaggan sattes korrekt på
+  själva remember-me-cookien (30 dagars livslängd gör konsekvensen av
+  ett uteblivet skydd värre där än för en vanlig session, vilket var
+  den ursprungliga oron), men INTE på den vanliga inloggningssessionens
+  egen cookie - den skrivs av en lägre nivå i servletcontainern som
+  inte ser samma signal.
+- **Andra steget (samma story, efter eskalering till arkitekt och
+  produktägare):** sessionscookien tvingas nu säker explicit, men bara
+  i en produktionsprofil - en generell inställning hade gjort lokal
+  utveckling över vanlig HTTP obrukbar (en webbläsare skickar aldrig en
+  säkert flaggad cookie tillbaka över en osäker anslutning, så
+  inloggningen hade sett ut att fungera men aldrig hållit i sig).
+  Produktionsprofilen måste aktiveras uttryckligen av driftmiljön -
+  den slår inte på sig själv bara för att appen körs där. Se
+  CLAUDE.md, Kända fällor, för exakt vilken miljövariabel som krävs.
+- **Medvetet accepterad risk i samma lösning (WINE-43):** att lita på
+  proxyns signal om det ursprungliga protokollet innebär att signalen
+  litas på från vilken källa som helst, utan någon motsvarande
+  begränsning på vilka avsändare som får skicka den - till skillnad
+  från det alternativ som hade byggt på servletcontainerns egen,
+  käll-adressbegränsade tolkning. Om driftplattformens proxy någon
+  gång inte skulle rensa bort en klients egen sådan signal, eller om
+  appen någon gång blir nåbar förbi proxyn, skulle en förfalskad signal
+  i teorin kunna få den säkra cookie-flaggan att sättas felaktigt.
+  Den praktiska skadan är ändå begränsad, eftersom webbläsare enligt
+  cookie-specifikationen avvisar en säkert flaggad cookie som tas emot
+  över ett faktiskt osäkert svar. Bedömt som en rimlig avvägning för
+  ett lärprojekt utan känsliga data - samma typ av avvägning som
+  remember-me-lägesvalet ovan - och alltså ett medvetet accepterat,
+  dokumenterat val, inte en brist som ska åtgärdas senare.
+- **En andra, separat accepterad risk upptäckt vid en uppföljande
+  kodgranskning (samma story, WINE-43).** Samma ramverksmekanism som
+  läser signalen om det ursprungliga protokollet (föregående punkt)
+  läser även motsvarande vidarebefordrade signaler för värdnamn, port
+  och sökvägsprefix - utan någon källbegränsning där heller. I teorin
+  skulle en förfalskad sådan signal kunna påverka vilken sida en
+  användare skickas till direkt efter en lyckad inloggning. Det här
+  täcks INTE av föregående punkts resonemang (som gäller specifikt
+  cookiens säkra flagga och webbläsarens skydd mot att ta emot den över
+  en osäker anslutning) och behöver därför bedömas separat. Den
+  praktiska skadan bedöms ändå som lägre än den föregående risken,
+  eftersom den förutsätter att en angripare kontrollerar headrarna i
+  offrets egen förfrågan - inte bara att offret klickar en tillskickad
+  länk, som ett klassiskt öppet omdirigeringsproblem annars hade
+  krävt. Medvetet accepterat av samma skäl som ovan: en rimlig
+  avvägning för ett lärprojekt utan känsliga data, inte en brist som
+  ska åtgärdas senare.

@@ -51,10 +51,19 @@ dem:
   Clouds instansstorlek. Miljövariabler som måste sättas i Clever
   Clouds konsol för att respektive funktion ska vara säker/fungera i
   produktion: `WINECELLAR_ANTHROPIC_API_KEY` (etikettskanning, se
-  "Säkerhet - nuläge") och `WINECELLAR_REMEMBER_ME_KEY` (signerar
+  "Säkerhet - nuläge"), `WINECELLAR_REMEMBER_ME_KEY` (signerar
   "håll mig inloggad"-cookien, se `SecurityConfig` - saknas den är
   remember-me bara avstängt, inte osäkert, men funktionen fungerar då
-  inte i produktion).
+  inte i produktion) och `SPRING_PROFILES_ACTIVE=prod` (aktiverar
+  `application-prod.yml`, som tvingar sessionscookien säker - se Kända
+  fällor nedan om varför det inte kan vara på som standard; saknas den
+  här variabeln är sessionscookien osäker i produktion. **Sedan WINE-43
+  loggar `ProdProfileGuard` (`web`-paketet) en varning vid uppstart**
+  om Clever Cloud-drift känns igen (samma signal som datasource-URL:en
+  redan litar på, `POSTGRESQL_ADDON_HOST`) men `prod`-profilen ändå
+  inte är aktiv - ett billigt säkerhetsnät mot just den här
+  fail-insecure-fällan, inte en fix i sig; profilen aktiveras
+  fortfarande inte automatiskt).
 
 ## Namngivning
 
@@ -613,16 +622,73 @@ i `infrastructure/excel/`.
   platshållaren eller en "typisk" bild/textkombination avslöjar buggen.
 - **Session-/remember-me-cookiens `Secure`-flagga förutsätter att appen
   faktiskt VET att anropet gick över HTTPS (WINE-40, kodgranskningsfynd,
-  ej åtgärdat - se uppföljande YouTrack-story).** Spring Security sätter
-  `Secure` baserat på om requesten "är säker" enligt servletcontainern,
-  vilket bara stämmer om appen själv terminerar TLS. Om Clever Cloud
-  terminerar TLS i en framförliggande proxy och vidarebefordrar ett
-  vanligt HTTP-anrop internt (typiskt signalerat via en `X-Forwarded-
-  Proto`-header) måste appen konfigureras (`server.forward-headers-
-  strategy: framework`, INTE satt i dagsläget) för att lita på den
-  headern - annars sätts `Secure` aldrig, trots att den faktiska
-  besökaren använder HTTPS. Obekräftat om detta faktiskt gäller Clever
-  Clouds nuvarande uppsättning - gäller i så fall lika mycket den redan
-  existerande sessionscookien, inte bara remember-me-cookien (som bara
-  gör exponeringsfönstret värre p.g.a. sin 30 dagar långa livslängd).
-  Ingen kodändring gjord i väntan på verifiering, se ADR 0020.
+  löst i två steg i WINE-43 - se ADR 0020).**
+  Spring Security sätter `Secure` baserat på om requesten "är säker"
+  enligt servletcontainern, vilket bara stämmer om appen själv
+  terminerar TLS. Clever Cloud terminerar TLS i en framförliggande
+  reverse proxy/load balancer och vidarebefordrar ett vanligt HTTP-anrop
+  internt, med det ursprungliga protokollet signalerat via en
+  `X-Forwarded-Proto`-header - bekräftat av Clever Clouds egen
+  dokumentation (deras plattformsdokumentation för applikationsruntimes
+  beskriver load balancern framför appen och anger explicit att
+  `X-Forwarded-Proto` alltid är satt på plattformen; deras tekniska
+  blogg beskriver samma sak för JVM-baserade ramverk specifikt).
+  `server.forward-headers-strategy: framework` är därför satt i
+  `application.yml` - ramverkets (Spring Framework/spring-web, inte
+  Spring Security) `ForwardedHeaderFilter` läser headern.
+  **Automatiskt bekräftat av `ForwardedHeadersIT` (WINE-43) mot en
+  riktig inbäddad servletcontainer, med ett verkligt, förvånande
+  resultat i två delar, inte en:** remember-me-cookien (skriven av
+  Spring Securitys eget applikationslager, som läser requestens
+  "är säker"-status via samma request som filtret satte upp) FÅR
+  `Secure` satt korrekt. Den vanliga sessionscookien (JSESSIONID) FÅR
+  DET INTE, trots samma header - Tomcat skapar och skriver den cookien
+  via sin egen, interna request-hantering, som ligger utanför/före den
+  Spring-nivå-wrappring `ForwardedHeaderFilter` sätter upp; bara en
+  servletcontainer-nivå-lösning (den "native"-strategin, som kräver
+  Clever Clouds interna proxy-IP-intervall - se nästa stycke för varför
+  den avvisades) hade åtgärdat även sessionscookien via samma mekanism.
+  Den ursprungliga WINE-43-dokumentationen påstod felaktigt att båda
+  cookies skyddades av `framework`-strategin ensam, ett antagande som
+  aldrig var testat förrän detta automatiska test skrevs.
+  **Löst (samma story, efter eskalering till arkitekt och användaren):**
+  sessionscookien tvingas nu säker explicit via
+  `server.servlet.session.cookie.secure: true`, men BARA i en ny
+  `application-prod.yml`-profil - inte i huvudkonfigurationen, eftersom
+  en generell inställning hade gjort lokal `mvn spring-boot:run` över
+  vanlig HTTP obrukbar (en webbläsare skickar aldrig en säkert flaggad
+  cookie tillbaka över en osäker anslutning, så inloggningen hade sett
+  ut att fungera men aldrig hållit i sig mellan requester). **Kräver ett
+  manuellt steg i drift: miljövariabeln `SPRING_PROFILES_ACTIVE=prod`
+  måste sättas i Clever Cloud-konsolen** för att profilen faktiskt ska
+  aktiveras - den slår inte på sig själv bara för att appen körs i
+  produktionsmiljön, och ingen tidigare story har satt den. Utan den
+  miljövariabeln fortsätter sessionscookien vara osäker i produktion,
+  precis som innan den här fixen. Verifierat av `ForwardedHeadersIT`
+  under båda profilerna: sessionscookien blir säker med `prod`-profilen
+  aktiv (och det stående `X-Forwarded-Proto`-behovet för remember-me-
+  cookien kvarstår oförändrat), och förblir osäker i default-profilen så
+  att lokal HTTP-utveckling inte går sönder.
+  **Medvetet accepterad risk (samma story, se ADR 0020):**
+  `framework`-strategin litar på `X-Forwarded-Proto` från VILKEN
+  källa som helst, utan någon motsvarighet till den käll-IP-allowlist
+  som servletcontainerns egen ("native") strategi hade haft. Skulle
+  Clever Clouds proxy någon gång inte strippa en klients egen sådan
+  header, eller skulle appen bli nåbar förbi proxyn, kan en förfalskad
+  header i teorin få `Secure`-flaggan att sättas felaktigt - men
+  webbläsare avvisar ändå en `Secure`-flaggad cookie som tas emot över
+  ett faktiskt osäkert (HTTP) svar, vilket begränsar den praktiska
+  skadan. Bedömt som en rimlig avvägning för ett lärprojekt utan
+  känsliga data, inte en brist som ska åtgärdas senare.
+  **Kompletterande, separat accepterad risk (upptäckt vid en
+  uppföljande kodgranskning, samma story, se ADR 0020).**
+  `ForwardedHeaderFilter` litar på samma sätt på `X-Forwarded-Host`/
+  `-Port`/`-Prefix`, utan källbegränsning - vilket i teorin kan påverka
+  Spring Securitys omdirigeringsmål direkt efter en lyckad inloggning
+  (`DefaultSavedRequest`). Täcks INTE av föregående styckes
+  cookie-specifika resonemang, så det är ett separat, kompletterande
+  beslut, inte en förlängning av det. Bedömd praktisk skada är ändå
+  LÄGRE än cookie-risken - exploatering kräver att angriparen
+  kontrollerar headrarna i offrets egen förfrågan, inte bara en klickad
+  länk som ett klassiskt öppet omdirigeringsproblem. Medvetet
+  accepterat, samma avvägning som ovan.
