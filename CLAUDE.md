@@ -613,20 +613,47 @@ i `infrastructure/excel/`.
   platshållaren eller en "typisk" bild/textkombination avslöjar buggen.
 - **Session-/remember-me-cookiens `Secure`-flagga förutsätter att appen
   faktiskt VET att anropet gick över HTTPS (WINE-40, kodgranskningsfynd,
-  verifierat och åtgärdat i WINE-43 - se ADR 0020).** Spring Security
-  sätter `Secure` baserat på om requesten "är säker" enligt
-  servletcontainern, vilket bara stämmer om appen själv terminerar TLS.
-  Clever Cloud terminerar TLS i en framförliggande reverse proxy/load
-  balancer och vidarebefordrar ett vanligt HTTP-anrop internt, med det
-  ursprungliga protokollet signalerat via en `X-Forwarded-Proto`-header
-  - bekräftat av Clever Clouds egen dokumentation (deras plattformsdoku-
-  mentation för applikationsruntimes beskriver load balancern framför
-  appen och anger explicit att `X-Forwarded-Proto` alltid är satt på
-  plattformen; deras tekniska blogg beskriver samma sak för JVM-baserade
-  ramverk specifikt). `server.forward-headers-strategy: framework` är
-  därför satt i `application.yml` - Spring Securitys
-  `ForwardedHeaderFilter` läser headern och gör att både den vanliga
-  sessionscookien och remember-me-cookien får `Secure` satt korrekt.
+  delvis åtgärdat i WINE-43, kvarstående öppen fråga - se ADR 0020).**
+  Spring Security sätter `Secure` baserat på om requesten "är säker"
+  enligt servletcontainern, vilket bara stämmer om appen själv
+  terminerar TLS. Clever Cloud terminerar TLS i en framförliggande
+  reverse proxy/load balancer och vidarebefordrar ett vanligt HTTP-anrop
+  internt, med det ursprungliga protokollet signalerat via en
+  `X-Forwarded-Proto`-header - bekräftat av Clever Clouds egen
+  dokumentation (deras plattformsdokumentation för applikationsruntimes
+  beskriver load balancern framför appen och anger explicit att
+  `X-Forwarded-Proto` alltid är satt på plattformen; deras tekniska
+  blogg beskriver samma sak för JVM-baserade ramverk specifikt).
+  `server.forward-headers-strategy: framework` är därför satt i
+  `application.yml` - ramverkets (Spring Framework/spring-web, inte
+  Spring Security) `ForwardedHeaderFilter` läser headern.
+  **Automatiskt bekräftat av `ForwardedHeadersIT` (WINE-43) mot en
+  riktig inbäddad servletcontainer, med ett verkligt, förvånande
+  resultat i två delar, inte en:** remember-me-cookien (skriven av
+  Spring Securitys eget applikationslager, som läser requestens
+  "är säker"-status via samma request som filtret satte upp) FÅR
+  `Secure` satt korrekt. Den vanliga sessionscookien (JSESSIONID) FÅR
+  DET INTE, trots samma header - Tomcat skapar och skriver den cookien
+  via sin egen, interna request-hantering, som ligger utanför/före den
+  Spring-nivå-wrappring `ForwardedHeaderFilter` sätter upp; bara en
+  servletcontainer-nivå-lösning (den "native"-strategin, som kräver
+  Clever Clouds interna proxy-IP-intervall - se nästa stycke för varför
+  den avvisades) hade åtgärdat även sessionscookien. **Det här är en
+  kvarstående, olöst begränsning** - den ursprungliga WINE-43-
+  dokumentationen påstod felaktigt att båda cookies skyddades, ett
+  antagande som aldrig var testat förrän detta automatiska test skrevs.
   Ingen produktionsverifiering av det faktiska cookiesvaret har gjorts
-  (kräver åtkomst till produktionsmiljön) - beslutet grundar sig på
-  plattformens dokumenterade, generella TLS-termineringsarkitektur.
+  utöver detta - beslutet om själva `framework`-strategin grundar sig i
+  övrigt på plattformens dokumenterade, generella
+  TLS-termineringsarkitektur.
+  **Medvetet accepterad risk (samma story, se ADR 0020):**
+  `framework`-strategin litar på `X-Forwarded-Proto` från VILKEN
+  källa som helst, utan någon motsvarighet till den käll-IP-allowlist
+  som servletcontainerns egen ("native") strategi hade haft. Skulle
+  Clever Clouds proxy någon gång inte strippa en klients egen sådan
+  header, eller skulle appen bli nåbar förbi proxyn, kan en förfalskad
+  header i teorin få `Secure`-flaggan att sättas felaktigt - men
+  webbläsare avvisar ändå en `Secure`-flaggad cookie som tas emot över
+  ett faktiskt osäkert (HTTP) svar, vilket begränsar den praktiska
+  skadan. Bedömt som en rimlig avvägning för ett lärprojekt utan
+  känsliga data, inte en brist som ska åtgärdas senare.

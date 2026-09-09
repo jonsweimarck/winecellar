@@ -57,13 +57,36 @@ utfärdade cookies på en gång, inte en i taget.
   behov av enhetsspecifik återkallning uppstår senare är en migrering
   till det persistenta läget ett rimligt nästa steg - inget i det här
   beslutet stänger den vägen.
-- **Begränsning upptäckt vid kodgranskning, verifierad och åtgärdad
-  (WINE-43):** webbläsarens säkra cookie-flagga sätts av ramverket bara
-  när appen själv uppfattar anropet som krypterat. Driftmiljön
-  terminerar TLS i en framförliggande proxy, bekräftat av
-  driftplattformens egen dokumentation - appen är därför konfigurerad
-  att lita på proxyns signal om det ursprungliga protokollet. Utan den
-  konfigurationen hade cookien (liksom den vanliga
-  inloggningssessionens) saknat skyddet i praktiken - 30 dagars
-  livslängd gör konsekvensen värre för remember-me än för en vanlig
-  session.
+- **Begränsning upptäckt vid kodgranskning, delvis åtgärdad (WINE-43) -
+  en kvarstående, olöst del finns fortfarande kvar.** Webbläsarens
+  säkra cookie-flagga sätts av ramverket bara när appen själv uppfattar
+  anropet som krypterat. Driftmiljön terminerar TLS i en framförliggande
+  proxy, bekräftat av driftplattformens egen dokumentation - appen är
+  därför konfigurerad att lita på proxyns signal om det ursprungliga
+  protokollet. Ett automatiskt test skrivet i samma story bekräftade
+  dock att den konfigurationen bara löser hälften av problemet: den
+  säkra flaggan sätts numera korrekt på själva remember-me-cookien
+  (30 dagars livslängd gör konsekvensen av ett uteblivet skydd värre
+  där än för en vanlig session, vilket var den ursprungliga oron), men
+  INTE på den vanliga inloggningssessionens egen cookie - den skrivs av
+  en lägre nivå i servletcontainern som inte ser samma signal. Detta var
+  odokumenterat och otestat fram till WINE-43. En fullständig lösning
+  (t.ex. att explicit tvinga fram en säker sessionscookie) har egna
+  avvägningar - framför allt att den skulle göra lokal utveckling över
+  vanlig HTTP obrukbar utan särskiljning per miljö - och är därför
+  medvetet lämnad som en öppen fråga, inte löst i den här storyn.
+- **Medvetet accepterad risk i samma lösning (WINE-43):** att lita på
+  proxyns signal om det ursprungliga protokollet innebär att signalen
+  litas på från vilken källa som helst, utan någon motsvarande
+  begränsning på vilka avsändare som får skicka den - till skillnad
+  från det alternativ som hade byggt på servletcontainerns egen,
+  käll-adressbegränsade tolkning. Om driftplattformens proxy någon
+  gång inte skulle rensa bort en klients egen sådan signal, eller om
+  appen någon gång blir nåbar förbi proxyn, skulle en förfalskad signal
+  i teorin kunna få den säkra cookie-flaggan att sättas felaktigt.
+  Den praktiska skadan är ändå begränsad, eftersom webbläsare enligt
+  cookie-specifikationen avvisar en säkert flaggad cookie som tas emot
+  över ett faktiskt osäkert svar. Bedömt som en rimlig avvägning för
+  ett lärprojekt utan känsliga data - samma typ av avvägning som
+  remember-me-lägesvalet ovan - och alltså ett medvetet accepterat,
+  dokumenterat val, inte en brist som ska åtgärdas senare.

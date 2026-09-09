@@ -56,9 +56,14 @@ server:
   # protokollet signalerat via X-Forwarded-Proto (bekräftat av Clever Clouds
   # egen dokumentation, se ADR 0020 och CLAUDE.md, Kända fällor - WINE-43).
   # Utan detta uppfattar appen aldrig anropet som krypterat, så Spring
-  # Securitys Secure-cookieflagga (sessionscookien och remember-me-cookien,
-  # se ADR 0020) sätts aldrig trots att den faktiska besökaren använder
-  # HTTPS. "framework" använder Spring Securitys ForwardedHeaderFilter.
+  # Securitys Secure-cookieflagga sätts aldrig trots att den faktiska
+  # besökaren använder HTTPS. "framework" använder Spring Framework/
+  # spring-webs ForwardedHeaderFilter (inte Spring Security, trots
+  # namnlikheten). Bekräftat via automatiskt test (ForwardedHeadersIT,
+  # WINE-43) att detta räcker för remember-me-cookien - men INTE för den
+  # vanliga sessionscookien (JSESSIONID), som Tomcat skriver via sin egen,
+  # interna request-hantering, utanför ForwardedHeaderFilter-wrappern. Se
+  # CLAUDE.md, Kända fällor, för den öppna frågan detta lämnar olöst.
   forward-headers-strategy: framework
 
 winecellar:
