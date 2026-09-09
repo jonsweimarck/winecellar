@@ -51,10 +51,14 @@ dem:
   Clouds instansstorlek. Miljövariabler som måste sättas i Clever
   Clouds konsol för att respektive funktion ska vara säker/fungera i
   produktion: `WINECELLAR_ANTHROPIC_API_KEY` (etikettskanning, se
-  "Säkerhet - nuläge") och `WINECELLAR_REMEMBER_ME_KEY` (signerar
+  "Säkerhet - nuläge"), `WINECELLAR_REMEMBER_ME_KEY` (signerar
   "håll mig inloggad"-cookien, se `SecurityConfig` - saknas den är
   remember-me bara avstängt, inte osäkert, men funktionen fungerar då
-  inte i produktion).
+  inte i produktion) och `SPRING_PROFILES_ACTIVE=prod` (aktiverar
+  `application-prod.yml`, som tvingar sessionscookien säker - se Kända
+  fällor nedan om varför det inte kan vara på som standard; saknas den
+  här variabeln är sessionscookien osäker i produktion utan att appen på
+  något sätt signalerar det).
 
 ## Namngivning
 
@@ -613,7 +617,7 @@ i `infrastructure/excel/`.
   platshållaren eller en "typisk" bild/textkombination avslöjar buggen.
 - **Session-/remember-me-cookiens `Secure`-flagga förutsätter att appen
   faktiskt VET att anropet gick över HTTPS (WINE-40, kodgranskningsfynd,
-  delvis åtgärdat i WINE-43, kvarstående öppen fråga - se ADR 0020).**
+  löst i två steg i WINE-43 - se ADR 0020).**
   Spring Security sätter `Secure` baserat på om requesten "är säker"
   enligt servletcontainern, vilket bara stämmer om appen själv
   terminerar TLS. Clever Cloud terminerar TLS i en framförliggande
@@ -638,14 +642,28 @@ i `infrastructure/excel/`.
   Spring-nivå-wrappring `ForwardedHeaderFilter` sätter upp; bara en
   servletcontainer-nivå-lösning (den "native"-strategin, som kräver
   Clever Clouds interna proxy-IP-intervall - se nästa stycke för varför
-  den avvisades) hade åtgärdat även sessionscookien. **Det här är en
-  kvarstående, olöst begränsning** - den ursprungliga WINE-43-
-  dokumentationen påstod felaktigt att båda cookies skyddades, ett
-  antagande som aldrig var testat förrän detta automatiska test skrevs.
-  Ingen produktionsverifiering av det faktiska cookiesvaret har gjorts
-  utöver detta - beslutet om själva `framework`-strategin grundar sig i
-  övrigt på plattformens dokumenterade, generella
-  TLS-termineringsarkitektur.
+  den avvisades) hade åtgärdat även sessionscookien via samma mekanism.
+  Den ursprungliga WINE-43-dokumentationen påstod felaktigt att båda
+  cookies skyddades av `framework`-strategin ensam, ett antagande som
+  aldrig var testat förrän detta automatiska test skrevs.
+  **Löst (samma story, efter eskalering till arkitekt och användaren):**
+  sessionscookien tvingas nu säker explicit via
+  `server.servlet.session.cookie.secure: true`, men BARA i en ny
+  `application-prod.yml`-profil - inte i huvudkonfigurationen, eftersom
+  en generell inställning hade gjort lokal `mvn spring-boot:run` över
+  vanlig HTTP obrukbar (en webbläsare skickar aldrig en säkert flaggad
+  cookie tillbaka över en osäker anslutning, så inloggningen hade sett
+  ut att fungera men aldrig hållit i sig mellan requester). **Kräver ett
+  manuellt steg i drift: miljövariabeln `SPRING_PROFILES_ACTIVE=prod`
+  måste sättas i Clever Cloud-konsolen** för att profilen faktiskt ska
+  aktiveras - den slår inte på sig själv bara för att appen körs i
+  produktionsmiljön, och ingen tidigare story har satt den. Utan den
+  miljövariabeln fortsätter sessionscookien vara osäker i produktion,
+  precis som innan den här fixen. Verifierat av `ForwardedHeadersIT`
+  under båda profilerna: sessionscookien blir säker med `prod`-profilen
+  aktiv (och det stående `X-Forwarded-Proto`-behovet för remember-me-
+  cookien kvarstår oförändrat), och förblir osäker i default-profilen så
+  att lokal HTTP-utveckling inte går sönder.
   **Medvetet accepterad risk (samma story, se ADR 0020):**
   `framework`-strategin litar på `X-Forwarded-Proto` från VILKEN
   källa som helst, utan någon motsvarighet till den käll-IP-allowlist

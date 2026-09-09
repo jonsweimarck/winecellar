@@ -25,7 +25,8 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
  * servletcontainer (inte @WebMvcTest/MockMvc, som inte bootar
  * ForwardedHeaderFilter-registreringen) vad {@code
  * server.forward-headers-strategy: framework} FAKTISKT åstadkommer när en
- * {@code X-Forwarded-Proto: https}-header följer med.
+ * {@code X-Forwarded-Proto: https}-header följer med, i default-profilen
+ * (ingen {@code SPRING_PROFILES_ACTIVE} satt - motsvarar lokal utveckling).
  *
  * <p><b>Två skilda, empiriskt bekräftade resultat, inte ett:</b>
  * <ul>
@@ -33,18 +34,21 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
  *   lager, som läser requestens `isSecure()` via samma request-wrapper som
  *   ForwardedHeaderFilter satte upp) FÅR `Secure` satt korrekt - verifierat
  *   av {@code skaSättaSäkerRememberMeCookieMedForwardedHttpsHeader}.</li>
- *   <li>Den vanliga sessionscookien (JSESSIONID) FÅR DET INTE - Tomcats
- *   egen sessionshantering skapar och skriver den cookien direkt via
- *   servletcontainerns interna request-objekt, INNAN/UTANFÖR
- *   ForwardedHeaderFilter-wrappern som resten av requesten ser. Detta
- *   motsäger den ursprungliga WINE-43-dokumentationens påstående att BÅDA
- *   cookies skyddas - se `skaINTESättaSäkerSessionscookieTrotsForwardedHttpsHeader`,
- *   som medvetet dokumenterar den faktiska begränsningen istället för att
- *   dölja den. Flaggat som en öppen fråga till arkitekten (se PR/rapport),
- *   inte tyst löst här - en riktig fix (t.ex. att explicit tvinga en säker
- *   sessionscookie) har verkliga avvägningar (bryter lokal HTTP-utveckling)
- *   som kräver ett produktbeslut.</li>
+ *   <li>Den vanliga sessionscookien (JSESSIONID) FÅR DET INTE i den här
+ *   (default-)profilen - Tomcats egen sessionshantering skapar och skriver
+ *   den cookien direkt via servletcontainerns interna request-objekt,
+ *   INNAN/UTANFÖR ForwardedHeaderFilter-wrappern som resten av requesten
+ *   ser. Detta motsäger den ursprungliga WINE-43-dokumentationens
+ *   påstående att BÅDA cookies skyddas - se
+ *   `skaInteSättaSäkerSessionscookieTrotsForwardedHttpsHeader`, som
+ *   medvetet dokumenterar den faktiska begränsningen istället för att
+ *   dölja den.</li>
  * </ul>
+ *
+ * <p>Löst för produktion via en separat produktionsprofil, se
+ * {@link ForwardedHeadersProdProfileIT} - sessionscookien ska FÖRBLI osäker
+ * här i default-profilen, annars går lokal HTTP-utveckling sönder (se
+ * ADR 0020 och CLAUDE.md, Kända fällor).
  */
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @TestPropertySource(properties = "winecellar.remember-me.key=forwarded-headers-test-nyckel")

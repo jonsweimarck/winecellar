@@ -62,8 +62,9 @@ server:
   # namnlikheten). Bekräftat via automatiskt test (ForwardedHeadersIT,
   # WINE-43) att detta räcker för remember-me-cookien - men INTE för den
   # vanliga sessionscookien (JSESSIONID), som Tomcat skriver via sin egen,
-  # interna request-hantering, utanför ForwardedHeaderFilter-wrappern. Se
-  # CLAUDE.md, Kända fällor, för den öppna frågan detta lämnar olöst.
+  # interna request-hantering, utanför ForwardedHeaderFilter-wrappern.
+  # Sessionscookien tvingas därför säker separat, bara i produktion, via
+  # application-prod.yml - se den filen och CLAUDE.md, Kända fällor.
   forward-headers-strategy: framework
 
 winecellar:

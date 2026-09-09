@@ -57,24 +57,28 @@ utfärdade cookies på en gång, inte en i taget.
   behov av enhetsspecifik återkallning uppstår senare är en migrering
   till det persistenta läget ett rimligt nästa steg - inget i det här
   beslutet stänger den vägen.
-- **Begränsning upptäckt vid kodgranskning, delvis åtgärdad (WINE-43) -
-  en kvarstående, olöst del finns fortfarande kvar.** Webbläsarens
-  säkra cookie-flagga sätts av ramverket bara när appen själv uppfattar
-  anropet som krypterat. Driftmiljön terminerar TLS i en framförliggande
-  proxy, bekräftat av driftplattformens egen dokumentation - appen är
-  därför konfigurerad att lita på proxyns signal om det ursprungliga
-  protokollet. Ett automatiskt test skrivet i samma story bekräftade
-  dock att den konfigurationen bara löser hälften av problemet: den
-  säkra flaggan sätts numera korrekt på själva remember-me-cookien
-  (30 dagars livslängd gör konsekvensen av ett uteblivet skydd värre
-  där än för en vanlig session, vilket var den ursprungliga oron), men
-  INTE på den vanliga inloggningssessionens egen cookie - den skrivs av
-  en lägre nivå i servletcontainern som inte ser samma signal. Detta var
-  odokumenterat och otestat fram till WINE-43. En fullständig lösning
-  (t.ex. att explicit tvinga fram en säker sessionscookie) har egna
-  avvägningar - framför allt att den skulle göra lokal utveckling över
-  vanlig HTTP obrukbar utan särskiljning per miljö - och är därför
-  medvetet lämnad som en öppen fråga, inte löst i den här storyn.
+- **Begränsning upptäckt vid kodgranskning, löst i två steg (WINE-43).**
+  Webbläsarens säkra cookie-flagga sätts av ramverket bara när appen
+  själv uppfattar anropet som krypterat. Driftmiljön terminerar TLS i
+  en framförliggande proxy, bekräftat av driftplattformens egen
+  dokumentation - appen är därför konfigurerad att lita på proxyns
+  signal om det ursprungliga protokollet. Ett automatiskt test skrivet
+  i samma story visade dock att den konfigurationen bara löste hälften
+  av problemet i ett första steg: den säkra flaggan sattes korrekt på
+  själva remember-me-cookien (30 dagars livslängd gör konsekvensen av
+  ett uteblivet skydd värre där än för en vanlig session, vilket var
+  den ursprungliga oron), men INTE på den vanliga inloggningssessionens
+  egen cookie - den skrivs av en lägre nivå i servletcontainern som
+  inte ser samma signal.
+- **Andra steget (samma story, efter eskalering till arkitekt och
+  produktägare):** sessionscookien tvingas nu säker explicit, men bara
+  i en produktionsprofil - en generell inställning hade gjort lokal
+  utveckling över vanlig HTTP obrukbar (en webbläsare skickar aldrig en
+  säkert flaggad cookie tillbaka över en osäker anslutning, så
+  inloggningen hade sett ut att fungera men aldrig hållit i sig).
+  Produktionsprofilen måste aktiveras uttryckligen av driftmiljön -
+  den slår inte på sig själv bara för att appen körs där. Se
+  CLAUDE.md, Kända fällor, för exakt vilken miljövariabel som krävs.
 - **Medvetet accepterad risk i samma lösning (WINE-43):** att lita på
   proxyns signal om det ursprungliga protokollet innebär att signalen
   litas på från vilken källa som helst, utan någon motsvarande
