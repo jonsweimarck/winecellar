@@ -51,6 +51,15 @@ spring:
 
 server:
   port: 8080
+  # Clever Cloud terminerar TLS i en framförliggande reverse proxy/load
+  # balancer och skickar vanlig HTTP internt till appen, med det ursprungliga
+  # protokollet signalerat via X-Forwarded-Proto (bekräftat av Clever Clouds
+  # egen dokumentation, se ADR 0020 och CLAUDE.md, Kända fällor - WINE-43).
+  # Utan detta uppfattar appen aldrig anropet som krypterat, så Spring
+  # Securitys Secure-cookieflagga (sessionscookien och remember-me-cookien,
+  # se ADR 0020) sätts aldrig trots att den faktiska besökaren använder
+  # HTTPS. "framework" använder Spring Securitys ForwardedHeaderFilter.
+  forward-headers-strategy: framework
 
 winecellar:
   anthropic:

@@ -613,16 +613,20 @@ i `infrastructure/excel/`.
   platshållaren eller en "typisk" bild/textkombination avslöjar buggen.
 - **Session-/remember-me-cookiens `Secure`-flagga förutsätter att appen
   faktiskt VET att anropet gick över HTTPS (WINE-40, kodgranskningsfynd,
-  ej åtgärdat - se uppföljande YouTrack-story).** Spring Security sätter
-  `Secure` baserat på om requesten "är säker" enligt servletcontainern,
-  vilket bara stämmer om appen själv terminerar TLS. Om Clever Cloud
-  terminerar TLS i en framförliggande proxy och vidarebefordrar ett
-  vanligt HTTP-anrop internt (typiskt signalerat via en `X-Forwarded-
-  Proto`-header) måste appen konfigureras (`server.forward-headers-
-  strategy: framework`, INTE satt i dagsläget) för att lita på den
-  headern - annars sätts `Secure` aldrig, trots att den faktiska
-  besökaren använder HTTPS. Obekräftat om detta faktiskt gäller Clever
-  Clouds nuvarande uppsättning - gäller i så fall lika mycket den redan
-  existerande sessionscookien, inte bara remember-me-cookien (som bara
-  gör exponeringsfönstret värre p.g.a. sin 30 dagar långa livslängd).
-  Ingen kodändring gjord i väntan på verifiering, se ADR 0020.
+  verifierat och åtgärdat i WINE-43 - se ADR 0020).** Spring Security
+  sätter `Secure` baserat på om requesten "är säker" enligt
+  servletcontainern, vilket bara stämmer om appen själv terminerar TLS.
+  Clever Cloud terminerar TLS i en framförliggande reverse proxy/load
+  balancer och vidarebefordrar ett vanligt HTTP-anrop internt, med det
+  ursprungliga protokollet signalerat via en `X-Forwarded-Proto`-header
+  - bekräftat av Clever Clouds egen dokumentation (deras plattformsdoku-
+  mentation för applikationsruntimes beskriver load balancern framför
+  appen och anger explicit att `X-Forwarded-Proto` alltid är satt på
+  plattformen; deras tekniska blogg beskriver samma sak för JVM-baserade
+  ramverk specifikt). `server.forward-headers-strategy: framework` är
+  därför satt i `application.yml` - Spring Securitys
+  `ForwardedHeaderFilter` läser headern och gör att både den vanliga
+  sessionscookien och remember-me-cookien får `Secure` satt korrekt.
+  Ingen produktionsverifiering av det faktiska cookiesvaret har gjorts
+  (kräver åtkomst till produktionsmiljön) - beslutet grundar sig på
+  plattformens dokumenterade, generella TLS-termineringsarkitektur.

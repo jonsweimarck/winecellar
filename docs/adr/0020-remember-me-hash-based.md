@@ -57,13 +57,13 @@ utfärdade cookies på en gång, inte en i taget.
   behov av enhetsspecifik återkallning uppstår senare är en migrering
   till det persistenta läget ett rimligt nästa steg - inget i det här
   beslutet stänger den vägen.
-- **Känd, obekräftad begränsning (upptäckt vid kodgranskning):**
-  webbläsarens säkra cookie-flagga sätts av ramverket bara när appen
-  själv uppfattar anropet som krypterat. Om driftmiljön terminerar TLS
-  i en framförliggande proxy krävs att appen är konfigurerad att lita
-  på proxyns signal om det, annars riskerar cookien (liksom den
-  vanliga inloggningssessionens) att sakna den skyddet i praktiken -
-  30 dagars livslängd gör konsekvensen värre för remember-me än för en
-  vanlig session. Om detta faktiskt gäller den nuvarande driftmiljön är
-  inte verifierat; ingen kodändring är gjord i väntan på det. Uppföljs
-  i en separat story.
+- **Begränsning upptäckt vid kodgranskning, verifierad och åtgärdad
+  (WINE-43):** webbläsarens säkra cookie-flagga sätts av ramverket bara
+  när appen själv uppfattar anropet som krypterat. Driftmiljön
+  terminerar TLS i en framförliggande proxy, bekräftat av
+  driftplattformens egen dokumentation - appen är därför konfigurerad
+  att lita på proxyns signal om det ursprungliga protokollet. Utan den
+  konfigurationen hade cookien (liksom den vanliga
+  inloggningssessionens) saknat skyddet i praktiken - 30 dagars
+  livslängd gör konsekvensen värre för remember-me än för en vanlig
+  session.
