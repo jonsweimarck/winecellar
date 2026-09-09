@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.NestedTestConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -357,6 +358,69 @@ class WineControllerTest {
                         .andExpect(status().is3xxRedirection())
                         .andExpect(redirectedUrl("/login?logout"))
                         .andExpect(cookie().maxAge("remember-me", 0));
+            }
+
+            /**
+             * WINE-40, granskningsfynd runda 2: pinnar fail-safe-grenen i
+             * {@code SecurityConfig} (se dess klasskommentar) - saknas en
+             * konfigurerad nyckel (produktionens lokala default är tom)
+             * registreras remember-me-stödet inte alls i filterkedjan, så
+             * kryssrutan ska bete sig som overksam (ingen cookie) istället
+             * för att tyst signera med ett förutsägbart värde.
+             *
+             * Övriga tester i den här filen delar en gemensam kontext,
+             * pinnad till `test-remember-me-nyckel` via
+             * {@code @TestPropertySource} på klassnivå - det här enda
+             * scenariot behöver tvärtom en TOM nyckel, vilket kräver en
+             * egen Spring-kontext. {@code @NestedTestConfiguration(OVERRIDE)}
+             * bryter arvet av den yttre klassens
+             * {@code @TestPropertySource}, så kontext-annoteringarna nedan
+             * måste upprepas i sin helhet.
+             */
+            @Nested
+            @DisplayName("utan konfigurerad nyckel")
+            @NestedTestConfiguration(NestedTestConfiguration.EnclosingConfiguration.OVERRIDE)
+            @WebMvcTest(WineController.class)
+            @Import(SecurityConfig.class)
+            @TestPropertySource(properties = "winecellar.remember-me.key=")
+            class UtanKonfigureradNyckel {
+
+                @Autowired
+                private MockMvc mockMvc;
+
+                @Autowired
+                private PasswordEncoder passwordEncoder;
+
+                @MockBean
+                private WineService wineService;
+
+                @MockBean
+                private LabelInterpretationService labelInterpretationService;
+
+                @MockBean
+                private UserRepository userRepository;
+
+                @BeforeEach
+                void stubbaTestanvändare() {
+                    User testAnvändare = new User(
+                            new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0);
+                    when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
+                }
+
+                @Test
+                @DisplayName("ska INTE sätta någon remember-me-cookie, trots ikryssad ruta")
+                void skaInteSättaRememberMeCookieNärNyckelSaknas() throws Exception {
+                    MvcResult inloggning = mockMvc.perform(post("/login")
+                                    .with(csrf())
+                                    .param("username", "testperson")
+                                    .param("password", "hemligt123")
+                                    .param("remember-me", "on"))
+                            .andExpect(status().is3xxRedirection())
+                            .andExpect(redirectedUrl("/"))
+                            .andReturn();
+
+                    assertThat(inloggning.getResponse().getCookie("remember-me")).isNull();
+                }
             }
         }
     }
