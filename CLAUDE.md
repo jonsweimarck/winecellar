@@ -57,8 +57,13 @@ dem:
   inte i produktion) och `SPRING_PROFILES_ACTIVE=prod` (aktiverar
   `application-prod.yml`, som tvingar sessionscookien säker - se Kända
   fällor nedan om varför det inte kan vara på som standard; saknas den
-  här variabeln är sessionscookien osäker i produktion utan att appen på
-  något sätt signalerar det).
+  här variabeln är sessionscookien osäker i produktion. **Sedan WINE-43
+  loggar `ProdProfileGuard` (`web`-paketet) en varning vid uppstart**
+  om Clever Cloud-drift känns igen (samma signal som datasource-URL:en
+  redan litar på, `POSTGRESQL_ADDON_HOST`) men `prod`-profilen ändå
+  inte är aktiv - ett billigt säkerhetsnät mot just den här
+  fail-insecure-fällan, inte en fix i sig; profilen aktiveras
+  fortfarande inte automatiskt).
 
 ## Namngivning
 
@@ -675,3 +680,15 @@ i `infrastructure/excel/`.
   ett faktiskt osäkert (HTTP) svar, vilket begränsar den praktiska
   skadan. Bedömt som en rimlig avvägning för ett lärprojekt utan
   känsliga data, inte en brist som ska åtgärdas senare.
+  **Kompletterande, separat accepterad risk (upptäckt vid en
+  uppföljande kodgranskning, samma story, se ADR 0020).**
+  `ForwardedHeaderFilter` litar på samma sätt på `X-Forwarded-Host`/
+  `-Port`/`-Prefix`, utan källbegränsning - vilket i teorin kan påverka
+  Spring Securitys omdirigeringsmål direkt efter en lyckad inloggning
+  (`DefaultSavedRequest`). Täcks INTE av föregående styckes
+  cookie-specifika resonemang, så det är ett separat, kompletterande
+  beslut, inte en förlängning av det. Bedömd praktisk skada är ändå
+  LÄGRE än cookie-risken - exploatering kräver att angriparen
+  kontrollerar headrarna i offrets egen förfrågan, inte bara en klickad
+  länk som ett klassiskt öppet omdirigeringsproblem. Medvetet
+  accepterat, samma avvägning som ovan.

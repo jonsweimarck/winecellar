@@ -65,6 +65,9 @@ server:
   # interna request-hantering, utanför ForwardedHeaderFilter-wrappern.
   # Sessionscookien tvingas därför säker separat, bara i produktion, via
   # application-prod.yml - se den filen och CLAUDE.md, Kända fällor.
+  # Samma filter läser även X-Forwarded-Host/-Port/-Prefix utan
+  # källbegränsning, vilket i teorin kan påverka omdirigeringsmålet efter
+  # inloggning - en separat, medvetet accepterad risk, se ADR 0020.
   forward-headers-strategy: framework
 
 winecellar:

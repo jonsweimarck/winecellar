@@ -94,3 +94,20 @@ utfärdade cookies på en gång, inte en i taget.
   ett lärprojekt utan känsliga data - samma typ av avvägning som
   remember-me-lägesvalet ovan - och alltså ett medvetet accepterat,
   dokumenterat val, inte en brist som ska åtgärdas senare.
+- **En andra, separat accepterad risk upptäckt vid en uppföljande
+  kodgranskning (samma story, WINE-43).** Samma ramverksmekanism som
+  läser signalen om det ursprungliga protokollet (föregående punkt)
+  läser även motsvarande vidarebefordrade signaler för värdnamn, port
+  och sökvägsprefix - utan någon källbegränsning där heller. I teorin
+  skulle en förfalskad sådan signal kunna påverka vilken sida en
+  användare skickas till direkt efter en lyckad inloggning. Det här
+  täcks INTE av föregående punkts resonemang (som gäller specifikt
+  cookiens säkra flagga och webbläsarens skydd mot att ta emot den över
+  en osäker anslutning) och behöver därför bedömas separat. Den
+  praktiska skadan bedöms ändå som lägre än den föregående risken,
+  eftersom den förutsätter att en angripare kontrollerar headrarna i
+  offrets egen förfrågan - inte bara att offret klickar en tillskickad
+  länk, som ett klassiskt öppet omdirigeringsproblem annars hade
+  krävt. Medvetet accepterat av samma skäl som ovan: en rimlig
+  avvägning för ett lärprojekt utan känsliga data, inte en brist som
+  ska åtgärdas senare.
