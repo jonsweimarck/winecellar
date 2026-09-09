@@ -60,3 +60,13 @@ winecellar:
     # faktiskt används).
     api-key: ${WINECELLAR_ANTHROPIC_API_KEY:}
     model: ${WINECELLAR_ANTHROPIC_MODEL:claude-sonnet-5}
+  remember-me:
+    # Signerar "håll mig inloggad"-cookien (WINE-40, se ADR 0020). Utan en
+    # egen, stabil nyckel genererar Spring Security en ny slumpad nyckel
+    # vid varje JVM-start, vilket hade ogiltigförklarat ALLA utestående
+    # remember-me-cookies vid varenda redeploy - ofarligt, men irriterande.
+    # Den lokala standarden duger för utveckling; produktion ska sätta en
+    # egen hemlighet via miljövariabeln (se SecurityConfig för varför en
+    # förutsägbar nyckel är en riktig säkerhetsrisk, inte bara en
+    # bekvämlighetsfråga).
+    key: ${WINECELLAR_REMEMBER_ME_KEY:lokal-utvecklingsnyckel-ej-hemlig}

@@ -29,6 +29,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import jakarta.servlet.http.Cookie;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -53,6 +54,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
@@ -248,6 +250,107 @@ class WineControllerTest {
             mockMvc.perform(get("/").session(session))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrlPattern("**/login"));
+        }
+
+        /**
+         * WINE-40: "håll mig inloggad"-kryssrutan postar som
+         * `remember-me` - Spring Securitys egen defaultparameter, som
+         * kryssrutan i login.html medvetet återanvänder i stället för ett
+         * eget namn.
+         */
+        @Nested
+        @DisplayName("håll mig inloggad")
+        class HållMigInloggad {
+
+            @Test
+            @DisplayName("ska sätta en remember-me-cookie när rutan är ikryssad")
+            void skaSättaRememberMeCookieNärRutanÄrIkryssad() throws Exception {
+                MvcResult inloggning = mockMvc.perform(post("/login")
+                                .with(csrf())
+                                .param("username", "testperson")
+                                .param("password", "hemligt123")
+                                .param("remember-me", "on"))
+                        .andExpect(status().is3xxRedirection())
+                        .andExpect(redirectedUrl("/"))
+                        .andReturn();
+
+                Cookie rememberMeCookie = inloggning.getResponse().getCookie("remember-me");
+                assertThat(rememberMeCookie).isNotNull();
+                assertThat(rememberMeCookie.getValue()).isNotBlank();
+                // Positiv maxAge = webbläsaren sparar den bortom sessionen
+                // (dvs. även efter att fliken/webbläsaren stängs) -
+                // exakt det en "session-only"-cookie (maxAge -1) INTE gör.
+                assertThat(rememberMeCookie.getMaxAge()).isGreaterThan(0);
+            }
+
+            @Test
+            @DisplayName("ska INTE sätta någon remember-me-cookie när rutan lämnas okryssad")
+            void skaInteSättaRememberMeCookieUtanIkryssadRuta() throws Exception {
+                MvcResult inloggning = mockMvc.perform(post("/login")
+                                .with(csrf())
+                                .param("username", "testperson")
+                                .param("password", "hemligt123"))
+                        .andExpect(status().is3xxRedirection())
+                        .andExpect(redirectedUrl("/"))
+                        .andReturn();
+
+                assertThat(inloggning.getResponse().getCookie("remember-me")).isNull();
+            }
+
+            /**
+             * Den egentliga poängen med funktionen: en HELT NY förfrågan
+             * utan sessionscookie (som en webbläsare som stängts och
+             * öppnats igen skulle skicka) ska ändå räknas som inloggad så
+             * länge remember-me-cookien följer med. Ett test som bara
+             * kollar att EN cookie sätts (ovan) bevisar inte att den
+             * faktiskt fungerar för återautentisering.
+             */
+            @Test
+            @DisplayName("ska hålla användaren inloggad via cookien, helt utan aktiv session")
+            void skaHållaAnvändarenInloggadViaCookienUtanSession() throws Exception {
+                MvcResult inloggning = mockMvc.perform(post("/login")
+                                .with(csrf())
+                                .param("username", "testperson")
+                                .param("password", "hemligt123")
+                                .param("remember-me", "on"))
+                        .andExpect(status().is3xxRedirection())
+                        .andReturn();
+                Cookie rememberMeCookie = inloggning.getResponse().getCookie("remember-me");
+
+                mockMvc.perform(get("/").cookie(rememberMeCookie))
+                        .andExpect(status().isOk());
+            }
+
+            /**
+             * Det hash-baserade läget (se ADR 0020) är helt tillståndslöst
+             * server-side - det finns ingen lista över utfärdade cookies
+             * att stryka en rad ur. Utloggning kan alltså bara instruera
+             * webbläsaren att SJÄLV kasta cookien (en satt `Max-Age: 0`) -
+             * en tidigare kopierad cookie-sträng (t.ex. om den läckt)
+             * förblir giltig till sin egen utgångstid oavsett utloggning.
+             * Testet verifierar därför bara det webbläsaren faktiskt kan
+             * lita på: att en normal utloggning tar bort cookien från DEN
+             * egna webbläsaren, inte en (omöjlig att uppnå utan en
+             * databas) server-side återkallning.
+             */
+            @Test
+            @DisplayName("ska instruera webbläsaren att ta bort remember-me-cookien vid utloggning")
+            void skaTaBortRememberMeCookienVidUtloggning() throws Exception {
+                MvcResult inloggning = mockMvc.perform(post("/login")
+                                .with(csrf())
+                                .param("username", "testperson")
+                                .param("password", "hemligt123")
+                                .param("remember-me", "on"))
+                        .andExpect(status().is3xxRedirection())
+                        .andReturn();
+                MockHttpSession session = (MockHttpSession) inloggning.getRequest().getSession(false);
+                Cookie rememberMeCookie = inloggning.getResponse().getCookie("remember-me");
+
+                mockMvc.perform(post("/logout").session(session).with(csrf()).cookie(rememberMeCookie))
+                        .andExpect(status().is3xxRedirection())
+                        .andExpect(redirectedUrl("/login?logout"))
+                        .andExpect(cookie().maxAge("remember-me", 0));
+            }
         }
     }
 

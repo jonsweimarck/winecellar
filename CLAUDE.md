@@ -329,6 +329,22 @@ tidigare HTTP Basic-modellen helt, se
   startar appen ändå (tom lokal default), men skanningsanropet
   misslyckas. `WINECELLAR_ANTHROPIC_MODEL` är valfri (default
   `claude-sonnet-5`).
+- **"Håll mig inloggad" (WINE-40, se ADR 0020)** - en kryssruta i
+  `login.html` (postar som `remember-me`, Spring Securitys egen
+  defaultparameter). Hash-baserad remember-me (`SecurityConfig`s
+  `.rememberMe(...)`), INTE det databasbackade persistenta läget -
+  medvetet, se ADR:n för avvägningen. 30 dagars giltighetstid, hårdkodad
+  konstant (ingen hemlighet, ingen anledning att göra den
+  miljöspecifik). Signeringsnyckeln läses från `winecellar.remember-me.
+  key`/`WINECELLAR_REMEMBER_ME_KEY` - samma mönster som
+  `WINECELLAR_ANTHROPIC_API_KEY` (ofarlig lokal default, en riktig
+  hemlighet krävs i produktion - annars kan cookien förfalskas av vem
+  som helst med tillgång till en lösenordshash). En utloggning kan bara
+  instruera webbläsaren att KASTA sin egen cookie (`Max-Age: 0`) - det
+  hash-baserade läget är helt tillståndslöst server-side, så en tidigare
+  kopierad cookie-sträng förblir giltig till sin egen utgångstid
+  oavsett; bara ett lösenordsbyte eller en nyckelrotation
+  ogiltigförklarar redan utfärdade cookies i efterhand.
 
 ## Etikettskanning (LLM) - nuläge
 

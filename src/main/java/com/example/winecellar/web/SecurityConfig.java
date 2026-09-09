@@ -1,6 +1,7 @@
 package com.example.winecellar.web;
 
 import com.example.winecellar.application.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -36,12 +37,34 @@ import java.util.List;
  * (WINE-10) migrerades till ett riktigt konto i WINE-17 innan det här
  * kunde göras säkert - annars hade admin-kontots oscopeade vy försvunnit
  * innan någon annan väg in till samma data fanns.
+ *
+ * **"Håll mig inloggad" (WINE-40, se ADR 0020) använder Spring Securitys
+ * inbyggda, hash-baserade remember-me-läge, inte det databasbackade
+ * persistenta läget.** Kort sagt är appens skala (ett lärprojekt utan
+ * krav på att kunna återkalla ett enskilt kvarglömt konto/enhet i
+ * förväg) inte värd den extra tabellen/städlogiken det persistenta
+ * läget kräver. Nyckeln som signerar cookien läses från konfiguration
+ * (`winecellar.remember-me.key`) - en tom/förutsägbar nyckel i
+ * produktion hade låtit vem som helst med tillgång till en
+ * lösenordshash (t.ex. efter ett databasläckage) förfalska en giltig
+ * cookie för valfri användare, så samma mönster som
+ * `WINECELLAR_ANTHROPIC_API_KEY` gäller: en ofarlig lokal standard, en
+ * riktig hemlighet satt via miljövariabel i produktion.
  */
 @Configuration
 public class SecurityConfig {
 
+    /**
+     * 30 dagar - samma storleksordning som de flesta webbplatsers "håll
+     * mig inloggad". Ingen anledning att göra detta konfigurerbart per
+     * miljö; till skillnad från nyckeln är giltighetstiden inte en
+     * hemlighet.
+     */
+    private static final int REMEMBER_ME_VALIDITY_SECONDS = 60 * 60 * 24 * 30;
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http, @Value("${winecellar.remember-me.key}") String rememberMeKey) throws Exception {
         http
                 .authorizeHttpRequests(requests -> requests
                         // Statiska resurser måste vara öppna: de behövs av
@@ -56,6 +79,9 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .permitAll())
+                .rememberMe(rememberMe -> rememberMe
+                        .key(rememberMeKey)
+                        .tokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS))
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
                         .permitAll());
