@@ -166,6 +166,11 @@ helt privat, egen vinlista, ingen delning och ingen rollindelning
 CSRF är påslaget (htmx-formulären skickar token via en
 `htmx:configRequest`-lyssnare, se `vinkallare.html`).
 
+Inloggningssidan har en "håll mig inloggad"-kryssruta (hash-baserad
+remember-me, se [ADR 0020](docs/adr/0020-remember-me-hash-based.md)) -
+signeringsnyckeln sätts via `WINECELLAR_REMEMBER_ME_KEY` i produktion
+(ofarlig lokal default annars).
+
 Etikettskanningen (se Vinlistan ovan) kräver `WINECELLAR_ANTHROPIC_API_KEY`
 - utan den startar appen ändå (tom lokal default), men skanningsanropet
 misslyckas. `WINECELLAR_ANTHROPIC_MODEL` är valfri (default

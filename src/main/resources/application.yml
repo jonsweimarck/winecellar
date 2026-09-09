@@ -60,3 +60,13 @@ winecellar:
     # faktiskt används).
     api-key: ${WINECELLAR_ANTHROPIC_API_KEY:}
     model: ${WINECELLAR_ANTHROPIC_MODEL:claude-sonnet-5}
+  remember-me:
+    # Signerar "håll mig inloggad"-cookien (WINE-40, se ADR 0020). Tom
+    # standard, INTE en hårdkodad utvecklingssträng (fixat i kodgranskning) -
+    # till skillnad från t.ex. WINECELLAR_ANTHROPIC_API_KEY duger inte en
+    # känd/förutsägbar sträng här som en "ofarlig" lokal default, eftersom
+    # den fortfarande går att signera en giltig, förfalskad cookie med. Är
+    # nyckeln tom registrerar SecurityConfig inte remember-me-stödet alls -
+    # kryssrutan blir overksam lokalt om variabeln inte satts, hellre än
+    # osäker. Produktion MÅSTE sätta en egen hemlighet via miljövariabeln.
+    key: ${WINECELLAR_REMEMBER_ME_KEY:}

@@ -16,5 +16,12 @@
         .fel { color: var(--fel); margin-top: 1rem; text-align: center; }
         .info { color: var(--text-dampad); margin-top: 1rem; text-align: center; }
         .lank { margin-top: 1.5rem; text-align: center; font-size: 0.9rem; }
+        /* Samma mönster som vinlistans filterkryssrutor (.kryssrad i
+           vinkallare.html) - en egen kopia här eftersom det bara är
+           "håll mig inloggad" på den här sidan som behöver den, och
+           tema.css bär det som delas av HELA appen, inte bara de två
+           anonyma sidorna. */
+        .kryssrad { display: flex; align-items: center; gap: 0.4rem; font-weight: normal; cursor: pointer; }
+        .kryssrad input { width: auto; margin: 0; }
     </style>
 </th:block>
