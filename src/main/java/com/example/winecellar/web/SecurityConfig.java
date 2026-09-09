@@ -1,6 +1,8 @@
 package com.example.winecellar.web;
 
 import com.example.winecellar.application.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +13,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -44,15 +47,28 @@ import java.util.List;
  * krav på att kunna återkalla ett enskilt kvarglömt konto/enhet i
  * förväg) inte värd den extra tabellen/städlogiken det persistenta
  * läget kräver. Nyckeln som signerar cookien läses från konfiguration
- * (`winecellar.remember-me.key`) - en tom/förutsägbar nyckel i
+ * (`winecellar.remember-me.key`) - en förutsägbar, commitad nyckel i
  * produktion hade låtit vem som helst med tillgång till en
  * lösenordshash (t.ex. efter ett databasläckage) förfalska en giltig
- * cookie för valfri användare, så samma mönster som
- * `WINECELLAR_ANTHROPIC_API_KEY` gäller: en ofarlig lokal standard, en
- * riktig hemlighet satt via miljövariabel i produktion.
+ * cookie för valfri användare.
+ *
+ * **Fail-safe fallback, inte en bekväm men osäker default (fixat i
+ * kodgranskning, WINE-40).** Till skillnad från
+ * `WINECELLAR_ANTHROPIC_API_KEY` (vars tomma default bara gör
+ * etikettskanningen overksam) hade en tom/förutsägbar nyckel HÄR
+ * fortfarande dugt för att signera en giltig cookie - "tom sträng" är
+ * lika mycket ett känt, förfalskningsbart värde som en hårdkodad
+ * sträng. Den lokala defaulten är därför tom, och remember-me-stödet
+ * registreras inte alls i {@code HttpSecurity} om nyckeln saknas/är
+ * blank - glöms miljövariabeln bort i produktion blir "håll mig
+ * inloggad"-kryssrutan overksam (ingen cookie sätts, användaren loggas
+ * bara ut som vanligt när sessionen tar slut) istället för att tyst
+ * signera cookies med en offentligt känd nyckel.
  */
 @Configuration
 public class SecurityConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     /**
      * 30 dagar - samma storleksordning som de flesta webbplatsers "håll
@@ -79,12 +95,23 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .permitAll())
-                .rememberMe(rememberMe -> rememberMe
-                        .key(rememberMeKey)
-                        .tokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS))
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
                         .permitAll());
+        if (StringUtils.hasText(rememberMeKey)) {
+            http.rememberMe(rememberMe -> rememberMe
+                    .key(rememberMeKey)
+                    .tokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS));
+        } else {
+            // Ingen nyckel konfigurerad - registrera INTE remember-me-stödet
+            // alls, hellre än att falla tillbaka till ett känt/förutsägbart
+            // värde som skulle duga lika bra för en förfalskad cookie. Utan
+            // att .rememberMe(...) någonsin anropas lägger Spring Security
+            // aldrig till filtret, så "håll mig inloggad"-kryssrutan blir
+            // overksam istället för osäker.
+            log.warn("winecellar.remember-me.key saknas/är tom - "
+                    + "\"håll mig inloggad\" är avstängt tills en riktig nyckel konfigureras.");
+        }
         return http.build();
     }
 

@@ -48,7 +48,13 @@ dem:
   `spring-boot:run`, PostgreSQL-tillägget måste länkas till den
   specifika appen (länken följer inte med automatiskt om appen skapas
   om), och HikariCP-poolstorleken behöver hållas rimlig mot Clever
-  Clouds instansstorlek.
+  Clouds instansstorlek. Miljövariabler som måste sättas i Clever
+  Clouds konsol för att respektive funktion ska vara säker/fungera i
+  produktion: `WINECELLAR_ANTHROPIC_API_KEY` (etikettskanning, se
+  "Säkerhet - nuläge") och `WINECELLAR_REMEMBER_ME_KEY` (signerar
+  "håll mig inloggad"-cookien, se `SecurityConfig` - saknas den är
+  remember-me bara avstängt, inte osäkert, men funktionen fungerar då
+  inte i produktion).
 
 ## Namngivning
 
@@ -605,3 +611,18 @@ i `infrastructure/excel/`.
   igen:** verifiera alltid med BÅDE en ovanligt smal/hög testbild OCH
   ett vin med minimal text samtidigt - varken "Ingen bild"-
   platshållaren eller en "typisk" bild/textkombination avslöjar buggen.
+- **Session-/remember-me-cookiens `Secure`-flagga förutsätter att appen
+  faktiskt VET att anropet gick över HTTPS (WINE-40, kodgranskningsfynd,
+  ej åtgärdat - se uppföljande YouTrack-story).** Spring Security sätter
+  `Secure` baserat på om requesten "är säker" enligt servletcontainern,
+  vilket bara stämmer om appen själv terminerar TLS. Om Clever Cloud
+  terminerar TLS i en framförliggande proxy och vidarebefordrar ett
+  vanligt HTTP-anrop internt (typiskt signalerat via en `X-Forwarded-
+  Proto`-header) måste appen konfigureras (`server.forward-headers-
+  strategy: framework`, INTE satt i dagsläget) för att lita på den
+  headern - annars sätts `Secure` aldrig, trots att den faktiska
+  besökaren använder HTTPS. Obekräftat om detta faktiskt gäller Clever
+  Clouds nuvarande uppsättning - gäller i så fall lika mycket den redan
+  existerande sessionscookien, inte bara remember-me-cookien (som bara
+  gör exponeringsfönstret värre p.g.a. sin 30 dagar långa livslängd).
+  Ingen kodändring gjord i väntan på verifiering, se ADR 0020.

@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -89,6 +90,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(WineController.class)
 @Import(SecurityConfig.class)
+// Produktionens default är medvetet TOM (se SecurityConfig/application.yml) -
+// utan ett pinnat testvärde här skulle remember-me-stödet inte registreras
+// alls i testkontexten, och HållMigInloggad-testerna nedan skulle sluta
+// sätta någon cookie. Samma mönster som CLAUDE.md redan beskriver för andra
+// hårdkodade testuppgifter i @WebMvcTest-klasser.
+@TestPropertySource(properties = "winecellar.remember-me.key=test-remember-me-nyckel")
 class WineControllerTest {
 
     @Autowired
