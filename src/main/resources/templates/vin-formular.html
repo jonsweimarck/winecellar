@@ -29,9 +29,17 @@
         .etikettresultat { border: 1px solid var(--lyckat-ram); background: var(--lyckat-yta); border-radius: var(--radie); padding: 1rem; margin-top: 1rem; }
         .etikettresultat p { margin: 0; }
         .tolkat-falt { background: var(--markerat-yta); border-color: var(--markerat-ram); }
-        /* "Farlig zon" (WINE-44): en egen .kort, precis som formulärets
-           övriga sektioner - men bara med en förklarande textrad och
-           raderingsknappen, ingen fältlista. */
+        /* Raderingssektionen (WINE-44): en egen .kort, precis som
+           formulärets övriga sektioner - men bara med en förklarande
+           textrad och raderingsknappen, ingen fältlista och avsiktligt
+           ingen egen .sektionsrubrik (produktägarfeedback - "Farlig
+           zon" upplevdes som en onödig rubrik för en sektion som redan
+           är tydlig av knappens text/färg). .sektionsrubrik ger annars
+           2rem marginal ovanför sin sektion (se tema.css) - utan en
+           rubrik att bära den marginalen sätts den i stället direkt på
+           kortet här, så avståndet till formuläret ovanför är
+           oförändrat. */
+        .radera-kort { margin-top: 2rem; }
         .farlig-zon-text { margin: 0 0 0.75rem; color: var(--text-dampad); }
         dialog p { margin: 0 0 1rem; }
     </style>
@@ -211,8 +219,7 @@
          huvudformuläret ovan, eftersom den postar mot en helt annan
          adress/åtgärd. -->
     <th:block th:if="${wine.id != null}">
-        <p class="sektionsrubrik">Farlig zon</p>
-        <div class="kort">
+        <div class="kort radera-kort">
             <div class="falt">
                 <p class="farlig-zon-text">Radera vinet permanent ur källaren. Går inte att ångra.</p>
                 <button type="button" id="oppna-radera-dialog" class="knapp-farlig">Radera vinet</button>
