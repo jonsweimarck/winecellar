@@ -43,9 +43,9 @@ import java.util.List;
  *
  * **"Håll mig inloggad" (WINE-40, se ADR 0020) använder Spring Securitys
  * inbyggda, hash-baserade remember-me-läge, inte det databasbackade
- * persistenta läget.** Kort sagt är appens skala (ett lärprojekt utan
+ * persistenta läget.** Kort sagt är appens nuvarande skala - utan
  * krav på att kunna återkalla ett enskilt kvarglömt konto/enhet i
- * förväg) inte värd den extra tabellen/städlogiken det persistenta
+ * förväg - inte värd den extra tabellen/städlogiken det persistenta
  * läget kräver. Nyckeln som signerar cookien läses från konfiguration
  * (`winecellar.remember-me.key`) - en förutsägbar, commitad nyckel i
  * produktion hade låtit vem som helst med tillgång till en

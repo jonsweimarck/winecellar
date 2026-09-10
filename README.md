@@ -4,8 +4,8 @@ Webbapp för att hålla reda på en vinsamling - ersätter en Excel-fil
 (`Vinlista.xlsx`, en rad per vin). Läs- och skrivbar från både dator och
 mobil, deployad på Clever Cloud.
 
-Lärprojekt i samma serie som `roombooking` (samma process: Claude Code,
-Specification by Example, CI/CD). Se `docs/adr/` för arkitektur- och
+Byggd i samma serie som `roombooking`, med samma process: Claude Code,
+Specification by Example, CI/CD. Se `docs/adr/` för arkitektur- och
 designbesluten och varför de togs - den här filen beskriver bara
 nuläget.
 
