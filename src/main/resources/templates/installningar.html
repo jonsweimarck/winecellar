@@ -53,7 +53,11 @@
     </p>
 
     <p class="sektionsrubrik">Vinlista</p>
-    <form method="post" th:action="@{/installningar/antal-flaskor-filter}">
+    <!-- Sparas automatiskt (WINE-45) - ingen egen spara-knapp längre.
+         Fältet skickar sitt formulär självt vid ändring (se skriptet
+         nedan), samma serverrunda (fullständig POST + redirect) som
+         knappen tidigare utlöste manuellt. -->
+    <form method="post" th:action="@{/installningar/antal-flaskor-filter}" id="antalFlaskorFilterFormular">
         <!-- .falt måste vara .korts DIREKTA barn, inte formulärets - ett
              mellanliggande element mellan .kort och dess första .falt
              bryter .kort > .falt:first-child och ger en oönskad
@@ -61,11 +65,9 @@
              därför RUNT kortet i stället för inuti det. -->
         <div class="kort">
             <label class="falt"><span>Antal flaskor minst</span>
-                <input type="number" name="minQuantity" th:value="${minQuantityFilterDefault}">
+                <input type="number" name="minQuantity" th:value="${minQuantityFilterDefault}"
+                       id="minQuantityFilterFalt">
             </label>
-            <div class="falt">
-                <button type="submit">Spara</button>
-            </div>
         </div>
     </form>
 
@@ -159,6 +161,22 @@
                     }
                 });
             });
+        })();
+
+        // Sparar "Antal flaskor minst" automatiskt vid ändring (WINE-45) -
+        // ingen egen spara-knapp längre. "change" (inte "input") utlöses
+        // vid blur/Enter och även av webbläsarens inbyggda number-
+        // spinnerpilar - täcker alltså både att skriva ett nytt värde och
+        // att klicka pilarna upp/ner. Formuläret skickas precis som en
+        // manuell knapptryckning gjorde tidigare: en vanlig POST följt av
+        // en helsidesredirect, ingen AJAX/htmx inblandad.
+        (function () {
+            var falt = document.getElementById('minQuantityFilterFalt');
+            if (falt) {
+                falt.addEventListener('change', function () {
+                    document.getElementById('antalFlaskorFilterFormular').submit();
+                });
+            }
         })();
 
         // Tonar bort återkopplingsbrickan efter sparat standardfilter -
