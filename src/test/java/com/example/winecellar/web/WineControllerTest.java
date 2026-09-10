@@ -51,7 +51,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -148,9 +147,9 @@ class WineControllerTest {
         }
 
         @Test
-        @DisplayName("ska DELETE nekas")
-        void skaDeleteNekas() throws Exception {
-            mockMvc.perform(delete("/wines/1").with(csrf()))
+        @DisplayName("ska radering nekas")
+        void skaRaderaNekas() throws Exception {
+            mockMvc.perform(post("/wines/1/radera").with(csrf()))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrlPattern("**/login"));
 
@@ -613,9 +612,10 @@ class WineControllerTest {
                             // detaljfalt-fragmentets DOM-ordning
                             containsString("class=\"fd-varfor-kopt\""),
                             containsString("class=\"fd-tasting\""),
-                            // Redigera/Ta bort ligger numera inne i Detaljer, inte i
+                            // Redigera-ikonen ligger numera inne i Detaljer, inte i
                             // översikten - .detalj-atgarder delas mellan de breda korten
-                            // och kortvyn
+                            // och kortvyn. "Ta bort" flyttades till redigera-sidan
+                            // (WINE-44), så den knappen finns inte längre här alls.
                             containsString("class=\"detalj-atgarder\"")
                     )));
         }
@@ -1091,29 +1091,28 @@ class WineControllerTest {
                     .doesNotContain("&quot;");
         }
 
+        /**
+         * WINE-44: "Redigera" ersattes av en ikonlänk (ingen synlig text
+         * längre), och "Ta bort" finns inte kvar i vinlistan alls - se
+         * "Farlig zon" i vin-formular.html/NärEttVinTasBort nedan för den
+         * nya vägen.
+         */
         @Test
-        @DisplayName("\"Ta bort\"-länken ska skicka med aktivt filter, sökning och sortering")
-        void skaSkickaMedAktivtTillståndITaBortLänken() throws Exception {
+        @DisplayName("ska rendera en Redigera-ikonlänk och inte längre någon \"Ta bort\"-knapp i vinlistan")
+        void skaRenderaRedigeraIkonOchIngenTaBortKnapp() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
 
-            String html = mockMvc.perform(get("/")
-                            .with(user("admin").roles("ADMIN")).with(csrf())
-                            .param("search", "barolo")
-                            .param("wineType", "RED")
-                            .param("sort", "VINTAGE")
-                            .param("direction", "DESCENDING"))
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
-                    .andReturn().getResponse().getContentAsString();
-
-            java.util.regex.Matcher taBortLänk = java.util.regex.Pattern
-                    .compile("hx-delete=\"([^\"]+)\"")
-                    .matcher(html);
-            assertThat(taBortLänk.find()).isTrue();
-            String hxDelete = taBortLänk.group(1);
-            assertThat(hxDelete).contains("search=barolo")
-                    .contains("wineType=RED")
-                    .contains("sort=VINTAGE")
-                    .contains("direction=DESCENDING");
+                    .andExpect(content().string(allOf(
+                            containsString("aria-label=\"Redigera\""),
+                            containsString("href=\"/wines/1/redigera\""),
+                            // "hx-delete=" (med likhetstecken), inte bara "hx-delete" -
+                            // ordet nämns fortfarande i en förklarande JS-kommentar
+                            // längre upp i sidan (se vinkallare.html:s <head>).
+                            not(containsString("hx-delete=")),
+                            not(containsString(">Ta bort<"))
+                    )));
         }
     }
 
@@ -1135,6 +1134,23 @@ class WineControllerTest {
                             containsString("name=\"bild\""),
                             containsString("Lägg till")
                     )));
+        }
+
+        /**
+         * WINE-44: det finns inget att radera förrän vinet är sparat -
+         * knappen/dialogen ska inte visas alls på "lägg till"-formuläret.
+         */
+        @Test
+        @DisplayName("ska inte visa någon \"Radera vinet\"-knapp")
+        void skaInteVisaRaderaKnapp() throws Exception {
+            // Kollar den faktiska knappens id (en HTML-attribut-sträng),
+            // inte fritext som "Radera vinet"/"<dialog" - båda förekommer
+            // ordagrant i förklarande kommentarer längre ner i samma sida
+            // (JS-kommentaren vid dialoglogiken, se vin-formular.html),
+            // vilket hade gett falska träffar.
+            mockMvc.perform(get("/wines/nytt").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(not(containsString("id=\"oppna-radera-dialog\""))));
         }
     }
 
@@ -1383,58 +1399,39 @@ class WineControllerTest {
         }
     }
 
+    /**
+     * WINE-44: raderingen flyttades från vinlistans htmx-baserade
+     * DELETE-knapp till en bekräftad radering på redigera-sidan - se
+     * "Farlig zon" i vin-formular.html. Samma POST+redirect-mönster som
+     * lägg till/redigera nu, i stället för den gamla direkta
+     * fragment-renderingen (se devlog/CLAUDE.md för den tidigare
+     * mekanismen).
+     */
     @Nested
-    @DisplayName("när ett vin tas bort")
-    class NärEttVinTasBort {
+    @DisplayName("när ett vin raderas")
+    class NärEttVinRaderas {
 
         @Test
-        @DisplayName("ska id skickas till WineService")
-        void skaIdSkickasTillService() throws Exception {
-            when(wineService.listWines(any())).thenReturn(List.of());
-
-            mockMvc.perform(delete("/wines/1").with(user("admin").roles("ADMIN")).with(csrf()))
-                    .andExpect(status().isOk());
+        @DisplayName("ska id och ägare skickas till WineService och sidan omdirigera till startsidan")
+        void skaIdSkickasTillServiceOchOmdirigera() throws Exception {
+            mockMvc.perform(post("/wines/1/radera").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
 
             verify(wineService).removeWine(new WineId(1L), null);
         }
 
-        @Test
-        @DisplayName("ska behålla aktivt filter, sökning och sortering efter en borttagning")
-        void skaBehållaAktivtFilterEfterBorttagning() throws Exception {
-            when(wineService.listWines(any())).thenReturn(List.of());
-            when(wineService.search(any(), any())).thenReturn(List.of());
-
-            mockMvc.perform(delete("/wines/1")
-                            .with(user("admin").roles("ADMIN")).with(csrf())
-                            .param("search", "barolo")
-                            .param("wineType", "RED")
-                            .param("sort", "VINTAGE")
-                            .param("direction", "DESCENDING"))
-                    .andExpect(status().isOk());
-
-            verify(wineService).search(SearchCriteria.builder()
-                    .searchTerm("barolo")
-                    .sortField(SortField.VINTAGE).sortDirection(SortDirection.DESCENDING)
-                    .wineTypes(Set.of(WineType.RED))
-                    .minQuantity(1)
-                    .build(), null);
-        }
-
         /**
-         * Ingen redirect här (till skillnad från lägg till/redigera) -
-         * borttagningen renderar samma request direkt, så meddelandet är
-         * ett vanligt Model-attribut, inte ett flash-attribut. Verifierar
-         * mot det RENDERADE fragmentet, inte bara att metoden anropades -
-         * en trasig th:if i mallen hade annars inte upptäckts.
+         * Måste vara ett FLASH-attribut, inte ett vanligt model-attribut -
+         * samma resonemang som för lägg till/redigera (se
+         * NärEttVinLäggsTill.skaSättaFlashMeddelande).
          */
         @Test
-        @DisplayName("ska visa ett bekräftelsemeddelande i det returnerade fragmentet")
-        void skaVisaBekräftelsemeddelande() throws Exception {
-            when(wineService.listWines(any())).thenReturn(List.of());
-
-            mockMvc.perform(delete("/wines/1").with(user("admin").roles("ADMIN")).with(csrf()))
-                    .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("Vin borttaget")));
+        @DisplayName("ska sätta ett flash-meddelande som visas efter omdirigeringen")
+        void skaSättaFlashMeddelande() throws Exception {
+            mockMvc.perform(post("/wines/1/radera").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(flash().attribute("feedback", "Vin borttaget"));
         }
     }
 
@@ -1488,6 +1485,25 @@ class WineControllerTest {
                             containsString("name=\"vivinoRating\""),
                             containsString("name=\"bild\""),
                             containsString(Rating.R16.label())
+                    )));
+        }
+
+        /**
+         * WINE-44: raderingen (med sin bekräftelsedialog) ska bara vara
+         * möjlig för ett redan sparat vin, inte på "lägg till"-formuläret
+         * (se motsvarande test i NärFormuläretFörEttNyttVinVisas).
+         */
+        @Test
+        @DisplayName("ska visa en \"Radera vinet\"-knapp med bekräftelsedialog mot rätt id")
+        void skaVisaRaderaKnappMedBekräftelsedialog() throws Exception {
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(BAROLO));
+
+            mockMvc.perform(get("/wines/1/redigera").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("Radera vinet"),
+                            containsString("<dialog"),
+                            containsString("action=\"/wines/1/radera\"")
                     )));
         }
     }

@@ -12,22 +12,30 @@
         // CSRF slogs på igen i samband med WINE-12 (formulärinloggning med
         // session, se SecurityConfig) - htmx skickar ingen CSRF-token
         // automatiskt, till skillnad från vanliga <form>-formulär (som får
-        // fältet auto-injicerat av thymeleaf-extras-springsecurity6).
-        // Behövs bara för de state-ändrande htmx-anropen (hx-delete på
-        // "Ta bort"-knapparna) - ofarligt att lägga till på hx-get också.
+        // fältet auto-injicerat av thymeleaf-extras-springsecurity6). Det
+        // enda kvarvarande htmx-anropet (verktygsradens hx-get vid
+        // filter-/sök-/sorteringsändring) är i sig inte state-ändrande och
+        // behöver egentligen ingen CSRF-header - men lyssnaren är ofarlig
+        // att ha kvar, och skyddar automatiskt mot att missa den om ett
+        // framtida state-ändrande htmx-anrop läggs till igen (WINE-44 tog
+        // bort det enda som fanns, "Ta bort"-knappens hx-delete, se
+        // vin-formular.html för den nya raderingsvägen).
         document.addEventListener('htmx:configRequest', (event) => {
             const token = document.querySelector('meta[name="_csrf"]').content;
             const header = document.querySelector('meta[name="_csrf_header"]').content;
             event.detail.headers[header] = token;
         });
 
-        // Tonar bort återkopplingsbrickan (Vin tillagt/sparat/borttaget)
-        // efter några sekunder. Måste triggas explicit efter en htmx-swap,
-        // inte bara vid sidladdning - htmx exekverar inte nya
-        // <script>-taggar i utbytt innehåll, så ett inline-skript i
-        // fragmentet hade aldrig körts efter "Ta bort". Ett kvarglömt
-        // element (JS avstängt) är ofarligt - det försvinner vid nästa
-        // render ändå.
+        // Tonar bort återkopplingsbrickan (Vin tillagt/sparat) efter några
+        // sekunder. htmx:afterSwap-lyssnaren nedan var ursprungligen till
+        // för "Ta bort" (den enda handling som renderade om #vinlista-
+        // fragmentet direkt via htmx, utan sidladdning) - WINE-44 flyttade
+        // den handlingen till en vanlig POST+redirect (se
+        // vin-formular.html), så DOMContentLoaded-fallet är numera den enda
+        // vägen en toast faktiskt visas. htmx:afterSwap-lyssnaren är kvar
+        // ändå: ofarlig (hittar ingen .toast och gör inget), och skyddar
+        // mot samma "glömd bortfoning efter en framtida htmx-swap"-fälla om
+        // en ny sådan handling någonsin läggs till.
         //
         // Söker alltid i HELA document, inte i event.detail.target:
         // hx-swap="outerHTML" ersätter target-elementet självt, och
@@ -75,6 +83,16 @@
         .filterinnehall legend { font-weight: 600; font-size: 0.85rem; padding: 0 0 0.5rem; }
         .kryssrad { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.3rem; font-weight: normal; cursor: pointer; }
         .kryssrad input { width: auto; margin: 0; }
+
+        /* WINE-44: label följt av fält på SAMMA rad, i stället för ovanför/
+           under - måste explicit slå av den generella `label { display:
+           block; margin-top: 0.75rem }`-regeln högst upp i den här filen
+           (annars radbryter labeln alltid till en egen rad) och den
+           generella `input, select { width: 100% }`-regeln (annars blir
+           antalsfältet lika brett som hela filterkolumnen). */
+        .antal-rad { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.3rem; }
+        .antal-rad label { display: inline; margin: 0; }
+        .antal-rad input { width: 5rem; }
 
         .ursprung-tree, .ursprung-tree ul { list-style: none; margin: 0; padding: 0; }
         .ursprung-tree ul { padding-left: 1.25rem; margin-top: 0.3rem; margin-left: 0.4rem; border-left: 1px dashed var(--ram); }
@@ -242,20 +260,12 @@
         .vinkort dl .fd-munskankarna { order: 80; grid-column: 1 / -1; }
         .vinkort dl .fd-annan-referens { order: 90; grid-column: 1 / -1; }
 
+        /* WINE-44: innehåller numera bara Redigera-ikonen - "Ta bort"
+           flyttades till en bekräftad radering på redigera-sidan
+           (vin-formular.html, se "Farlig zon" där), så den tidigare
+           dämpade knappstilen för "Ta bort" (ram + felfärgad text i
+           stället för fylld accent) behövs inte längre här. */
         .detalj-atgarder { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
-        /* "Ta bort" ska INTE ärva den fyllda accentknappen från tema.css:
-           dels är accenten reserverad för den primära handlingen (Lägg
-           till vin), dels upprepas den här knappen en gång per vinkort -
-           en vägg av fyllda knappar drar blicken till just det man minst
-           vill råka klicka på. Dämpad ram + felfärgad text i stället. */
-        .detalj-atgarder button {
-            background: transparent;
-            border: 1px solid var(--ram);
-            color: var(--fel);
-            padding: 0.35rem 0.7rem;
-            font-size: 0.9rem;
-        }
-        .detalj-atgarder button:hover { background: var(--fel-yta); border-color: var(--fel-ram); }
 
         .flaskor-badge {
             position: absolute;
@@ -447,9 +457,11 @@
                 </fieldset>
 
                 <fieldset>
-                    <legend>Antal</legend>
-                    <label for="minQuantity">Antal flaskor minst</label>
-                    <input type="number" id="minQuantity" name="minQuantity" th:value="${minQuantity}">
+                    <legend>Antal flaskor</legend>
+                    <div class="antal-rad">
+                        <label for="minQuantity">Minst:</label>
+                        <input type="number" id="minQuantity" name="minQuantity" th:value="${minQuantity}">
+                    </div>
                 </fieldset>
 
                 <fieldset>
@@ -657,12 +669,14 @@
                 </div>
 
                 <div class="detalj-atgarder">
-                    <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
-                    <button type="button"
-                            th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions}, minQuantity=${minQuantity})}"
-                            hx-target="#vinlista" hx-swap="outerHTML">
-                        Ta bort
-                    </button>
+                    <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}" class="topprad-ikonlank"
+                       aria-label="Redigera" title="Redigera">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </a>
                 </div>
             </div>
         </div>
@@ -700,12 +714,14 @@
                         <th:block th:insert="~{::detaljfalt(${vin})}"></th:block>
                     </dl>
                     <div class="detalj-atgarder">
-                        <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}">Redigera</a>
-                        <button type="button"
-                                th:attr="hx-delete=@{/wines/{id}(id=${vin.id.value}, search=${search}, sort=${sort}, direction=${direction}, wineType=${selectedWineTypes}, country=${selectedCountries}, region=${selectedRegions}, subregion=${selectedSubregions}, minQuantity=${minQuantity})}"
-                                hx-target="#vinlista" hx-swap="outerHTML">
-                            Ta bort
-                        </button>
+                        <a th:href="@{/wines/{id}/redigera(id=${vin.id.value})}" class="topprad-ikonlank"
+                           aria-label="Redigera" title="Redigera">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </a>
                     </div>
                 </details>
             </div>

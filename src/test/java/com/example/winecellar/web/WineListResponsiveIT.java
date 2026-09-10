@@ -123,17 +123,17 @@ class WineListResponsiveIT extends SharedPostgres {
     }
 
     @Test
-    void skaVisaRedigeraOchTaBortDirektPåDesktop() {
+    void skaVisaRedigeraIkonDirektPåDesktop() {
         // De breda korten (desktop, >960px) har ingen infälld Detaljer -
-        // allt, inklusive Redigera/Ta bort, visas direkt utan att något
-        // behöver fällas ut. Till skillnad från kortvyn (mobil) nedan,
-        // som fortfarande döljer dem tills "Detaljer" klickas.
+        // Redigera-ikonen visas direkt utan att något behöver fällas ut.
+        // Till skillnad från kortvyn (mobil) nedan, som fortfarande döljer
+        // den tills "Detaljer" klickas. "Ta bort" finns inte längre kvar i
+        // listan alls sedan WINE-44 - se VinFormularIT för raderingsflödet.
         try (BrowserContext context = nyKontext(1280, 800, false)) {
             Page page = öppnaVinkällaren(context);
             Locator tabell = page.locator("#vinlista-tabell");
 
-            assertThat(tabell.locator("text=Redigera").isVisible()).isTrue();
-            assertThat(tabell.locator("text=Ta bort").isVisible()).isTrue();
+            assertThat(tabell.locator("a[aria-label='Redigera']").isVisible()).isTrue();
         }
     }
 
@@ -155,7 +155,7 @@ class WineListResponsiveIT extends SharedPostgres {
     }
 
     @Test
-    void skaVisaFlaskbadgeOchDöljaRedigeraOchTaBortTillsDetaljerFällsUtPåMobil() {
+    void skaVisaFlaskbadgeOchDöljaRedigeraIkonTillsDetaljerFällsUtPåMobil() {
         // isMobile(true) krävs för att CSS-brytpunkten alls ska slå till, se
         // skaVisaKortPåMobilOchDöljaTabell ovan för bakgrunden.
         try (BrowserContext context = nyKontext(375, 900, true)) {
@@ -163,12 +163,11 @@ class WineListResponsiveIT extends SharedPostgres {
             Locator kort = page.locator("#vinlista-kort");
 
             assertThat(kort.locator(".flaskor-badge").textContent()).isEqualTo("3");
-            assertThat(kort.locator("text=Redigera").isVisible()).isFalse();
+            assertThat(kort.locator("a[aria-label='Redigera']").isVisible()).isFalse();
 
             kort.locator("summary:has-text(\"Detaljer\")").click();
 
-            assertThat(kort.locator("text=Redigera").isVisible()).isTrue();
-            assertThat(kort.locator("text=Ta bort").isVisible()).isTrue();
+            assertThat(kort.locator("a[aria-label='Redigera']").isVisible()).isTrue();
         }
     }
 
@@ -194,34 +193,6 @@ class WineListResponsiveIT extends SharedPostgres {
 
             assertThat(page.locator(".knapp-lagg-till-desktop").isVisible()).isTrue();
             assertThat(page.locator(".knapp-lagg-till-fab").isVisible()).isFalse();
-        }
-    }
-
-    /**
-     * WINE-42: borttagning går en HELT ANNAN väg än lägg till/redigera -
-     * ingen redirect, htmx byter bara ut #vinlista-fragmentet direkt.
-     * Meddelandet är alltså ett vanligt Model-attribut, inte ett
-     * flash-attribut, och tonas bort via htmx:afterSwap-lyssnaren i
-     * stället för DOMContentLoaded. Ingen av de två mekanismerna
-     * verifieras av VinFormularITs motsvarande test (som bara täcker
-     * lägg-till-vägen) - de kan gå sönder oberoende av varandra.
-     */
-    @Test
-    void skaVisaOchTonaBortEnBekräftelseEfterAttEttVinTagitsBort() {
-        try (BrowserContext context = nyKontext(1280, 800, false)) {
-            Page page = öppnaVinkällaren(context);
-
-            page.locator("#vinlista-tabell").locator("text=Ta bort").click();
-            page.waitForSelector(".toast");
-
-            // trim(): textContent() tar med whitespacen runt ikon-SVG:n
-            // och textspannet i markupen, se motsvarande kommentar i
-            // VinFormularIT.
-            assertThat(page.locator(".toast").textContent().trim()).isEqualTo("Vin borttaget");
-            assertThat(page.locator(".toast").getAttribute("class")).doesNotContain("toast-dold");
-
-            page.waitForTimeout(3300);
-            assertThat(page.locator(".toast").getAttribute("class")).contains("toast-dold");
         }
     }
 

@@ -12,7 +12,16 @@
     <style>
         .inloggningssida { max-width: 22rem; margin: 15vh auto 3rem; padding: 0 1rem; }
         .apptitel { text-align: center; margin: 0 0 1.5rem; }
-        .knapp-bred { width: 100%; }
+        /* WINE-44: fälten och knappen ska vara lika breda. Knappen (ett
+           <button>) är box-sizing: content-box som standard (ärver inte
+           tema.css:s input/select/textarea-regel), så width: 100% utan
+           border-box hade gjort den bredare än ett fält med samma regel -
+           bredden räknas då från olika baslinjer (innehåll kontra
+           kant-till-kant). box-sizing: border-box här gör att båda mäts på
+           samma sätt. */
+        .knapp-bred { width: 100%; box-sizing: border-box; }
+        .inloggningssida input[type="text"],
+        .inloggningssida input[type="password"] { width: 100%; }
         .fel { color: var(--fel); margin-top: 1rem; text-align: center; }
         .info { color: var(--text-dampad); margin-top: 1rem; text-align: center; }
         .lank { margin-top: 1.5rem; text-align: center; font-size: 0.9rem; }

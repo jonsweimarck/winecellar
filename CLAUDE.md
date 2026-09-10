@@ -208,9 +208,13 @@ dem:
   `.detaljlista-bred` har ingen sådan regel och behåller
   dokumentordningen. Om Systembolagets beskrivning saknas visas
   produktnumret inte alls, även om det är satt (medveten tradeoff).
-- **Redigera/Ta bort ligger inne i "Detaljer" på mobil, men direkt
-  synliga i `.vk-topp` på desktop** - `.detalj-atgarder` är samma delade
-  `<div>` i båda fallen.
+- **Redigera-ikonen (WINE-44, ersatte en textlänk) ligger inne i
+  "Detaljer" på mobil, men direkt synlig på desktop** -
+  `.detalj-atgarder` är samma delade `<div>` i båda fallen, och
+  återanvänder `.topprad-ikonlank` (tema.css) för själva ikonlänkens
+  utseende trots namnet - en generisk "ikonknapp"-stil, inte något
+  topprad-specifikt. **"Ta bort" finns inte längre i vinlistan alls**
+  (samma WINE-44) - se `vin-formular.html`s "Farlig zon" nedan.
 - **Tabellhuvudets `colspan` på mobilens gamla tabellrad**-mönstret
   finns inte längre (desktopvyn är kort-baserad, inte en `<table>`) -
   se Kända fällor nedan om `.vk-bildyta`s bildjustering om den CSS:en
@@ -285,17 +289,36 @@ Se [ADR 0019](docs/adr/0019-shared-theme-css-variables.md).
   Lösning: låt `transform` (centrering) vara en helt konstant basregel
   som varken animation eller transition rör - animera bara `opacity`.
 - **Återkoppling efter spara/redigera/ta bort** (`.toast` i tema.css,
-  `${feedback}` i vinkallare.html): lägg till/redigera redirectar, så
-  meddelandet MÅSTE sättas via `RedirectAttributes.addFlashAttribute`
-  (ett vanligt Model-attribut vore borta redan innan GET / körs). Ta
-  bort är en direkt htmx-render av samma request - där räcker ett
-  vanligt `model.addAttribute`. **`event.detail.target` i en
-  `htmx:afterSwap`-lyssnare är INTE en pålitlig referens till det nya
-  innehållet vid `hx-swap="outerHTML"`** - target-elementet ersätts ju
-  självt. Sök i `document` i stället för att lita på den referensen,
-  annars körs aldrig bortfoningen efter en htmx-swap (upptäcktes bara av
-  ett Playwright-test som faktiskt väntade ut hela 3-sekunderstimern,
-  inte av att toasten syntes - den syntes fint, den försvann bara aldrig).
+  `${feedback}` i vinkallare.html): lägg till/redigera/ta bort (den
+  sistnämnda flyttad till en POST+redirect i WINE-44, se nedan)
+  redirectar, så meddelandet MÅSTE sättas via `RedirectAttributes.
+  addFlashAttribute` (ett vanligt Model-attribut vore borta redan innan
+  GET / körs). **`event.detail.target` i en `htmx:afterSwap`-lyssnare är
+  INTE en pålitlig referens till det nya innehållet vid
+  `hx-swap="outerHTML"`** - target-elementet ersätts ju självt. Sök i
+  `document` i stället för att lita på den referensen, annars körs
+  aldrig bortfoningen efter en htmx-swap (upptäcktes bara av ett
+  Playwright-test som faktiskt väntade ut hela 3-sekunderstimern, inte
+  av att toasten syntes - den syntes fint, den försvann bara aldrig).
+  Lärdomen gäller fortfarande om ett framtida state-ändrande htmx-anrop
+  läggs till, men är sedan WINE-44 inte längre den vägen toasten
+  faktiskt visas - se nästa punkt.
+- **"Ta bort" flyttades från vinlistan till redigera-sidan i WINE-44**
+  ("Farlig zon" i `vin-formular.html`, `POST /wines/{id}/radera`) -
+  vinlistans htmx-baserade `DELETE /wines/{id}` (en direkt render av
+  `#vinlista`-fragmentet i samma request, ingen redirect) finns inte
+  längre. Motiveringen: redigera-sidan är ingen htmx-fragmentkontext, så
+  en vanlig POST+redirect med flash-feedback (samma mönster som
+  lägg till/redigera) är den naturliga formen där, snarare än att bygga
+  ut htmx dit. Bekräftelsen inför raderingen är ett native
+  `<dialog>`-element (öppnas/stängs med ett par rader JS,
+  `showModal()`/`close()`), medvetet INTE `window.confirm()` - vissa
+  webbläsarinställningar blockerar `confirm()` som en popup, vilket hade
+  gjort raderingen obrukbar utan tydligt fel i just de lägena. `dialog`/
+  `dialog::backdrop`-baststilen ligger i tema.css (`.knapp-farlig` för
+  den destruktiva knappstilen, samma dämpade ram-i-stället-för-fylld-yta-
+  princip som `.knapp-sekundar`), sidspecifikt innehåll i
+  `vin-formular.html`.
 - **Vinlistan har två skilda tomma lägen**, styrda av `totalCount`
   (ofiltrerad): tom källare (inbjudan att lägga till/importera, och
   verktygsraden döljs HELT) kontra sökning utan träffar (verktygsraden
