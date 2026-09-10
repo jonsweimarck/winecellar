@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
@@ -75,6 +76,21 @@ class SettingsControllerTest {
                 .andExpect(content().string(containsString("Antal flaskor minst")))
                 .andExpect(content().string(containsString("name=\"minQuantity\"")))
                 .andExpect(content().string(containsString("value=\"2\"")));
+    }
+
+    /**
+     * WINE-45: fältet sparar sig självt (JS-driven, se installningar.html)
+     * i stället för via en manuell knapptryckning - den gamla
+     * "Spara"-knappen ska inte längre finnas kvar i markupen.
+     */
+    @Test
+    void skaInteVisaEnSparaKnappFörAntalFlaskorFilter() throws Exception {
+        when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2)));
+
+        mockMvc.perform(get("/installningar").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString(">Spara<"))));
     }
 
     @Test
