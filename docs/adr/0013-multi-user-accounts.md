@@ -27,8 +27,8 @@ behörighetsnivåer som idag.
    privat per användare" (nedan) håller risken låg - en ny
    registrering ger bara en tom, privat lista, aldrig åtkomst till
    någon annans data. Ingen e-postverifiering eller
-   godkännandeflöde - ett lärprojekt av den här storleken behöver inte
-   den ceremonin.
+   godkännandeflöde - en app av den här storleken och skalan behöver
+   inte den ceremonin.
 
 2. **Formulärbaserad inloggning med session, inte den tidigare
    autentiseringsmodellen.** Ersätter

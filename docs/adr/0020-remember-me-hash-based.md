@@ -28,7 +28,7 @@ Det hash-baserade läget används, med en fast signeringsnyckel satt via
 konfiguration (miljövariabel i produktion, samma mönster som appens
 övriga externa hemligheter) och en giltighetstid på 30 dagar.
 
-Motivering: appens skala (ett lärprojekt, inte en tjänst med krav på
+Motivering: appens skala (inte en tjänst med krav på
 säkerhetsrevision eller enhetsöversikt) gör inte den extra
 databastabellen, städlogiken för utgångna rader och den ytterligare
 adapterkoden motiverad. Det hash-baserade läget ger samma
@@ -91,8 +91,8 @@ utfärdade cookies på en gång, inte en i taget.
   Den praktiska skadan är ändå begränsad, eftersom webbläsare enligt
   cookie-specifikationen avvisar en säkert flaggad cookie som tas emot
   över ett faktiskt osäkert svar. Bedömt som en rimlig avvägning för
-  ett lärprojekt utan känsliga data - samma typ av avvägning som
-  remember-me-lägesvalet ovan - och alltså ett medvetet accepterat,
+  appens skala och avsaknad av känsliga data - samma typ av avvägning
+  som remember-me-lägesvalet ovan - och alltså ett medvetet accepterat,
   dokumenterat val, inte en brist som ska åtgärdas senare.
 - **En andra, separat accepterad risk upptäckt vid en uppföljande
   kodgranskning (samma story, WINE-43).** Samma ramverksmekanism som
@@ -109,5 +109,5 @@ utfärdade cookies på en gång, inte en i taget.
   offrets egen förfrågan - inte bara att offret klickar en tillskickad
   länk, som ett klassiskt öppet omdirigeringsproblem annars hade
   krävt. Medvetet accepterat av samma skäl som ovan: en rimlig
-  avvägning för ett lärprojekt utan känsliga data, inte en brist som
-  ska åtgärdas senare.
+  avvägning för appens skala och avsaknad av känsliga data, inte en
+  brist som ska åtgärdas senare.

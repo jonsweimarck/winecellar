@@ -678,8 +678,8 @@ i `infrastructure/excel/`.
   header i teorin få `Secure`-flaggan att sättas felaktigt - men
   webbläsare avvisar ändå en `Secure`-flaggad cookie som tas emot över
   ett faktiskt osäkert (HTTP) svar, vilket begränsar den praktiska
-  skadan. Bedömt som en rimlig avvägning för ett lärprojekt utan
-  känsliga data, inte en brist som ska åtgärdas senare.
+  skadan. Bedömt som en rimlig avvägning för appens nuvarande skala
+  och avsaknad av känsliga data, inte en brist som ska åtgärdas senare.
   **Kompletterande, separat accepterad risk (upptäckt vid en
   uppföljande kodgranskning, samma story, se ADR 0020).**
   `ForwardedHeaderFilter` litar på samma sätt på `X-Forwarded-Host`/
