@@ -172,11 +172,53 @@
         // en helsidesredirect, ingen AJAX/htmx inblandad.
         (function () {
             var falt = document.getElementById('minQuantityFilterFalt');
-            if (falt) {
-                falt.addEventListener('change', function () {
-                    document.getElementById('antalFlaskorFilterFormular').submit();
-                });
+            var formular = document.getElementById('antalFlaskorFilterFormular');
+            if (!falt || !formular) {
+                return;
             }
+
+            var redanSkickat = false;
+
+            // Ett klick på en angränsande länk/knapp (Importera, Exportera,
+            // Logga ut) direkt efter en fältändring - utan att först tabba
+            // bort fältet - hinner webbläsaren bearbeta "blur"/"change" (som
+            // utlöser vårt requestSubmit nedan) FÖRE klickets egen
+            // navigering. Två nästan samtidiga navigeringar konkurrerar då
+            // om samma sida, med oförutsägbart utfall mellan webbläsare -
+            // värdet kan tyst gå förlorat. Lösningen: fånga (capture-fasen)
+            // varje klick på hela dokumentet medan vår egen navigering
+            // pågår och avbryt det, så att vårt sparande alltid får
+            // slutföras ostört. Användaren får då klicka en gång till på
+            // länken efter att sidan laddat om - en rimlig avvägning mot
+            // risken att tyst tappa ett ändrat filtervärde.
+            function avbrytKlickUnderPågåendeSparning(event) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            }
+
+            // "submit"-händelsen (inte bara vårt eget requestSubmit-anrop)
+            // är den enda pålitliga signalen för "formuläret skickas nu" -
+            // den täcker även webbläsarens EGEN implicita formulärskickning
+            // vid Enter i ett formulär med ett enda fält och ingen
+            // submit-knapp, som annars hade kunnat trigga ett andra,
+            // överflödigt anrop utöver vårt eget requestSubmit-anrop.
+            // Flaggan förhindrar det andra anropet oavsett vilken av de två
+            // vägarna som råkar komma fram först.
+            formular.addEventListener('submit', function (event) {
+                if (redanSkickat) {
+                    event.preventDefault();
+                    return;
+                }
+                redanSkickat = true;
+                document.addEventListener('click', avbrytKlickUnderPågåendeSparning, true);
+            });
+
+            falt.addEventListener('change', function () {
+                // requestSubmit() (inte submit()) så att eventuella
+                // framtida valideringsattribut (min/required) respekteras -
+                // submit() kringgår HTML5-valideringen helt.
+                formular.requestSubmit();
+            });
         })();
 
         // Tonar bort återkopplingsbrickan efter sparat standardfilter -

@@ -111,6 +111,31 @@ class SettingsIT extends SharedPostgres {
     }
 
     /**
+     * Robusthetsfynd från granskningen: ett klick på en angränsande länk
+     * (t.ex. "Exportera") direkt efter en fältändring - utan att först
+     * tabba bort fältet - hinner annars starta två nästan samtidiga
+     * navigeringar (blurens auto-submit och länkens egen navigering), med
+     * risk att det ändrade värdet tyst går förlorat beroende på
+     * webbläsare. Skriptet i installningar.html avbryter klicket medan
+     * auto-submitten pågår - verifierat här genom att klicka direkt på
+     * "Exportera"-länken utan något Tab-tryck emellan, och sedan bekräfta
+     * att värdet ändå sparades.
+     */
+    @Test
+    void skaInteTappaÄndratVärdeVidKlickPåAnnanLänkUtanAttFörstTabbaBort() {
+        try (BrowserContext context = nyInloggadKontext()) {
+            Page sida = öppnaInställningar(context);
+
+            sida.locator("#minQuantityFilterFalt").fill("9");
+            sida.locator("a[href='/export']").click();
+            sida.waitForLoadState();
+
+            sida.navigate(url("/installningar"));
+            assertThat(sida.locator("#minQuantityFilterFalt").inputValue()).isEqualTo("9");
+        }
+    }
+
+    /**
      * Bevisar att det sparade värdet faktiskt ANVÄNDS, inte bara att det
      * råkar stå kvar i inställningsfältet - samma sparade default som
      * `WineController.wineCellar(...)` faller tillbaka till när `GET /`
@@ -120,7 +145,7 @@ class SettingsIT extends SharedPostgres {
      * "Vinlistan har två skilda tomma lägen").
      */
     @Test
-    void skaAnvändasSomVinlistansStandardfilterEfterAtt() {
+    void skaAnvändaDetSparadeVärdetSomVinlistansStandardfilterEfterFörstaSidladdningen() {
         wineService.save(Wine.builder()
                 .owner(userRepository.findByUsername(TESTKONTO_ANVÄNDARNAMN).orElseThrow().id())
                 .name("Barolo").quantity(3)

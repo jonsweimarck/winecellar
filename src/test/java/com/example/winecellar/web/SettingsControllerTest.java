@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
@@ -89,7 +90,7 @@ class SettingsControllerTest {
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.not(containsString(">Spara<"))));
+                .andExpect(content().string(not(containsString(">Spara<"))));
     }
 
     @Test
