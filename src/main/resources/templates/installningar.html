@@ -177,7 +177,24 @@
                 return;
             }
 
-            var redanSkickat = false;
+            // Värdet som senast faktiskt tilläts skickas (eller null om
+            // inget ännu skickats på den här sidladdningen). Används för
+            // att skilja en ÄKTA duplett (exakt samma värde skickas två
+            // gånger i följd - se submit-lyssnaren nedan) från en HELT NY,
+            // senare ändring (ett annat värde) - bara den förra ska
+            // blockeras. Medvetet INTE en enkel "redanSkickat"-boolean som
+            // förblir sann permanent efter första inlämningen: en sådan
+            // flagga tystade även legitima efterföljande ändringar (t.ex.
+            // flera snabba klick på spinnerpilarna, 3 → 4 → 5) eftersom
+            // bara den FÖRSTA hade skickats och resten tyst avvisats - värre
+            // än ursprungsproblemet, där en ny navigering normalt vinner
+            // över en pågående. Skickas flera olika värden i rask följd
+            // (spinnerklick) tillåts alltså flera separata sidnavigeringar
+            // köas efter varandra - webbläsaren låter då den SISTA vinna,
+            // vilket är en fullt acceptabel utgång.
+            var senastSkickatVärde = null;
+
+            var klickBlockAktiv = false;
 
             // Ett klick på en angränsande länk/knapp (Importera, Exportera,
             // Logga ut) direkt efter en fältändring - utan att först tabba
@@ -190,7 +207,11 @@
             // pågår och avbryt det, så att vårt sparande alltid får
             // slutföras ostört. Användaren får då klicka en gång till på
             // länken efter att sidan laddat om - en rimlig avvägning mot
-            // risken att tyst tappa ett ändrat filtervärde.
+            // risken att tyst tappa ett ändrat filtervärde. Kopplas bort
+            // igen av pageshow-lyssnaren längst ner om sidan återställs
+            // från bfcache utan att faktiskt ha navigerat bort (annars
+            // förblir blocket permanent aktivt - se den lyssnaren för
+            // detaljer).
             function avbrytKlickUnderPågåendeSparning(event) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -201,16 +222,22 @@
             // den täcker även webbläsarens EGEN implicita formulärskickning
             // vid Enter i ett formulär med ett enda fält och ingen
             // submit-knapp, som annars hade kunnat trigga ett andra,
-            // överflödigt anrop utöver vårt eget requestSubmit-anrop.
-            // Flaggan förhindrar det andra anropet oavsett vilken av de två
-            // vägarna som råkar komma fram först.
+            // överflödigt anrop utöver vårt eget requestSubmit-anrop - båda
+            // för EXAKT samma värde, eftersom inget hinner ändra fältet
+            // mellan de två. Det andra anropet avvisas genom att jämföra
+            // fältets aktuella värde mot det senast tillåtna - en äkta ny
+            // ändring har alltid ett annat värde och slipper därför alltid
+            // igenom, oavsett hur nyligen den föregående inlämningen skedde.
             formular.addEventListener('submit', function (event) {
-                if (redanSkickat) {
+                if (falt.value === senastSkickatVärde) {
                     event.preventDefault();
                     return;
                 }
-                redanSkickat = true;
-                document.addEventListener('click', avbrytKlickUnderPågåendeSparning, true);
+                senastSkickatVärde = falt.value;
+                if (!klickBlockAktiv) {
+                    klickBlockAktiv = true;
+                    document.addEventListener('click', avbrytKlickUnderPågåendeSparning, true);
+                }
             });
 
             falt.addEventListener('change', function () {
@@ -218,6 +245,26 @@
                 // framtida valideringsattribut (min/required) respekteras -
                 // submit() kringgår HTML5-valideringen helt.
                 formular.requestSubmit();
+            });
+
+            // Försäkring mot webbläsarens back/forward-cache (bfcache):
+            // navigerar användaren tillbaka hit (t.ex. Bakåt-knappen efter
+            // att ha lämnat /installningar) kan sidan återställas direkt
+            // från cachen i stället för att laddas om på riktigt - då körs
+            // INGET av skriptet ovan igen, så utan den här lyssnaren hade
+            // ett redan aktivt klick-block (se ovan) blivit permanent och
+            // blockerat ALLA klick på sidan. `event.persisted` är sant
+            // just vid en sådan bfcache-återställning (falskt vid en vanlig
+            // sidladdning, då variablerna ändå redan är i sitt
+            // ursprungsläge).
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted) {
+                    senastSkickatVärde = null;
+                    if (klickBlockAktiv) {
+                        document.removeEventListener('click', avbrytKlickUnderPågåendeSparning, true);
+                        klickBlockAktiv = false;
+                    }
+                }
             });
         })();
 

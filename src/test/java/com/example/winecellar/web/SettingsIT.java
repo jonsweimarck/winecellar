@@ -136,6 +136,53 @@ class SettingsIT extends SharedPostgres {
     }
 
     /**
+     * Granskningsfynd (runda 2, WINE-45): en tidigare fix använde en
+     * "redanSkickat"-flagga som förblev sann permanent efter den FÖRSTA
+     * inlämningen, vilket tystade alla efterföljande, legitima ändringar
+     * av samma fält innan sidan hunnit navigera bort - t.ex. flera snabba
+     * klick på ett number-fälts inbyggda spinnerpilar (som redan
+     * dokumenterat triggar "change" per klick), som var och en borde
+     * resultera i en egen sparning. Simulerar tre snabba, på varandra
+     * följande värdeändringar (3 → 4 → 5) inom EN synkron
+     * `evaluate`-körning - utan att låta Playwright vänta på navigering
+     * mellan dem - och bekräftar att det SISTA värdet (5) är det som
+     * faktiskt sparas, inte det första (3).
+     */
+    @Test
+    void skaSparaDetSistaVärdetVidFleraSnabbaÄndringarInnanNavigeringHinnerSke() {
+        try (BrowserContext context = nyInloggadKontext()) {
+            Page sida = öppnaInställningar(context);
+
+            // Webbläsaren slår själv ihop flera navigeringar som triggas
+            // inom samma synkrona körning till EN faktisk nätverksrundtur
+            // (den SISTA vinner - verifierat manuellt: bara ett POST-anrop,
+            // med minQuantity=5, gick faktiskt ut på nätverket här) - precis
+            // det acceptabla utfallet uppgiften beskriver. `waitForResponse`
+            // (som börjar lyssna INNAN skriptet körs, inte efteråt) krävs
+            // för att inte råka missa/racea mot just den enda faktiska
+            // POST-rundtripen - ett vanligt `waitForLoadState()` anropat
+            // EFTER `evaluate()` hinner ibland köras innan Playwright ens
+            // hunnit registrera att en ny navigering är på gång, och en
+            // efterföljande egen `navigate()` skulle då kunna avbryta
+            // POST-anropet innan servern hunnit spara värdet.
+            sida.waitForResponse(response -> response.url().endsWith("/installningar/antal-flaskor-filter"),
+                    () -> sida.evaluate("""
+                            () => {
+                                const falt = document.getElementById('minQuantityFilterFalt');
+                                ['3', '4', '5'].forEach(varde => {
+                                    falt.value = varde;
+                                    falt.dispatchEvent(new Event('change', { bubbles: true }));
+                                });
+                            }
+                            """));
+            sida.waitForLoadState();
+
+            sida.navigate(url("/installningar"));
+            assertThat(sida.locator("#minQuantityFilterFalt").inputValue()).isEqualTo("5");
+        }
+    }
+
+    /**
      * Bevisar att det sparade värdet faktiskt ANVÄNDS, inte bara att det
      * råkar stå kvar i inställningsfältet - samma sparade default som
      * `WineController.wineCellar(...)` faller tillbaka till när `GET /`
