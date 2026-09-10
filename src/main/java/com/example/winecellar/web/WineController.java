@@ -21,7 +21,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -87,17 +86,17 @@ public class WineController {
     }
 
     /**
-     * Delas av GET / och DELETE /wines/{id} - båda renderar samma
-     * #vinlista-fragment utifrån samma sök-/filter-/sorteringstillstånd.
-     * "Ta bort" skickade tidigare inget om aktivt tillstånd alls (fixat
-     * 2026-07-22, se CLAUDE.md) - borttagningsknapparna postar nu med
-     * exakt samma queryparametrar som verktygsraden, se vinkallare.html.
+     * Bygger vinlistans modell utifrån aktuellt sök-/filter-/
+     * sorteringstillstånd - anropas av GET /. Hade tidigare en andra
+     * anropsplats (DELETE /wines/{id}, den htmx-baserade "Ta bort"-
+     * knappen), flyttad till en vanlig POST+redirect i WINE-44 (se
+     * deleteWine) - kvar som en egen metod ändå, inte inlinead i
+     * wineCellar, ifall en framtida anropsplats tillkommer.
      *
      * Tar emot ett redan uppslaget {@code Optional<User>} istället för
-     * {@link Authentication} - båda anropsplatserna behöver ändå
-     * användarens hela post (id OCH sparat minQuantity-standardval), och
-     * ett gemensamt uppslag i anropande kod undviker flera separata
-     * {@code findByUsername}-frågor per request (WINE-41-granskning).
+     * {@link Authentication} eftersom {@link #wineCellar} redan behöver
+     * slå upp användarens hela post (id OCH sparat minQuantity-
+     * standardval) innan den anropar hit (WINE-41-granskning).
      */
     private void populateWineListModel(
             Model model, String search, SortField sort, SortDirection direction,
@@ -426,30 +425,24 @@ public class WineController {
     }
 
     /**
-     * Behåller aktivt filter/sökning/sortering efter en borttagning
-     * (fixat 2026-07-22 - tidigare återställdes vyn alltid till
-     * standardläget, se CLAUDE.md). Borttagningsknapparna postar nu med
-     * samma queryparametrar som verktygsraden (se vinkallare.html:s
-     * hx-delete), så samma @RequestParam-uppsättning som GET / tas emot
-     * här också.
+     * Tar bort ett vin permanent (WINE-44) - flyttad hit från vinlistans
+     * tidigare htmx-baserade "Ta bort"-knapp (en direkt DELETE-request som
+     * renderade om #vinlista-fragmentet i samma svar, se CLAUDE.md/
+     * devlog för historiken). Redigera-sidan (vin-formular.html, "Farlig
+     * zon") är ingen htmx-fragmentkontext, så det här är en vanlig
+     * formulärinskickning i stället: POST, redirect till startsidan
+     * efteråt, med samma flash-feedback-mönster som addWine/saveEdit.
+     * Aktivt filter/sökning/sortering återställs alltså till
+     * standardläget efter en borttagning nu - annorlunda än den gamla
+     * mekanismen, men en naturlig konsekvens av att man kommer hit från
+     * en helt annan sida (redigeringsformuläret), inte från själva
+     * vinlistan.
      */
-    @DeleteMapping("/wines/{id}")
-    public String removeWine(
-            @PathVariable Long id,
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false, defaultValue = "NAME") SortField sort,
-            @RequestParam(required = false, defaultValue = "ASCENDING") SortDirection direction,
-            @RequestParam(required = false) Set<String> wineType,
-            @RequestParam(required = false) Set<String> country,
-            @RequestParam(required = false) Set<String> region,
-            @RequestParam(required = false) Set<String> subregion,
-            @RequestParam(required = false) String minQuantity,
-            Model model, Authentication authentication) {
-        Optional<User> currentUser = CurrentUser.find(authentication, userRepository);
-        wineService.removeWine(new WineId(id), currentUser.map(User::id).orElse(null));
-        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, minQuantity, currentUser);
-        model.addAttribute("feedback", "Vin borttaget");
-        return "vinkallare :: lista";
+    @PostMapping("/wines/{id}/radera")
+    public String deleteWine(@PathVariable Long id, Authentication authentication, RedirectAttributes redirectAttributes) {
+        wineService.removeWine(new WineId(id), currentOwner(authentication));
+        redirectAttributes.addFlashAttribute("feedback", "Vin borttaget");
+        return "redirect:/";
     }
 
     @GetMapping("/wines/{id}/bild")

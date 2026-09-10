@@ -29,6 +29,11 @@
         .etikettresultat { border: 1px solid var(--lyckat-ram); background: var(--lyckat-yta); border-radius: var(--radie); padding: 1rem; margin-top: 1rem; }
         .etikettresultat p { margin: 0; }
         .tolkat-falt { background: var(--markerat-yta); border-color: var(--markerat-ram); }
+        /* "Farlig zon" (WINE-44): en egen .kort, precis som formulärets
+           övriga sektioner - men bara med en förklarande textrad och
+           raderingsknappen, ingen fältlista. */
+        .farlig-zon-text { margin: 0 0 0.75rem; color: var(--text-dampad); }
+        dialog p { margin: 0 0 1rem; }
     </style>
 </head>
 <body>
@@ -200,6 +205,37 @@
         </div>
     </form>
 
+    <!-- WINE-44: raderingen ligger på redigera-sidan, inte längre på
+         vinlistan - bara relevant för ett redan sparat vin (wine.id !=
+         null), aldrig på "lägg till"-sidan. Egen <form>, utanför
+         huvudformuläret ovan, eftersom den postar mot en helt annan
+         adress/åtgärd. -->
+    <th:block th:if="${wine.id != null}">
+        <p class="sektionsrubrik">Farlig zon</p>
+        <div class="kort">
+            <div class="falt">
+                <p class="farlig-zon-text">Radera vinet permanent ur källaren. Går inte att ångra.</p>
+                <button type="button" id="oppna-radera-dialog" class="knapp-farlig">Radera vinet</button>
+            </div>
+        </div>
+
+        <!-- Bekräftelse krävs innan raderingen faktiskt skickas in - se
+             skriptet nedan. Byggd med <dialog>, INTE window.confirm()/
+             confirm(): en del webbläsarinställningar räknar confirm() som
+             en popup och blockerar den, vilket hade gjort raderingen
+             obrukbar utan felmeddelande i just de lägena. <dialog> är en
+             vanlig del av sidan och fungerar likadant på mobil och webb. -->
+        <dialog id="radera-dialog">
+            <form method="post" th:action="@{/wines/{id}/radera(id=${wine.id.value})}">
+                <p>Radera <strong th:text="${wine.name}"></strong> permanent ur källaren? Det går inte att ångra.</p>
+                <div class="atgardsrad">
+                    <button type="submit" class="knapp-farlig">Ja, radera vinet</button>
+                    <button type="button" id="stang-radera-dialog" class="knapp-sekundar">Avbryt</button>
+                </div>
+            </form>
+        </dialog>
+    </th:block>
+
     <script>
         // Skalar ner en vald/fotograferad etikettbild i webbläsaren innan
         // uppladdning (WINE-5) - inte för filstorlekens skull (5 MB räcker
@@ -275,6 +311,29 @@
             fält.addEventListener('input', släckMarkering);
             fält.addEventListener('change', släckMarkering);
         });
+
+        // Bekräftelsedialogen för "Radera vinet" (WINE-44) - se kommentaren
+        // vid <dialog id="radera-dialog"> ovan för varför den bygger på
+        // <dialog> i stället för window.confirm(). Knappen som öppnar
+        // dialogen och avbryt-knappen inuti den är type="button" (inte
+        // submit) - bara det faktiska "Ja, radera vinet"-formuläret
+        // skickar in något.
+        (function () {
+            var öppnaKnapp = document.getElementById('oppna-radera-dialog');
+            var dialogruta = document.getElementById('radera-dialog');
+            var avbrytKnapp = document.getElementById('stang-radera-dialog');
+            if (!öppnaKnapp || !dialogruta) {
+                return;
+            }
+            öppnaKnapp.addEventListener('click', function () {
+                dialogruta.showModal();
+            });
+            if (avbrytKnapp) {
+                avbrytKnapp.addEventListener('click', function () {
+                    dialogruta.close();
+                });
+            }
+        })();
     </script>
 </body>
 </html>

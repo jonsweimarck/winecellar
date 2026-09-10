@@ -217,6 +217,36 @@ button:hover, .knapp:hover { background: var(--accent-hover); }
 
 .knapp-sekundar:hover { background: var(--yta-hover); }
 
+/* Farlig/destruktiv handling (WINE-44: "Radera vinet") - samma dämpade
+   princip som knapp-sekundar (ram istället för fylld yta, så accenten
+   förblir reserverad för sidans primära handling), men felfärgad text
+   för att signalera att handlingen är destruktiv och inte kan ångras. */
+.knapp-farlig {
+    background: transparent;
+    color: var(--fel);
+    border-color: var(--ram-stark);
+}
+
+.knapp-farlig:hover { background: var(--fel-yta); border-color: var(--fel-ram); }
+
+/* Bekräftelsedialoger (WINE-44, se "Radera vinet" i vin-formular.html) -
+   det native <dialog>-elementet i stället för window.confirm()/confirm(),
+   som vissa webbläsarinställningar blockerar som en popup. Temats vanliga
+   yt-/ramfärger, inte webbläsarens defaultutseende (vitt, skarp kant). */
+dialog {
+    border: 1px solid var(--ram);
+    border-radius: var(--radie-stor);
+    background: var(--yta-2);
+    color: var(--text);
+    padding: 1.25rem;
+    max-width: 26rem;
+    width: calc(100% - 2rem);
+}
+
+dialog::backdrop {
+    background: var(--skugga);
+}
+
 /* Sektionsrubrik + kort: ett grupperat avsnitt med en dämpad etikett
    ovanför. Infört på inställningssidan och återanvänt av formuläret -
    ligger här, inte i en enskild mall, just för att det numera är

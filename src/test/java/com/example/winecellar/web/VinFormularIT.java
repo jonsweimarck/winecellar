@@ -149,6 +149,56 @@ class VinFormularIT extends SharedPostgres {
         }
     }
 
+    /**
+     * WINE-44: "Ta bort" flyttades från vinlistan till en bekräftad
+     * radering på redigera-sidan, byggd med ett native &lt;dialog&gt;-
+     * element i stället för window.confirm() (se kommentaren i
+     * vin-formular.html för varför). Hela kedjan i ett enda test - öppna
+     * dialogen, bekräfta, redirect till startsidan, och toasten som visas
+     * och sedan tonas bort - på samma sätt som
+     * skaVisaOchTonaBortEnBekräftelseEfterAttEttVinSparats ovan gör för
+     * lägg-till-vägen. Ingen av de två kan bevisas av WineControllerTest
+     * (som bara ser att flash-attributet sätts, se
+     * WineControllerTest.NärEttVinRaderas) - bara en riktig webbläsare kan
+     * bevisa att dialogen faktiskt går att öppna/bekräfta och att toasten
+     * SYNS och sedan FÖRSVINNER.
+     */
+    @Test
+    void skaRaderaVinetEfterBekräftelseIDialogenOchTonaBortToasten() {
+        try (BrowserContext context = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(context);
+            sida.locator("input[name=name]").fill("Raderingstestvin");
+            sida.locator("input[name=quantity]").fill("1");
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+
+            sida.locator("#vinlista-tabell .vinkort-bred", new Page.LocatorOptions().setHasText("Raderingstestvin"))
+                    .locator("a[aria-label='Redigera']")
+                    .click();
+            sida.waitForURL(url("**/redigera"));
+
+            // Bara knappen som öppnar dialogen är klickad hittills -
+            // ingenting ska ha skickats in än.
+            sida.locator("#oppna-radera-dialog").click();
+            assertThat(sida.locator("#radera-dialog").isVisible()).isTrue();
+
+            sida.locator("#radera-dialog button[type=submit]").click();
+            sida.waitForURL(url("/"));
+
+            // trim(): textContent() tar med den formaterande whitespacen
+            // runt ikon-SVG:n och textspannet i markupen, inte bara
+            // själva orden.
+            assertThat(sida.locator(".toast").textContent().trim()).isEqualTo("Vin borttaget");
+            assertThat(sida.locator(".toast").getAttribute("class")).doesNotContain("toast-dold");
+
+            // setTimeout i vinkallare.html är satt till 3000ms.
+            sida.waitForTimeout(3300);
+            assertThat(sida.locator(".toast").getAttribute("class")).contains("toast-dold");
+
+            assertThat(sida.locator("body").textContent()).doesNotContain("Raderingstestvin");
+        }
+    }
+
     @Test
     void skaMarkeraExaktDeFältSomÄrObligatoriska() {
         try (BrowserContext context = nyInloggadKontext()) {
