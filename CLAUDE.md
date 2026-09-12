@@ -54,14 +54,23 @@ dem:
   "Säkerhet - nuläge"), `WINECELLAR_REMEMBER_ME_KEY` (signerar
   "håll mig inloggad"-cookien, se `SecurityConfig` - saknas den är
   remember-me bara avstängt, inte osäkert, men funktionen fungerar då
-  inte i produktion) och `SPRING_PROFILES_ACTIVE=prod` (aktiverar
-  `application-prod.yml`, som tvingar sessionscookien säker - se Kända
-  fällor nedan om varför det inte kan vara på som standard; saknas den
-  här variabeln är sessionscookien osäker i produktion. **Sedan WINE-43
-  loggar `ProdProfileGuard` (`web`-paketet) en varning vid uppstart**
-  om Clever Cloud-drift känns igen (samma signal som datasource-URL:en
-  redan litar på, `POSTGRESQL_ADDON_HOST`) men `prod`-profilen ändå
-  inte är aktiv - ett billigt säkerhetsnät mot just den här
+  inte i produktion. **Sedan WINE-47 loggar `RememberMeKeyGuard`
+  (`web`-paketet) en varning vid uppstart** om Clever Cloud-drift känns
+  igen (samma `POSTGRESQL_ADDON_HOST`-signal som `ProdProfileGuard`
+  redan litar på) men nyckeln ändå saknas/är blank - byggd efter att
+  nyckeln visade sig faktiskt saknas i produktion, vilket gjorde "håll
+  mig inloggad" helt overksamt utan att något syntes för användaren
+  förutom att bli utloggad efter sessionens vanliga timeout. Samma
+  "billigt säkerhetsnät, inte en fix i sig"-princip som
+  `ProdProfileGuard` nedan - nyckeln sätts fortfarande inte automatiskt)
+  och `SPRING_PROFILES_ACTIVE=prod` (aktiverar `application-prod.yml`,
+  som tvingar sessionscookien säker - se Kända fällor nedan om varför
+  det inte kan vara på som standard; saknas den här variabeln är
+  sessionscookien osäker i produktion. **Sedan WINE-43 loggar
+  `ProdProfileGuard` (`web`-paketet) en varning vid uppstart** om Clever
+  Cloud-drift känns igen (samma signal som datasource-URL:en redan
+  litar på, `POSTGRESQL_ADDON_HOST`) men `prod`-profilen ändå inte är
+  aktiv - ett billigt säkerhetsnät mot just den här
   fail-insecure-fällan, inte en fix i sig; profilen aktiveras
   fortfarande inte automatiskt).
 
