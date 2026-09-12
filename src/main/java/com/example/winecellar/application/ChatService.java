@@ -29,20 +29,31 @@ import java.util.Optional;
 public class ChatService {
 
     /**
-     * Sätts in som assistentens svar (inte ett kastat fel) om
-     * {@link WineChatAssistant} misslyckas helt - användarens eget
-     * meddelande är redan sparat vid det laget, och ett vanligt
-     * chattmeddelande är enklare att visa i gränssnittet än ett särskilt
-     * felläge. Paketprivat, inte private, så testerna kan verifiera texten
-     * utan att duplicera den.
+     * Visas som ett felmeddelande (inte sparat som ett {@link ChatMessage})
+     * om {@link WineChatAssistant} misslyckas helt - se
+     * {@link ChatResult.AssistantUnavailable} för varför inget falskt
+     * assistentmeddelande sätts in i konversationen. Public så webblagret
+     * kan återanvända exakt samma text.
      */
-    static final String ASSISTANT_UNAVAILABLE_MESSAGE = "Kunde inte få ett svar just nu - försök gärna igen.";
+    public static final String ASSISTANT_UNAVAILABLE_MESSAGE = "Kunde inte få ett svar just nu - försök gärna igen.";
 
     private final ConversationRepository conversationRepository;
     private final WineRepository wineRepository;
     private final WineChatAssistant assistant;
     private final int maxConversationsPerUser;
     private final int maxMessagesPerConversation;
+
+    /**
+     * Serialiserar gränskontrollen ({@code countByOwner}/{@code countMessages}
+     * följt av den reserverande skrivningen) mot ett gemensamt lås - utan
+     * det kan två nästan samtidiga requests (dubbelklick, två flikar) båda
+     * läsa ett värde under gränsen innan någon hunnit skriva, och gränsen
+     * överskrids. Ett enda process-internt lås räcker för appens nuvarande
+     * driftsform (en instans) - det omfattar bara läs-och-skriv-paret, inte
+     * det efterföljande (blockerande) anropet mot assistenten, så en
+     * långsam extern förfrågan inte serialiserar ALLA användares chattar.
+     */
+    private final Object limitGuard = new Object();
 
     public ChatService(
             ConversationRepository conversationRepository,
@@ -64,30 +75,51 @@ public class ChatService {
      * meddelandet.
      */
     public ChatResult startConversation(UserId owner, String firstMessage) {
-        if (conversationRepository.countByOwner(owner) >= maxConversationsPerUser) {
-            return new ChatResult.LimitReached(
-                    "Du har redan %d konversationer, som är max. Radera en gammal konversation för att starta en ny."
-                            .formatted(maxConversationsPerUser));
+        Conversation conversation;
+        synchronized (limitGuard) {
+            if (conversationRepository.countByOwner(owner) >= maxConversationsPerUser) {
+                return new ChatResult.LimitReached(
+                        "Du har redan %d konversationer, som är max. Radera en gammal konversation för att starta en ny."
+                                .formatted(maxConversationsPerUser));
+            }
+            conversation = conversationRepository.save(
+                    new Conversation(null, owner, titleFrom(firstMessage), Instant.now()));
+            conversationRepository.addMessage(
+                    new ChatMessage(null, conversation.id(), Role.USER, firstMessage, Instant.now()));
         }
-        Conversation conversation = conversationRepository.save(
-                new Conversation(null, owner, titleFrom(firstMessage), Instant.now()));
-        return sendMessage(conversation, firstMessage);
+        return generateReply(conversation);
     }
 
     /**
      * Anropande kod (webblagret, eller en stegklass i tester) ansvarar för
-     * att redan ha slagit upp och ägarskapskontrollerat {@code conversation}
-     * - samma "repositoryt/tjänsten är dum, anroparen har redan gjort
-     * uppslaget"-princip som gäller för {@code WineService.removeWine} och
-     * dess {@code findByIdAndOwner}-krav.
+     * att redan ha slagit upp {@code conversation} - men {@code owner}
+     * måste ändå matcha dess faktiska ägare, annars kastas ett fel istället
+     * för att blint lita på ett objekt som råkat följa med från fel
+     * sammanhang (samma "verifiera, lita inte blint"-princip som
+     * {@code WineService.removeWine} tillämpar via sitt eget
+     * {@code findByIdAndOwner}-krav, fast utan en extra databasläsning här
+     * eftersom anroparen redan har det uppslagna objektet i handen).
      */
-    public ChatResult postMessage(Conversation conversation, String text) {
-        if (conversationRepository.countMessages(conversation.id()) >= maxMessagesPerConversation) {
-            return new ChatResult.LimitReached(
-                    "Den här konversationen har redan %d meddelanden, som är max. Starta en ny konversation för att fortsätta."
-                            .formatted(maxMessagesPerConversation));
+    public ChatResult postMessage(UserId owner, Conversation conversation, String text) {
+        if (!conversation.owner().equals(owner)) {
+            throw new IllegalArgumentException("Konversationen tillhör inte den angivna ägaren");
         }
-        return sendMessage(conversation, text);
+        synchronized (limitGuard) {
+            // "+ 2": en lyckad utväxling lägger alltid till både användarens
+            // och assistentens meddelande (se generateReply). Gränsen
+            // kontrolleras mot vad SLUTRESULTATET skulle bli, inte bara
+            // det redan sparade antalet - annars kan en udda konfigurerad
+            // gräns överskridas med ett meddelande (antalet är annars alltid
+            // jämnt efter en lyckad utväxling, vilket döljer felet vid en
+            // jämn gräns som standardvärdet 40).
+            if (conversationRepository.countMessages(conversation.id()) + 2 > maxMessagesPerConversation) {
+                return new ChatResult.LimitReached(
+                        "Den här konversationen har redan %d meddelanden, som är max. Starta en ny konversation för att fortsätta."
+                                .formatted(maxMessagesPerConversation));
+            }
+            conversationRepository.addMessage(new ChatMessage(null, conversation.id(), Role.USER, text, Instant.now()));
+        }
+        return generateReply(conversation);
     }
 
     public List<Conversation> listConversations(UserId owner) {
@@ -107,15 +139,21 @@ public class ChatService {
         conversationRepository.deleteByIdAndOwner(id, owner);
     }
 
-    private ChatResult sendMessage(Conversation conversation, String text) {
-        conversationRepository.addMessage(new ChatMessage(null, conversation.id(), Role.USER, text, Instant.now()));
-
+    /**
+     * Körs UTANFÖR {@code limitGuard} - anropar den externa tjänsten, vilket
+     * blockerar den här tråden men inte andra användares chattar.
+     * Användarens eget meddelande är redan sparat av anroparen när den här
+     * metoden körs.
+     */
+    private ChatResult generateReply(Conversation conversation) {
         List<Wine> wines = wineRepository.findAllByOwner(conversation.owner());
         List<ChatMessage> history = conversationRepository.findMessages(conversation.id());
-        String replyText = assistant.reply(wines, history).orElse(ASSISTANT_UNAVAILABLE_MESSAGE);
-
+        Optional<String> reply = assistant.reply(wines, history);
+        if (reply.isEmpty()) {
+            return new ChatResult.AssistantUnavailable(conversation);
+        }
         ChatMessage assistantMessage = conversationRepository.addMessage(
-                new ChatMessage(null, conversation.id(), Role.ASSISTANT, replyText, Instant.now()));
+                new ChatMessage(null, conversation.id(), Role.ASSISTANT, reply.get(), Instant.now()));
         return new ChatResult.Success(conversation, assistantMessage);
     }
 

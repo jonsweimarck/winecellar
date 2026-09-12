@@ -54,7 +54,7 @@ public class PersistenceSteps {
 
     private List<Wine> sökresultat;
     private UserId ägare;
-    private Conversation.ConversationId senasteKonversationId;
+    private Conversation.ConversationId latestConversationId;
 
     /**
      * WINE-15: `owner_id` är `NOT NULL` i databasen och `wines.owner_id`
@@ -139,12 +139,12 @@ public class PersistenceSteps {
         Conversation conversation = conversationRepository.save(new Conversation(null, ägare, question, Instant.now()));
         conversationRepository.addMessage(new ChatMessage(null, conversation.id(), ChatMessage.Role.USER, question, Instant.now()));
         conversationRepository.addMessage(new ChatMessage(null, conversation.id(), ChatMessage.Role.ASSISTANT, answer, Instant.now()));
-        senasteKonversationId = conversation.id();
+        latestConversationId = conversation.id();
     }
 
     @Så("ska konversationen fortfarande innehålla frågan {string} och svaret {string}")
     public void skaKonversationenFortfarandeInnehållaFråganOchSvaret(String question, String answer) {
-        assertThat(conversationRepository.findMessages(senasteKonversationId))
+        assertThat(conversationRepository.findMessages(latestConversationId))
                 .extracting(ChatMessage::content)
                 .contains(question, answer);
     }

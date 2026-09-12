@@ -465,6 +465,25 @@ class WineControllerTest {
                     )));
         }
 
+        /**
+         * WINE-48, kodgranskningsfynd: den delade menyn i toppraden (som
+         * WINE-48 ersatte den tidigare direkta kugghjulslänken med) hade
+         * tidigare ingen testtäckning alls - varken här eller någon
+         * annanstans. En flyttad/ombyggd navigeringslänk utan ett test är
+         * en känd fälla (se CLAUDE.md) - ett brutet mvn verify hade inte
+         * upptäckt att menyn tappat en av sina länkar.
+         */
+        @Test
+        @DisplayName("ska visa menylänkar till chatten och inställningar i toppraden")
+        void skaVisaMenylänkarTillChattenOchInställningarIToppraden() throws Exception {
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("href=\"/chatt\""),
+                            containsString("href=\"/installningar\"")
+                    )));
+        }
+
         @Test
         @DisplayName("ska erbjuda att rensa filtren när sökningen inte gav några träffar")
         void skaVisaIngaTräffarNärFiltretTömmerEnIckeTomKällare() throws Exception {

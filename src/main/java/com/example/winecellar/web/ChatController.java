@@ -60,6 +60,10 @@ public class ChatController {
                 redirectAttributes.addFlashAttribute("fel", limitReached.message());
                 yield "redirect:/chatt";
             }
+            case ChatResult.AssistantUnavailable unavailable -> {
+                redirectAttributes.addFlashAttribute("fel", ChatService.ASSISTANT_UNAVAILABLE_MESSAGE);
+                yield "redirect:/chatt/" + unavailable.conversation().id().value();
+            }
         };
     }
 
@@ -77,9 +81,14 @@ public class ChatController {
             Authentication authentication, RedirectAttributes redirectAttributes) {
         Conversation conversation = findOwnedConversationOr404(id, authentication);
         if (message != null && !message.isBlank()) {
-            ChatResult result = chatService.postMessage(conversation, message.trim());
-            if (result instanceof ChatResult.LimitReached limitReached) {
-                redirectAttributes.addFlashAttribute("fel", limitReached.message());
+            ChatResult result = chatService.postMessage(owner(authentication), conversation, message.trim());
+            switch (result) {
+                case ChatResult.Success ignored -> {
+                }
+                case ChatResult.LimitReached limitReached ->
+                        redirectAttributes.addFlashAttribute("fel", limitReached.message());
+                case ChatResult.AssistantUnavailable ignored ->
+                        redirectAttributes.addFlashAttribute("fel", ChatService.ASSISTANT_UNAVAILABLE_MESSAGE);
             }
         }
         return "redirect:/chatt/" + id;

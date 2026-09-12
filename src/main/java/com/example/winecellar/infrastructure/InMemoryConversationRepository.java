@@ -36,18 +36,23 @@ public class InMemoryConversationRepository implements ConversationRepository {
         return toStore;
     }
 
+    /** null owner = oscopeat (matcha oavsett ägare) - se WineRepository/ConversationRepository. */
     @Override
     public Optional<Conversation> findByIdAndOwner(ConversationId id, UserId owner) {
         return Optional.ofNullable(conversations.get(id.value()))
-                .filter(conversation -> conversation.owner().equals(owner));
+                .filter(conversation -> ownedBy(conversation, owner));
     }
 
     @Override
     public List<Conversation> findAllByOwner(UserId owner) {
         return conversations.values().stream()
-                .filter(conversation -> conversation.owner().equals(owner))
+                .filter(conversation -> ownedBy(conversation, owner))
                 .sorted(Comparator.comparing(Conversation::createdAt).reversed())
                 .toList();
+    }
+
+    private static boolean ownedBy(Conversation conversation, UserId owner) {
+        return owner == null || owner.equals(conversation.owner());
     }
 
     @Override

@@ -57,11 +57,7 @@ public class AnthropicLabelInterpreter implements LabelInterpreter {
             @Value("${winecellar.anthropic.api-key}") String apiKey,
             @Value("${winecellar.anthropic.model}") String model) {
         this.model = model;
-        this.restClient = restClientBuilder
-                .baseUrl("https://api.anthropic.com/v1/messages")
-                .defaultHeader("x-api-key", apiKey)
-                .defaultHeader("anthropic-version", "2023-06-01")
-                .build();
+        this.restClient = AnthropicApiClient.build(restClientBuilder, apiKey);
     }
 
     @Override
@@ -94,7 +90,7 @@ public class AnthropicLabelInterpreter implements LabelInterpreter {
     }
 
     private static String extractResponseText(JsonNode response) {
-        return response.path("content").path(0).path("text").asText();
+        return AnthropicApiClient.extractResponseText(response);
     }
 
     /**

@@ -17,4 +17,18 @@ public sealed interface ChatResult {
 
     record LimitReached(String message) implements ChatResult {
     }
+
+    /**
+     * Assistenten misslyckades helt att svara (se {@code WineChatAssistant}s
+     * "tomt = totalt misslyckande"-konvention). Till skillnad från ett tidigare
+     * försök sätts INGET falskt {@code ChatMessage} in i konversationen här -
+     * ett sådant meddelande hade skickats tillbaka till den externa tjänsten
+     * som en äkta tidigare assistent-tur nästa gång användaren skriver något,
+     * vilket kan få modellen att bygga vidare på ett svar den aldrig faktiskt
+     * gav. Webblagret visar {@code conversation} med bara användarens eget
+     * meddelande och ett separat felmeddelande, precis som för
+     * {@link LimitReached}.
+     */
+    record AssistantUnavailable(Conversation conversation) implements ChatResult {
+    }
 }

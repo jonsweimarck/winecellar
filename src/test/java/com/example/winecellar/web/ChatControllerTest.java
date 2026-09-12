@@ -160,7 +160,7 @@ class ChatControllerTest {
         inloggadAnvändareFinns();
         Conversation conversation = konversation();
         when(chatService.findConversation(ÄGARE, KONVERSATION_ID)).thenReturn(Optional.of(conversation));
-        when(chatService.postMessage(eq(conversation), eq("Några fler förslag?")))
+        when(chatService.postMessage(eq(ÄGARE), eq(conversation), eq("Några fler förslag?")))
                 .thenReturn(new ChatResult.Success(conversation, assistantMessage("Prova en Chianti")));
 
         mockMvc.perform(post("/chatt/7/meddelande").with(user("testperson")).with(csrf())
@@ -174,7 +174,7 @@ class ChatControllerTest {
         inloggadAnvändareFinns();
         Conversation conversation = konversation();
         when(chatService.findConversation(ÄGARE, KONVERSATION_ID)).thenReturn(Optional.of(conversation));
-        when(chatService.postMessage(eq(conversation), any()))
+        when(chatService.postMessage(eq(ÄGARE), eq(conversation), any()))
                 .thenReturn(new ChatResult.LimitReached("Den här konversationen har för många meddelanden"));
 
         mockMvc.perform(post("/chatt/7/meddelande").with(user("testperson")).with(csrf())
@@ -193,7 +193,7 @@ class ChatControllerTest {
                         .param("message", "Ett meddelande"))
                 .andExpect(status().isNotFound());
 
-        verify(chatService, never()).postMessage(any(), any());
+        verify(chatService, never()).postMessage(any(), any(), any());
     }
 
     @Test

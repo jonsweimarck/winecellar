@@ -88,13 +88,13 @@ public class ChatSteps {
 
     @Givet("att jag har en konversation med frågan {string} och svaret {string}")
     public void attJagHarEnKonversationMedFråganOchSvaret(String question, String answer) {
-        currentConversation = enskildKonversationMedFrågaOchSvar(question, answer);
+        currentConversation = singleConversationWithQuestionAndAnswer(question, answer);
     }
 
     @Givet("att jag redan har det maximala antalet konversationer")
     public void attJagRedanHarDetMaximalaAntaletKonversationer() {
         for (int i = 0; i < MAX_CONVERSATIONS; i++) {
-            enskildKonversationMedFrågaOchSvar("Fråga " + i, "Svar " + i);
+            singleConversationWithQuestionAndAnswer("Fråga " + i, "Svar " + i);
         }
     }
 
@@ -117,7 +117,7 @@ public class ChatSteps {
 
     @När("jag frågar {string} i samma konversation")
     public void jagFrågarISammaKonversation(String question) {
-        lastResult = chatService.postMessage(currentConversation, question);
+        lastResult = chatService.postMessage(OWNER, currentConversation, question);
     }
 
     @När("jag försöker starta en ny konversation")
@@ -127,7 +127,7 @@ public class ChatSteps {
 
     @När("jag försöker skicka ytterligare ett meddelande i den konversationen")
     public void jagFörsökerSkickaYtterligareEttMeddelandeIDenKonversationen() {
-        lastResult = chatService.postMessage(currentConversation, "Ännu ett meddelande");
+        lastResult = chatService.postMessage(OWNER, currentConversation, "Ännu ett meddelande");
     }
 
     @När("jag raderar konversationen")
@@ -165,7 +165,7 @@ public class ChatSteps {
         assertThat(conversationRepository.findByIdAndOwner(currentConversation.id(), OWNER)).isEmpty();
     }
 
-    private Conversation enskildKonversationMedFrågaOchSvar(String question, String answer) {
+    private Conversation singleConversationWithQuestionAndAnswer(String question, String answer) {
         Conversation conversation = conversationRepository.save(new Conversation(null, OWNER, question, Instant.now()));
         conversationRepository.addMessage(new ChatMessage(null, conversation.id(), Role.USER, question, Instant.now()));
         conversationRepository.addMessage(new ChatMessage(null, conversation.id(), Role.ASSISTANT, answer, Instant.now()));

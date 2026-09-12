@@ -52,11 +52,7 @@ public class AnthropicWineChatAssistant implements WineChatAssistant {
             @Value("${winecellar.anthropic.api-key}") String apiKey,
             @Value("${winecellar.anthropic.model}") String model) {
         this.model = model;
-        this.restClient = restClientBuilder
-                .baseUrl("https://api.anthropic.com/v1/messages")
-                .defaultHeader("x-api-key", apiKey)
-                .defaultHeader("anthropic-version", "2023-06-01")
-                .build();
+        this.restClient = AnthropicApiClient.build(restClientBuilder, apiKey);
     }
 
     @Override
@@ -72,7 +68,7 @@ public class AnthropicWineChatAssistant implements WineChatAssistant {
                     .body(requestBody)
                     .retrieve()
                     .body(JsonNode.class);
-            String text = response.path("content").path(0).path("text").asText();
+            String text = AnthropicApiClient.extractResponseText(response);
             return text.isBlank() ? Optional.empty() : Optional.of(text);
         } catch (Exception e) {
             return Optional.empty();

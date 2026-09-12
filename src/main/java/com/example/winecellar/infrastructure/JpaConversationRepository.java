@@ -34,15 +34,21 @@ public class JpaConversationRepository implements ConversationRepository {
         return toDomain(conversationJpaRepository.save(entity));
     }
 
+    /** null owner = oscopeat (matcha oavsett ägare) - se WineRepository/ConversationRepository. */
     @Override
     public Optional<Conversation> findByIdAndOwner(ConversationId id, UserId owner) {
-        return conversationJpaRepository.findByIdAndOwnerId(id.value(), owner.value())
-                .map(JpaConversationRepository::toDomain);
+        Optional<ConversationEntity> entity = owner == null
+                ? conversationJpaRepository.findById(id.value())
+                : conversationJpaRepository.findByIdAndOwnerId(id.value(), owner.value());
+        return entity.map(JpaConversationRepository::toDomain);
     }
 
     @Override
     public List<Conversation> findAllByOwner(UserId owner) {
-        return conversationJpaRepository.findByOwnerIdOrderByCreatedAtDesc(owner.value()).stream()
+        List<ConversationEntity> entities = owner == null
+                ? conversationJpaRepository.findAll()
+                : conversationJpaRepository.findByOwnerIdOrderByCreatedAtDesc(owner.value());
+        return entities.stream()
                 .map(JpaConversationRepository::toDomain)
                 .toList();
     }
@@ -56,7 +62,10 @@ public class JpaConversationRepository implements ConversationRepository {
     @Override
     @Transactional
     public void deleteByIdAndOwner(ConversationId id, UserId owner) {
-        if (conversationJpaRepository.findByIdAndOwnerId(id.value(), owner.value()).isPresent()) {
+        Optional<ConversationEntity> entity = owner == null
+                ? conversationJpaRepository.findById(id.value())
+                : conversationJpaRepository.findByIdAndOwnerId(id.value(), owner.value());
+        if (entity.isPresent()) {
             chatMessageJpaRepository.deleteByConversationId(id.value());
             conversationJpaRepository.deleteById(id.value());
         }
@@ -64,7 +73,9 @@ public class JpaConversationRepository implements ConversationRepository {
 
     @Override
     public int countByOwner(UserId owner) {
-        return Math.toIntExact(conversationJpaRepository.countByOwnerId(owner.value()));
+        return Math.toIntExact(owner == null
+                ? conversationJpaRepository.count()
+                : conversationJpaRepository.countByOwnerId(owner.value()));
     }
 
     @Override
