@@ -54,3 +54,4 @@ WINE-36).
 | [0018](0018-remove-import-duplicate-strategies.md) | Import av dubbletter betraktas som fel, inte som valbara strategier | Accepted |
 | [0019](0019-shared-theme-css-variables.md) | Gemensamt designsystem i en delad stilmall, byggt på CSS-variabler | Accepted |
 | [0020](0020-remember-me-hash-based.md) | "Håll mig inloggad" via hash-baserad remember-me, inte persistenta tokens | Accepted |
+| [0021](0021-wine-chat-conversational-llm-integration.md) | AI-chatt om vinsamlingen - persisterad konversationsdomän och en andra, flerturs-formad LLM-integration | Accepted |
