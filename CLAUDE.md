@@ -273,11 +273,15 @@ Se [ADR 0019](docs/adr/0019-shared-theme-css-variables.md).
   appen körs via `spring-boot:run` (ingen devtools i projektet). En
   ändring i `src/main/resources` syns inte i en redan startad app, hur
   många gånger man än laddar om i webbläsaren - starta om servern.
-- **Navigationen:** kugghjul i toppraden → `/installningar`, som samlar
-  import (`/import`), export (`/export`) och Logga ut. Import/export
-  ligger alltså INTE längre som knappar på vinlistan. `fragments/
-  topprad.html` delas av alla inloggade sidor (kugghjul när
-  `tillbakaLank` är null, annars tillbaka-pil).
+- **Navigationen:** hamburgarmeny i toppraden (WINE-48, ersatte en
+  direkt kugghjulslänk) → `/installningar` (som i sin tur samlar import
+  `/import`, export `/export` och Logga ut) och `/chatt`. Import/export
+  ligger alltså INTE längre som knappar på vinlistan, och chatten är
+  aldrig det heller. `fragments/topprad.html` delas av alla inloggade
+  sidor (menyn när `tillbakaLank` är null, annars tillbaka-pil) - ett
+  `<details>/<summary>`-par utan egen JS, samma no-JS-mönster som
+  filterpanelen och mobilkortens "Detaljer". Ingen "stäng vid klick
+  utanför"-logik - en meny-navigering stänger den ändå indirekt.
 - **`z-index` gör att ett `position: fixed`-element ritas OVANPÅ annat
   innehåll, inte att det undviker det.** Toasten flyttades från botten
   till högst upp/mitten (WINE-37, efter att bottenplaceringen visade sig
@@ -415,6 +419,61 @@ miljövariabler).
 - Statusraden "Fyllde i: ..." byggs från en FAST fältordning
   (`INTERPRETED_FIELD_ORDER`), inte ett `HashSet`s iterationsordning -
   annars blir meddelandet icke-deterministiskt mellan körningar.
+
+## Chatt om vinsamlingen (LLM) - nuläge
+
+Se [ADR 0021](docs/adr/0021-wine-chat-conversational-llm-integration.md)
+för arkitekturen (WINE-48). Egen konversationsdomän + egen LLM-port,
+skild från etikettolkningen (ovan) trots att båda pratar med samma
+externa tjänst - formen är fundamentalt olik (löpande konversation
+kontra enstaka strukturerad extraktion).
+
+- **`Conversation`/`ChatMessage`** (`domain/`) är tunna, som `Wine`/
+  `User` - `ConversationRepository` (`application/`) är EN port för
+  båda (aggregat, inte två separata repositories), med en JPA-adapter
+  (`JpaConversationRepository`, produktion) och en in-memory-adapter
+  (`InMemoryConversationRepository`, acceptanstester) - samma mönster
+  som `WineRepository`.
+- **`WineChatAssistant.reply(wines, history)` returnerar
+  `Optional<String>`** - samma "tomt = totalt misslyckande"-konvention
+  som `LabelInterpreter`. `ChatService` sätter INTE ett fel-läge om
+  detta händer - den sparar ett vanligt assistentmeddelande med en fast
+  standardtext (`ChatService.ASSISTANT_UNAVAILABLE_MESSAGE`) istället,
+  eftersom användarens eget meddelande redan hunnit sparas och ett
+  vanligt chattmeddelande är enklare att visa än ett särskilt felläge.
+- **`AnthropicWineChatAssistant`** återanvänder samma `RestClient`-
+  uppkoppling/nyckel/modell som `AnthropicLabelInterpreter` - men bygger
+  en systemprompt av HELA den aktuella vinlistan (alla fält, inte bara
+  vinlistans direkt synliga delmängd) och skickar med HELA
+  konversationshistoriken som `messages`-arrayen, eftersom tjänsten är
+  stateless mellan anrop.
+- **Gränserna (`winecellar.chat.max-conversations`/
+  `winecellar.chat.max-messages-per-conversation`, miljövariabler
+  `WINECELLAR_CHAT_MAX_CONVERSATIONS`/
+  `WINECELLAR_CHAT_MAX_MESSAGES_PER_CONVERSATION`, default 20/40)
+  kontrolleras i `ChatService`, INNAN något meddelande sparas eller
+  assistenten anropas** - en nådd gräns kostar alltså aldrig ett
+  onödigt externt anrop. Blockerar med `ChatResult.LimitReached`
+  (ett meddelande, inte ett kastat fel) - `ChatController` visar det som
+  en flash-`fel`-attribut och navigerar INTE bort, samma
+  Post-Redirect-Get-princip som resten av appens flash-meddelanden.
+- **Ingen tom konversation finns någonsin** - `ChatService.
+  startConversation(...)` skapar konversationen OCH skickar dess första
+  meddelande i samma anrop (titeln avkortas från just det meddelandet).
+  `ChatController` har därför bara EN `POST /chatt` (ny konversation +
+  första meddelandet), inte en separat "skapa tom konversation"-rutt.
+- **Radering (`POST /chatt/{id}/radera`) raderar meddelandena EXPLICIT
+  före konversationen i samma transaktion** (`JpaConversationRepository.
+  deleteByIdAndOwner`) - ingen `ON DELETE CASCADE` i schemat, bara det
+  FK-constraint Hibernate genererar från `@ManyToOne`.
+- **`ConversationEntity.owner`/`ChatMessageEntity.conversation` är
+  `FetchType.EAGER`** - samma fix som `WineEntity.owner` (se Kända
+  fällor) tillämpad direkt från början, eftersom fällan redan var känd.
+  Verifierad automatiskt av `chatt-persistens.feature` mot en riktig
+  Postgres (Testcontainers), inte bara antagen.
+- **Navigationsentry: hamburgarmenyn i toppraden** (ersatte den tidigare
+  direkta kugghjulslänken till Inställningar, se "Designsystem och
+  navigation" nedan), inte en egen knapp på vinlistan.
 
 ## Flera användare - nuläge
 

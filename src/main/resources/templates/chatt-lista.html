@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chatta om dina viner - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <style>
+        body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
+
+        .knapp-bred { width: 100%; box-sizing: border-box; }
+        .fel { color: var(--fel); }
+
+        .ny-konversation textarea {
+            width: 100%; box-sizing: border-box; min-height: 4.5rem; resize: vertical; font: inherit;
+        }
+
+        .konversationslista { display: flex; flex-direction: column; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
+        .konversationsrad {
+            display: block; padding: 0.9rem 1rem; text-decoration: none; color: var(--text);
+        }
+        .konversationsrad-titel { font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/topprad :: topprad('Chatta om dina viner', '/')}"></div>
+
+    <!-- Samma delade .toast-komponent (tema.css) som resten av appens
+         spara/ta bort-återkoppling, se installningar.html. -->
+    <p class="toast" th:if="${feedback != null}" role="status">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>
+        <span th:text="${feedback}"></span>
+    </p>
+
+    <p class="fel" th:if="${fel != null}" th:text="${fel}"></p>
+
+    <p class="sektionsrubrik">Ny konversation</p>
+    <form method="post" th:action="@{/chatt}" class="ny-konversation">
+        <div class="kort">
+            <div class="falt">
+                <textarea name="message" placeholder="Fråga vad som helst om din vinkällare..." required></textarea>
+            </div>
+            <div class="falt">
+                <button type="submit" class="knapp-bred">Skicka</button>
+            </div>
+        </div>
+    </form>
+
+    <th:block th:if="${!conversations.isEmpty()}">
+        <p class="sektionsrubrik">Tidigare konversationer</p>
+        <ul class="konversationslista">
+            <li th:each="conversation : ${conversations}" class="kort">
+                <a th:href="@{/chatt/{id}(id=${conversation.id.value})}" class="konversationsrad">
+                    <span class="konversationsrad-titel" th:text="${conversation.title}"></span>
+                </a>
+            </li>
+        </ul>
+    </th:block>
+
+    <p th:if="${conversations.isEmpty()}">Inga konversationer än - ställ din första fråga ovan.</p>
+
+    <script th:inline="none">
+        // Tonar bort återkopplingsbrickan efter en radering - samma
+        // .toast-mönster som installningar.html.
+        (function () {
+            var toast = document.querySelector('.toast');
+            if (toast) {
+                setTimeout(function () { toast.classList.add('toast-dold'); }, 3000);
+            }
+        })();
+    </script>
+</body>
+</html>
