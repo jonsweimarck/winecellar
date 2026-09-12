@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${conversation.title} + ' - Vinkällaren'"></title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <style>
+        body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
+        dialog p { margin: 0 0 1rem; }
+
+        .fel { color: var(--fel); }
+        .knapp-bred { width: 100%; box-sizing: border-box; }
+        .radera-kort { margin-top: 2rem; }
+        .farlig-zon-text { margin: 0 0 0.75rem; color: var(--text-dampad); }
+
+        .meddelanden { display: flex; flex-direction: column; gap: 0.75rem; margin: 1.5rem 0; }
+        .meddelande { padding: 0.75rem 1rem; border-radius: var(--radie); max-width: 85%; white-space: pre-wrap; }
+        .meddelande-user { align-self: flex-end; background: var(--accent); color: var(--pa-accent); }
+        .meddelande-assistant { align-self: flex-start; background: var(--yta-2); border: 1px solid var(--ram-stark); }
+
+        .nytt-meddelande textarea {
+            width: 100%; box-sizing: border-box; min-height: 3.5rem; resize: vertical; font: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/topprad :: topprad(${conversation.title}, '/chatt')}"></div>
+
+    <p class="fel" th:if="${fel != null}" th:text="${fel}"></p>
+
+    <div class="meddelanden">
+        <div th:each="meddelande : ${messages}"
+             th:class="${meddelande.role().name() == 'USER'} ? 'meddelande meddelande-user' : 'meddelande meddelande-assistant'"
+             th:text="${meddelande.content}"></div>
+    </div>
+
+    <form method="post" th:action="@{/chatt/{id}/meddelande(id=${conversation.id.value})}" class="nytt-meddelande">
+        <div class="kort">
+            <div class="falt">
+                <textarea name="message" placeholder="Skriv ett meddelande..." required></textarea>
+            </div>
+            <div class="falt">
+                <button type="submit" class="knapp-bred">Skicka</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Samma "Farlig zon"-mönster som vin-formular.html (WINE-44): en
+         <dialog>-bekräftelse, inte window.confirm() (blockeras av vissa
+         webbläsarinställningar, se CLAUDE.md). -->
+    <div class="kort radera-kort">
+        <div class="falt">
+            <p class="farlig-zon-text">Radera konversationen permanent. Går inte att ångra.</p>
+            <button type="button" id="oppna-radera-dialog" class="knapp-farlig">Radera konversationen</button>
+        </div>
+    </div>
+
+    <dialog id="radera-dialog">
+        <form method="post" th:action="@{/chatt/{id}/radera(id=${conversation.id.value})}">
+            <p>Radera konversationen <strong th:text="${conversation.title}"></strong> permanent? Det går inte att ångra.</p>
+            <div class="atgardsrad">
+                <button type="submit" class="knapp-farlig">Ja, radera konversationen</button>
+                <button type="button" id="stang-radera-dialog" class="knapp-sekundar">Avbryt</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script>
+        (function () {
+            var öppnaKnapp = document.getElementById('oppna-radera-dialog');
+            var dialogruta = document.getElementById('radera-dialog');
+            var avbrytKnapp = document.getElementById('stang-radera-dialog');
+            if (!öppnaKnapp || !dialogruta) {
+                return;
+            }
+            öppnaKnapp.addEventListener('click', function () {
+                dialogruta.showModal();
+            });
+            if (avbrytKnapp) {
+                avbrytKnapp.addEventListener('click', function () {
+                    dialogruta.close();
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

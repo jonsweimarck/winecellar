@@ -100,6 +100,14 @@ lista. Se [ADR 0013](docs/adr/0013-multi-user-accounts.md).
 flaskor minst"-standardval, satt i Inställningar - se "Filtrering,
 sökning och sortering" nedan.
 
+### Chattkonversationer
+
+Tabellerna `conversations` (`id`, `owner_id` FK → `users.id` **NOT
+NULL**, `title`, `created_at`) och `chat_messages` (`id`,
+`conversation_id` FK → `conversations.id` **NOT NULL**, `role`
+[`USER`/`ASSISTANT`], `content`, `created_at`) - se "Chatta om
+vinsamlingen" nedan och [ADR 0021](docs/adr/0021-wine-chat-conversational-llm-integration.md).
+
 ## Vinlistan
 
 Startsidan visar en överblick per vin: bild, namn, typ, producent,
@@ -151,6 +159,34 @@ Vald sortering/filtrering/sökning hamnar i URL:en
 bokmärkbart och delbart. Orkestreringen ligger i
 `WineService.search(SearchCriteria)`, inte i controllern - se
 [ADR 0006](docs/adr/0006-search-orchestration-in-application-layer.md).
+
+## Chatta om vinsamlingen
+
+En inloggad användare kan chatta fritt med en AI-assistent (samma
+Anthropic-integration som etikettskanningen) om hela sin vinsamling -
+`/chatt`, nås via hamburgarmenyn i toppraden (ersatte den tidigare
+direkta kugghjulslänken till Inställningar). Se
+[ADR 0021](docs/adr/0021-wine-chat-conversational-llm-integration.md)
+för de arkitektoniska besluten.
+
+- **Fri fråga, hela samlingen** - assistenten resonerar kring ALLA
+  användarens viner (inte bara det som råkar vara filtrerat/synligt),
+  hämtat färskt vid varje meddelande. Den är strikt läsande - kan
+  aldrig ändra vindata, varken direkt eller via ett bekräftelsesteg.
+- **Flera separata konversationer**, sparade i databasen med full
+  historik - att skicka ett meddelande skickar alltid med hela
+  konversationen hittills, eftersom den externa tjänsten är stateless
+  mellan anrop. En konversations titel autogenereras från dess första
+  meddelande.
+- **Fasta gränser per användare**, satta via miljövariabler -
+  `WINECELLAR_CHAT_MAX_CONVERSATIONS` (default 20) och
+  `WINECELLAR_CHAT_MAX_MESSAGES_PER_CONVERSATION` (default 40). En nådd
+  gräns blockerar med ett tydligt felmeddelande - inget trimmas bort
+  automatiskt. Användaren kan radera en egen konversation (samma
+  `<dialog>`-bekräftelse som "Radera vinet", se Vinlistan ovan).
+- Kräver `WINECELLAR_ANTHROPIC_API_KEY` (se Säkerhet nedan) - utan den
+  svarar assistenten alltid med ett standardmeddelande om att den inte
+  kunde svara, istället för att krascha.
 
 ## Säkerhet
 

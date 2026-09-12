@@ -3,8 +3,11 @@ package com.example.winecellar.acceptance;
 import com.example.winecellar.application.RegistrationService;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
+import com.example.winecellar.domain.ChatMessage;
+import com.example.winecellar.domain.Conversation;
 import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
+import com.example.winecellar.infrastructure.JpaConversationRepository;
 import com.example.winecellar.infrastructure.JpaWineRepository;
 import io.cucumber.java.Before;
 import io.cucumber.java.sv.Givet;
@@ -13,6 +16,7 @@ import io.cucumber.java.sv.Så;
 import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +41,9 @@ public class PersistenceSteps {
     private JpaWineRepository wineRepository;
 
     @Autowired
+    private JpaConversationRepository conversationRepository;
+
+    @Autowired
     private EntityManager entityManager;
 
     @Autowired
@@ -47,6 +54,7 @@ public class PersistenceSteps {
 
     private List<Wine> sökresultat;
     private UserId ägare;
+    private Conversation.ConversationId senasteKonversationId;
 
     /**
      * WINE-15: `owner_id` är `NOT NULL` i databasen och `wines.owner_id`
@@ -76,6 +84,18 @@ public class PersistenceSteps {
     @Before(order = -1)
     public void raderaAllaViner() {
         wineRepository.deleteAll();
+    }
+
+    /**
+     * WINE-48: samma FK-fälla mot `users` som `raderaAllaViner` löser för
+     * `wines` - `conversations.owner_id` är också `NOT NULL`. Ingen inbördes
+     * ordning krävs mellan de två raderingarna (wines/conversations
+     * refererar inte varandra, bara users var för sig), bara att båda sker
+     * innan `RegistrationSteps.reset()` (order 0).
+     */
+    @Before(order = -1)
+    public void raderaAllaKonversationer() {
+        conversationRepository.deleteAll();
     }
 
     @Before(order = 1)
@@ -112,5 +132,20 @@ public class PersistenceSteps {
     @Så("ska vinet {string} finnas i sökresultatet")
     public void skaVinetFinnasISökresultatet(String name) {
         assertThat(sökresultat).anySatisfy(wine -> assertThat(wine.name()).isEqualTo(name));
+    }
+
+    @Givet("att jag har sparat en konversation med frågan {string} och svaret {string}")
+    public void attJagHarSparatEnKonversationMedFråganOchSvaret(String question, String answer) {
+        Conversation conversation = conversationRepository.save(new Conversation(null, ägare, question, Instant.now()));
+        conversationRepository.addMessage(new ChatMessage(null, conversation.id(), ChatMessage.Role.USER, question, Instant.now()));
+        conversationRepository.addMessage(new ChatMessage(null, conversation.id(), ChatMessage.Role.ASSISTANT, answer, Instant.now()));
+        senasteKonversationId = conversation.id();
+    }
+
+    @Så("ska konversationen fortfarande innehålla frågan {string} och svaret {string}")
+    public void skaKonversationenFortfarandeInnehållaFråganOchSvaret(String question, String answer) {
+        assertThat(conversationRepository.findMessages(senasteKonversationId))
+                .extracting(ChatMessage::content)
+                .contains(question, answer);
     }
 }

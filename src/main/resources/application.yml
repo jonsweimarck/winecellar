@@ -88,3 +88,13 @@ winecellar:
     # kryssrutan blir overksam lokalt om variabeln inte satts, hellre än
     # osäker. Produktion MÅSTE sätta en egen hemlighet via miljövariabeln.
     key: ${WINECELLAR_REMEMBER_ME_KEY:}
+  chat:
+    # Gränser för AI-chatten om vinsamlingen (WINE-48, se docs/adr/
+    # 0021-wine-chat-conversational-llm-integration.md). Blockerar med ett
+    # tydligt fel när gränsen nås - ChatService trimmar aldrig bort något
+    # åt användaren. Miljövariabler, inte hemligheter i sig, men ändå
+    # konfigurerbara per miljö av samma skäl som giltighetstiden för
+    # remember-me INTE är det: det finns ingen anledning att tvinga en
+    # omdeploy för att justera dem.
+    max-conversations: ${WINECELLAR_CHAT_MAX_CONVERSATIONS:20}
+    max-messages-per-conversation: ${WINECELLAR_CHAT_MAX_MESSAGES_PER_CONVERSATION:40}

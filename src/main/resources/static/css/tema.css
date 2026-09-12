@@ -432,3 +432,37 @@ dialog::backdrop {
     flex-shrink: 0;
 }
 .topprad-ikonlank:hover { background: var(--yta-hover); }
+
+/* Hamburgarmenyn (WINE-48) ersätter den tidigare direkta länken till
+   Inställningar - ett <details>/<summary>-par, samma no-JS-mönster som
+   filterpanelen och mobilkortens "Detaljer" (se CLAUDE.md). Ingen
+   "stäng vid klick utanför"-logik - medvetet, för att slippa ny JS för
+   en menyknapp; ett klick på ett menyval navigerar ändå bort och stänger
+   den därmed indirekt. */
+.topprad-meny { position: relative; }
+.topprad-meny > summary { list-style: none; cursor: pointer; }
+.topprad-meny > summary::-webkit-details-marker { display: none; }
+.topprad-meny-innehall {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    z-index: 15;
+    min-width: 12rem;
+    background: var(--yta-2);
+    border: 1px solid var(--ram-stark);
+    border-radius: var(--radie);
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    padding: 0.3rem;
+}
+.topprad-meny-innehall a {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: var(--radie);
+    color: var(--text);
+    text-decoration: none;
+}
+.topprad-meny-innehall a:hover { background: var(--yta-hover); }
