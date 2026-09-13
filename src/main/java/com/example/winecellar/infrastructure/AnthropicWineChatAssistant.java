@@ -5,9 +5,12 @@ import com.example.winecellar.domain.ChatMessage;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
@@ -25,6 +28,11 @@ import java.util.stream.Stream;
  */
 @Component
 public class AnthropicWineChatAssistant implements WineChatAssistant {
+
+    // Tillfällig diagnosloggning (felsökning av WINECELLAR_ANTHROPIC_MODEL,
+    // 2026-09) - se motsvarande kommentar i AnthropicLabelInterpreter. Ta
+    // bort igen när felsökningen är klar.
+    private static final Logger log = LoggerFactory.getLogger(AnthropicWineChatAssistant.class);
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
             Du är en hjälpsam assistent för en vinsamlares privata vinkällare. Du svarar
@@ -70,7 +78,15 @@ public class AnthropicWineChatAssistant implements WineChatAssistant {
                     .body(JsonNode.class);
             String text = AnthropicApiClient.extractResponseText(response);
             return text.isBlank() ? Optional.empty() : Optional.of(text);
+        } catch (RestClientResponseException e) {
+            // Se motsvarande kommentar i AnthropicLabelInterpreter -
+            // e.getResponseBodyAsString() bär Anthropics faktiska
+            // felmeddelande (t.ex. avvisat modell-id), som annars är osynligt.
+            log.warn("Chattsvar från Anthropics API misslyckades (modell: \"{}\", status: {}): {}",
+                    model, e.getStatusCode(), e.getResponseBodyAsString());
+            return Optional.empty();
         } catch (Exception e) {
+            log.warn("Chattsvar från Anthropics API misslyckades (modell: \"{}\")", model, e);
             return Optional.empty();
         }
     }

@@ -4,9 +4,12 @@ import com.example.winecellar.application.InterpretedLabel;
 import com.example.winecellar.application.LabelInterpreter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Base64;
 import java.util.List;
@@ -23,6 +26,15 @@ import java.util.Optional;
  */
 @Component
 public class AnthropicLabelInterpreter implements LabelInterpreter {
+
+    // Tillfällig diagnosloggning (felsökning av WINECELLAR_ANTHROPIC_MODEL,
+    // 2026-09) - interpret() svalde tidigare ALLA undantag helt tyst (se
+    // Optional.empty()-konventionen nedan), vilket gjorde ett avvisat
+    // modell-id från Anthropics API omöjligt att skilja från ett
+    // nätverksfel eller ett tomt svar. Ta bort igen när felsökningen är
+    // klar - den hör inte till den ursprungliga "misslyckas tyst"-designen
+    // i ADR 0012.
+    private static final Logger log = LoggerFactory.getLogger(AnthropicLabelInterpreter.class);
 
     /**
      * name/producer/vintage FÅR INTE gissas eller härledas - bara läsas
@@ -64,7 +76,17 @@ public class AnthropicLabelInterpreter implements LabelInterpreter {
     public Optional<InterpretedLabel> interpret(byte[] imageData, String mimeType) {
         try {
             return parseInterpretedLabel(extractResponseText(callAnthropic(imageData, mimeType)));
+        } catch (RestClientResponseException e) {
+            // RestClientResponseException (HttpClientErrorException/
+            // HttpServerErrorException) bär Anthropics egen felrespons i
+            // klartext - t.ex. "model: not_found_error" om modell-id:t inte
+            // finns. Just den kroppen är annars osynlig - e.getMessage()
+            // ensamt visar bara statustexten, inte VARFÖR.
+            log.warn("Etikettolkning mot Anthropics API misslyckades (modell: \"{}\", status: {}): {}",
+                    model, e.getStatusCode(), e.getResponseBodyAsString());
+            return Optional.empty();
         } catch (Exception e) {
+            log.warn("Etikettolkning mot Anthropics API misslyckades (modell: \"{}\")", model, e);
             return Optional.empty();
         }
     }
