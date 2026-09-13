@@ -25,7 +25,20 @@ final class AnthropicApiClient {
                 .build();
     }
 
+    /**
+     * Letar upp det FÖRSTA innehållsblocket av typen "text" i svaret, inte
+     * bara content[0] - claude-sonnet-5 visade sig (produktionsfelsökning,
+     * 2026-09) lägga ett "thinking"-block FÖRE textblocket i arrayen även
+     * utan att resonemang efterfrågats i requesten, vilket gjorde att
+     * content[0]-antagandet plockade ett tomt resonemangsblock istället för
+     * det faktiska svaret.
+     */
     static String extractResponseText(JsonNode response) {
-        return response.path("content").path(0).path("text").asText();
+        for (JsonNode block : response.path("content")) {
+            if ("text".equals(block.path("type").asText())) {
+                return block.path("text").asText();
+            }
+        }
+        return "";
     }
 }

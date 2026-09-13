@@ -68,7 +68,12 @@ public class AnthropicWineChatAssistant implements WineChatAssistant {
         try {
             Map<String, Object> requestBody = Map.of(
                     "model", model,
-                    "max_tokens", 1024,
+                    // Se motsvarande kommentar i AnthropicLabelInterpreter -
+                    // ett fritt konversationssvar behöver inget resonemang,
+                    // och thinking-tokens räknas mot samma max_tokens-budget
+                    // som själva svaret.
+                    "thinking", Map.of("type", "disabled"),
+                    "max_tokens", 2048,
                     "system", SYSTEM_PROMPT_TEMPLATE.formatted(wineListAsText(wines)),
                     "messages", history.stream().map(AnthropicWineChatAssistant::toApiMessage).toList()
             );

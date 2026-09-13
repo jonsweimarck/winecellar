@@ -95,7 +95,15 @@ public class AnthropicLabelInterpreter implements LabelInterpreter {
         String base64Image = Base64.getEncoder().encodeToString(imageData);
         Map<String, Object> requestBody = Map.of(
                 "model", model,
-                "max_tokens", 1024,
+                // claude-sonnet-5 visade sig i produktion lägga ett
+                // "thinking"-block i svaret UTAN att ha bett om det - se
+                // AnthropicApiClient.extractResponseText. Extraktionen är
+                // strukturerad JSON, inget resonemang behövs här; disabled
+                // stänger av det explicit istället för att förlita sig på
+                // en oskriven default. max_tokens höjt från 1024 som
+                // marginal ifall ett resonemangsblock ändå dyker upp.
+                "thinking", Map.of("type", "disabled"),
+                "max_tokens", 2048,
                 "messages", List.of(Map.of(
                         "role", "user",
                         "content", List.of(
