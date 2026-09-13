@@ -45,6 +45,7 @@
                 <button type="submit" class="knapp-bred">Skicka</button>
             </div>
         </div>
+        <p id="ny-konversation-status" class="statusrad"></p>
     </form>
 
     <th:block th:if="${!conversations.isEmpty()}">
@@ -68,6 +69,31 @@
             if (toast) {
                 setTimeout(function () { toast.classList.add('toast-dold'); }, 3000);
             }
+        })();
+
+        // Väntefeedback (WINE-49) - att skicka första meddelandet i en ny
+        // konversation gör en vanlig sidnavigering som väntar in hela
+        // LLM-anropet innan svaret kommer tillbaka som en ny sida. Utan
+        // detta ser sidan overksam ut under hela väntetiden. Samma mönster
+        // som etikettskanningens #etikett-status (vin-formular.html,
+        // WINE-8): sätt statustexten synkront i submit-handlern, innan
+        // sidan hinner navigera bort, och inaktivera knappen för att
+        // förhindra ett dubbelt inskick medan svaret väntas in.
+        (function () {
+            var form = document.querySelector('.ny-konversation');
+            if (!form) {
+                return;
+            }
+            var statusRad = document.getElementById('ny-konversation-status');
+            var knapp = form.querySelector('button[type=submit]');
+            form.addEventListener('submit', function () {
+                if (statusRad) {
+                    statusRad.textContent = 'Skickar meddelande, väntar på svar...';
+                }
+                if (knapp) {
+                    knapp.disabled = true;
+                }
+            });
         })();
     </script>
 </body>

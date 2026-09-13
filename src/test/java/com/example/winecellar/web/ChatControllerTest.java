@@ -79,6 +79,20 @@ class ChatControllerTest {
     }
 
     @Test
+    void skaVisaVäntestatusradFörNyKonversation() throws Exception {
+        // WINE-49 - statusraden fylls i av JS på submit (se
+        // LabelScanFormIT/ChattFormIT för det Playwright-verifierade
+        // beteendet), men att den faktiskt renderas i markupen kan
+        // verifieras direkt här.
+        inloggadAnvändareFinns();
+        when(chatService.listConversations(ÄGARE)).thenReturn(List.of());
+
+        mockMvc.perform(get("/chatt").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"ny-konversation-status\"")));
+    }
+
+    @Test
     void skaVisaTomtLägeUtanKonversationer() throws Exception {
         inloggadAnvändareFinns();
         when(chatService.listConversations(ÄGARE)).thenReturn(List.of());
@@ -144,6 +158,18 @@ class ChatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Vilket vin passar till rödkött?")))
                 .andExpect(content().string(containsString("Barolo passar bra")));
+    }
+
+    @Test
+    void skaVisaVäntestatusradFörNyttMeddelande() throws Exception {
+        // WINE-49 - se motsvarande test/kommentar ovan för listsidan.
+        inloggadAnvändareFinns();
+        when(chatService.findConversation(ÄGARE, KONVERSATION_ID)).thenReturn(Optional.of(konversation()));
+        when(chatService.messages(KONVERSATION_ID)).thenReturn(List.of());
+
+        mockMvc.perform(get("/chatt/7").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"nytt-meddelande-status\"")));
     }
 
     @Test

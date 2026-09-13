@@ -44,6 +44,7 @@
                 <button type="submit" class="knapp-bred">Skicka</button>
             </div>
         </div>
+        <p id="nytt-meddelande-status" class="statusrad"></p>
     </form>
 
     <!-- Samma "Farlig zon"-mönster som vin-formular.html (WINE-44): en
@@ -82,6 +83,27 @@
                     dialogruta.close();
                 });
             }
+        })();
+
+        // Väntefeedback (WINE-49) - se motsvarande kommentar i
+        // chatt-lista.html. Ett skickat meddelande gör en vanlig
+        // sidnavigering som väntar in hela LLM-anropet innan svaret kommer
+        // tillbaka som en ny sida.
+        (function () {
+            var form = document.querySelector('.nytt-meddelande');
+            if (!form) {
+                return;
+            }
+            var statusRad = document.getElementById('nytt-meddelande-status');
+            var knapp = form.querySelector('button[type=submit]');
+            form.addEventListener('submit', function () {
+                if (statusRad) {
+                    statusRad.textContent = 'Skickar meddelande, väntar på svar...';
+                }
+                if (knapp) {
+                    knapp.disabled = true;
+                }
+            });
         })();
     </script>
 </body>
