@@ -77,7 +77,15 @@ public class AnthropicWineChatAssistant implements WineChatAssistant {
                     .retrieve()
                     .body(JsonNode.class);
             String text = AnthropicApiClient.extractResponseText(response);
-            return text.isBlank() ? Optional.empty() : Optional.of(text);
+            if (text.isBlank()) {
+                // Ett 200 OK-svar ger INGET undantag - den här grenen är
+                // annars helt tyst. Loggar hela svarskroppen, eftersom
+                // orsaken (t.ex. att content[0] inte är av typen "text" -
+                // extractResponseText letar bara där) annars är osynlig.
+                log.warn("Chattsvar från Anthropics API var tomt (modell: \"{}\"), fullt svar: {}", model, response);
+                return Optional.empty();
+            }
+            return Optional.of(text);
         } catch (RestClientResponseException e) {
             // Se motsvarande kommentar i AnthropicLabelInterpreter -
             // e.getResponseBodyAsString() bär Anthropics faktiska

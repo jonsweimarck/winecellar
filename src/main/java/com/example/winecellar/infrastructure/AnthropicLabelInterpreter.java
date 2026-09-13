@@ -129,10 +129,22 @@ public class AnthropicLabelInterpreter implements LabelInterpreter {
             String country = nullableText(json, "country");
             String region = nullableText(json, "region");
             if (name == null && producer == null && vintage == null && country == null && region == null) {
+                // Precis som chattens "tomt svar utan undantag" (se
+                // AnthropicWineChatAssistant) - ett giltigt JSON-svar med
+                // fem null-fält ÄR ett legitimt utfall för en oläsbar
+                // etikett, men loggas ändå tillfälligt eftersom det också
+                // är precis vad ett trunkerat/tomt modellsvar ser ut som.
+                log.warn("Etikettolkning mot Anthropics API gav inga tolkade fält (modell: \"{}\"), rå text: {}",
+                        model, text);
                 return Optional.empty();
             }
             return Optional.of(new InterpretedLabel(name, producer, vintage, country, region));
         } catch (Exception e) {
+            // Nås t.ex. om text är tom/inte JSON alls - denna inre catch
+            // körs INNAN det yttre interpret()-fångstblocket någonsin ser
+            // felet, så utan denna rad var även den här grenen helt tyst.
+            log.warn("Etikettolkning mot Anthropics API gav ett otolkbart svar (modell: \"{}\"), rå text: {}",
+                    model, text, e);
             return Optional.empty();
         }
     }
