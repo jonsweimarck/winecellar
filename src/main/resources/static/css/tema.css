@@ -465,4 +465,13 @@ dialog::backdrop {
     color: var(--text);
     text-decoration: none;
 }
+
+/* Delad statusrad för "väntar på ett långsamt LLM-svar"-återkoppling
+   (WINE-49) - samma dämpade, kursiva stil som etikettskanningens
+   #etikett-status (vin-formular.html, WINE-8), men flyttad hit eftersom
+   chattens två formulär (chatt-lista.html, chatt.html) nu återanvänder
+   den identiskt. #etikett-status ändrades avsiktligt inte till att peka
+   hit - att röra en redan fungerande, testtäckt sida är inte den här
+   storyns scope. */
+.statusrad { color: var(--text-dampad); font-style: italic; margin: 0.5rem 0 0; }
 .topprad-meny-innehall a:hover { background: var(--yta-hover); }
