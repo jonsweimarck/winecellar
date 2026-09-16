@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -283,9 +284,11 @@ public class WineController {
 
     @GetMapping("/wines/nytt")
     public String newWineForm(Model model, Authentication authentication) {
-        model.addAttribute("wine", emptyDraft());
+        Wine wine = emptyDraft();
+        model.addAttribute("wine", wine);
         model.addAttribute("ratings", Rating.values());
         model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
+        model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(wine));
         return "vin-formular";
     }
 
@@ -300,6 +303,22 @@ public class WineController {
     }
 
     /**
+     * Granskningsfynd (kodgranskning av PR #32): ett vin kan ha ett
+     * `ownRating` som INTE matchar någon av munskänkarnas 29 etiketter -
+     * antingen sparat innan den här inställningen fanns, eller skrivet i
+     * fritextläge innan kontot bytte till dropdown-läge. Utan det här
+     * hade dropdownen tyst fallit tillbaka till "Inget betyg", och en
+     * oförändrad sparning (användaren rörde aldrig betygsfältet) hade då
+     * tyst nollat ut det tidigare värdet - se vin-formular.html, som
+     * lägger till ett extra alternativ för just det här fallet, förvalt
+     * så att en oförändrad sparning bevarar värdet.
+     */
+    private static boolean isOwnRatingUnmatched(Wine wine) {
+        String ownRating = wine.ownRating();
+        return ownRating != null && Arrays.stream(Rating.values()).noneMatch(r -> r.label().equals(ownRating));
+    }
+
+    /**
      * Tolkar ett foto av en etikett till ett osparat utkast (WINE-5) -
      * renderar om samma formulär, förifyllt med det som kunde
      * läsas/härledas, istället för att spara något (se
@@ -311,16 +330,19 @@ public class WineController {
     public String interpretLabel(
             @RequestParam("bild") MultipartFile image, Model model, Authentication authentication) throws IOException {
         LabelInterpretationResult result = labelInterpretationService.interpret(image.getBytes(), image.getContentType());
-        model.addAttribute("ratings", Rating.values());
-        model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
+        Wine wine;
         if (result instanceof LabelInterpretationResult.Interpreted interpreted) {
-            model.addAttribute("wine", interpreted.draft());
+            wine = interpreted.draft();
             model.addAttribute("interpretedFields", interpreted.interpretedFields());
             model.addAttribute("interpretedFieldLabels", interpretedFieldLabels(interpreted.interpretedFields()));
         } else {
-            model.addAttribute("wine", emptyDraft());
+            wine = emptyDraft();
             model.addAttribute("labelInterpretationFailed", true);
         }
+        model.addAttribute("wine", wine);
+        model.addAttribute("ratings", Rating.values());
+        model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
+        model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(wine));
         return "vin-formular";
     }
 
@@ -420,6 +442,7 @@ public class WineController {
         model.addAttribute("wine", candidate);
         model.addAttribute("ratings", Rating.values());
         model.addAttribute("ownRatingFromScale", ownRatingFromScale);
+        model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(candidate));
         model.addAttribute("duplicateExisting", existing);
         model.addAttribute("duplicateIsFull", fullDuplicate);
         return "vin-formular";
@@ -479,6 +502,7 @@ public class WineController {
         model.addAttribute("wine", wine);
         model.addAttribute("ratings", Rating.values());
         model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
+        model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(wine));
         return "vin-formular";
     }
 

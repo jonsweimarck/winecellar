@@ -1247,6 +1247,63 @@ class WineControllerTest {
                     .andExpect(content().string(
                             containsString("<input type=\"text\" name=\"ownRating\" value=\"Riktigt bra, dricka nu\"")));
         }
+
+        /**
+         * Granskningsfynd (kodgranskning av PR #32): ett vin kan ha ett
+         * sparat "eget betyg" som INTE matchar någon av munskänkarnas 29
+         * etiketter (satt i fritextläge, eller innan inställningen fanns).
+         * Utan ett extra, förvalt alternativ i dropdownen för just det här
+         * fallet hade den tyst fallit tillbaka till "Inget betyg" - och en
+         * oförändrad sparning (användaren rör aldrig fältet) hade då tyst
+         * nollat ut det gamla värdet, se skaBevaraOmatchatFritextvärdeVidOförändradSparning
+         * nedan för den delen av regressionen.
+         */
+        @Test
+        @DisplayName("ska visa ett omatchat sparat värde som ett extra, förvalt alternativ i dropdownen")
+        void skaVisaOmatchatSparatVärdeSomExtraFörvaltAlternativ() throws Exception {
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+            when(wineService.findById(eq(new WineId(1L)), any()))
+                    .thenReturn(Optional.of(BAROLO.toBuilder().ownRating("Fantastiskt, dricka nu!").build()));
+
+            mockMvc.perform(get("/wines/1/redigera").with(user("testperson")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(
+                            containsString("<option value=\"Fantastiskt, dricka nu!\" "
+                                    + "selected=\"selected\">Fantastiskt, dricka nu! (sparad text, matchar ingen etikett)</option>")));
+        }
+
+        /**
+         * Regressionstest för samma granskningsfynd som ovan: en oförändrad
+         * sparning (bara priset ändrat, betygsfältet aldrig rört - simulerat
+         * genom att posta exakt det värde det extra dropdown-alternativet
+         * ovan förvalde) ska bevara det ursprungliga fritextvärdet, inte
+         * nolla ut det.
+         */
+        @Test
+        @DisplayName("ska bevara ett omatchat fritextvärde vid en oförändrad sparning i dropdown-läge")
+        void skaBevaraOmatchatFritextvärdeVidOförändradSparning() throws Exception {
+            Wine existing = BAROLO.toBuilder().ownRating("Fantastiskt, dricka nu!").build();
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(existing));
+
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(user("testperson")).with(csrf())
+                            .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1")
+                            .param("price", "199.00")
+                            .param("ownRating", "Fantastiskt, dricka nu!"))
+                    .andExpect(status().is3xxRedirection());
+
+            verify(wineService).save(existing.toBuilder()
+                    .price(new BigDecimal("199.00"))
+                    .ownRating("Fantastiskt, dricka nu!")
+                    .build());
+        }
     }
 
     @Nested
