@@ -301,10 +301,13 @@
            Inköpsdatum hamnar under bilden, Pris under textblocket,
            Varför köpt under Munskänkarna och Plats under Eget betyg.
            Munskänkarna/Eget betyg-kolumnerna är fasta 18rem (inte fr) -
-           de måste alltid rymma det längsta möjliga betygsvärdet (någon
+           tänkt att rymma det längsta möjliga FASTA betygsvärdet (någon
            av de 29 Rating-etiketterna, längst är t.ex. "12,5 (12 - 14,5
            Bra till mycket bra vin)"), oavsett vilket av de två fälten
-           som råkar ha ett långt värde - därför kräver den här vyn också
+           som råkar ha ett långt värde. Eget betyg är sedan WINE-50 fri
+           text (se Wine.java) och kan alltså bli längre än så - bredden
+           är inte justerad för det fallet, ett medvetet avstått
+           finjusteringsbehov snarare än en bugg - därför kräver den här vyn också
            sidans breddökning till 70rem och den höjda brytpunkten ovan.
            Varje fält i info-/text-raderna har ett explicit grid-column
            (inte auto-placering) - annars skulle t.ex. Pris hoppa in i
@@ -622,7 +625,7 @@
                     </div>
                     <div class="vk-egetbetyg" th:if="${vin.ownRating != null}">
                         <span class="vk-label">Eget betyg</span>
-                        <span class="vk-value" th:text="${vin.ownRating.label()}"></span>
+                        <span class="vk-value" th:text="${vin.ownRating}"></span>
                     </div>
                 </div>
 
@@ -704,7 +707,7 @@
                     </div>
                 </div>
                 <div class="vinkort-betyg">
-                    <p th:if="${vin.ownRating != null}"><span class="betyg-label">Eget betyg</span><span class="betyg-varde" th:text="${vin.ownRating.label()}"></span></p>
+                    <p th:if="${vin.ownRating != null}"><span class="betyg-label">Eget betyg</span><span class="betyg-varde" th:text="${vin.ownRating}"></span></p>
                     <p th:if="${vin.munskankarnaRating != null}"><span class="betyg-label">Munskänkarna</span><span class="betyg-varde" th:text="${vin.munskankarnaRating.label()}"></span></p>
                     <p th:if="${vin.vivinoRating != null}"><span class="betyg-label">Vivino</span><span class="betyg-varde" th:text="${vin.vivinoRating}"></span></p>
                 </div>

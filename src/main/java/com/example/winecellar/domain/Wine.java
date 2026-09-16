@@ -26,6 +26,15 @@ import java.time.LocalDate;
  * representera "inget värde ännu") - `quantity` är sedan ADR 0016
  * MEDVETET primitiv `int` igen, av samma skäl i motsatt riktning: det
  * fältet ska inte längre kunna representera "inget värde".
+ *
+ * `ownRating` är sedan WINE-50 ren fritext (`String`), INTE `Rating` -
+ * till skillnad från `munskankarnaRating`, som är oförändrat kvar som ett
+ * slutet `Rating`-betyg. En användare kan i Inställningar välja att fylla
+ * i "Eget betyg" via en dropdown med munskänkarnas 29 etiketter i stället
+ * för fritt, men oavsett vilket sparas alltid bara den valda/skrivna
+ * textsträngen rakt av (se `User.ownRatingFromScale`/`WineController`) -
+ * `Rating`-enumet används alltså bara för att FYLLA I fältet i det läget,
+ * aldrig för att TOLKA/VALIDERA det som sparas.
  */
 public record Wine(
         WineId id,
@@ -52,7 +61,7 @@ public record Wine(
         int quantity,
         String purchaseReason,
         String tastingNotes,
-        Rating ownRating,
+        String ownRating,
         String systembolagetProductNumber,
         String systembolagetDescription,
         String munskankarnaReview,
@@ -145,7 +154,7 @@ public record Wine(
         private int quantity;
         private String purchaseReason;
         private String tastingNotes;
-        private Rating ownRating;
+        private String ownRating;
         private String systembolagetProductNumber;
         private String systembolagetDescription;
         private String munskankarnaReview;
@@ -231,7 +240,7 @@ public record Wine(
             return this;
         }
 
-        public Builder ownRating(Rating ownRating) {
+        public Builder ownRating(String ownRating) {
             this.ownRating = ownRating;
             return this;
         }

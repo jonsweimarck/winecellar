@@ -66,8 +66,19 @@ public class WineEntity {
     @Column(columnDefinition = "text")
     private String tastingNotes;
 
-    @Enumerated(EnumType.STRING)
-    private Rating ownRating;
+    /**
+     * WINE-50: fritext, INTE en `Rating`-enum längre (till skillnad från
+     * `munskankarnaRating` nedan, som är oförändrat) - se Wine.java för
+     * varför. `columnDefinition = "text"` matchar samma mönster som
+     * övriga fria textfält på entiteten (region/grapes/tastingNotes m.fl.)
+     * - kolumnen var tidigare `varchar(255)` (Hibernates
+     * `@Enumerated(STRING)`-default utan `columnDefinition`), breddad till
+     * `text` av samma engångsmigrering som tar bort CHECK-constrainten
+     * och konverterar redan lagrade korta konstantnamn (t.ex. "R16") till
+     * sina fulla etiketter (se schema.sql/db/migrations).
+     */
+    @Column(columnDefinition = "text")
+    private String ownRating;
 
     private String systembolagetProductNumber;
 
@@ -233,11 +244,11 @@ public class WineEntity {
         this.tastingNotes = tastingNotes;
     }
 
-    Rating getOwnRating() {
+    String getOwnRating() {
         return ownRating;
     }
 
-    void setOwnRating(Rating ownRating) {
+    void setOwnRating(String ownRating) {
         this.ownRating = ownRating;
     }
 

@@ -122,9 +122,34 @@ dem:
   uppslagstabell - 29 fasta strängar är overengineering att normalisera
   bort. `Rating` har korta konstantnamn (`R16`, `R14_5`) som är det
   Postgres faktiskt lagrar, med den fulla svenska etiketten som ett
-  separat `label`-fält. `Rating.fraEtikett(text)` normaliserar
+  separat `label`-fält. `Rating.fromLabel(text)` normaliserar
   mellanslag innan matchning (källfilen har inkonsekvent dubbla
-  mellanslag i några rader).
+  mellanslag i några rader). **Gäller sedan WINE-50 bara
+  `munskankarnaRating`** (Munskänkarnas egen bedömning av vinet) -
+  `Wine.ownRating` (det egna, personliga betyget) är i stället ren
+  fritext (`String`, ingen `CHECK`-constraint), se nästa punkt.
+- **`Wine.ownRating` är fri text (WINE-50), `munskankarnaRating` är
+  OFÖRÄNDRAT en sluten `Rating`-skala.** En användare kan i
+  Inställningar ("Välj eget betyg från munskänkarnas betygsskala",
+  `User.ownRatingFromScale`, default avmarkerad/fritext för både nya och
+  redan existerande konton) välja att fylla i "Eget betyg" via en
+  dropdown med munskänkarnas 29 etiketter i stället för att skriva fritt
+  - men **oavsett vilket sparas alltid bara den valda/skrivna
+  textsträngen rakt av**, aldrig `Rating`-enumets korta konstantnamn.
+  Inställningen styr bara vilket FORMULÄRELEMENT `vin-formular.html`
+  renderar (`WineController.currentOwnRatingFromScale`/
+  `CurrentUser.ownRatingFromScale`) - den påverkar aldrig hur ett
+  inskickat värde tolkas eller sparas. Excel-import/export (kolumn N)
+  läser/skriver `own_rating` som ren text, utan validering mot de 29
+  kända etiketterna (till skillnad från "Munskänkarnas betyg",
+  fortfarande validerat via `Rating.fromLabel`). En engångsmigrering
+  (`db/migrations/2026-09-16-own-rating-to-freetext.sql`, speglad i
+  `schema.sql` för nya databaser) konverterar redan lagrade korta
+  konstantnamn (`"R16"`) till sina fulla etiketter och släpper
+  CHECK-constrainten INNAN kolumnen breddas - `own_rating` ingår inte i
+  `search_vector`-uttrycket, verifierat explicit (inte antaget) innan
+  migreringen skrevs, så den kända "cannot alter type of a column used
+  by a generated column"-fällan (se Kända fällor) gäller inte här.
 - **`WineService` har en enda `save`-metod**, inte separata
   `addWine`/`updateWine` - ingen skillnad i validering/sidoeffekter
   mellan att skapa och uppdatera.
@@ -152,7 +177,15 @@ dem:
   betygsordning), inte etikettens bokstavsordning -
   `Comparator.comparing(Rating::ordinal).reversed()` är "stigande" för
   ett betygsfält. Se `docs/devlog.md` för de Gherkin-scenarier som
-  ursprungligen avslöjade båda varianterna av felet.
+  ursprungligen avslöjade båda varianterna av felet. **Gäller sedan
+  WINE-50 bara `MUNSKANKARNA_RATING`** - `OWN_RATING` blev fri text (se
+  ovan) och har ingen betygsordning kvar att sortera efter.
+  `SortField.OWN_RATING` sorterar PROVISORISKT skiftlägesokänsligt
+  alfabetiskt (samma mönster som NAME/PRODUCER/COUNTRY) - en öppen fråga
+  flaggad till arkitekten i WINE-50-PR:en (alfabetiskt kontra ett försök
+  att tolka texten som ett känt Rating-namn med fallback, kontra att ta
+  bort fältet ur sorteringsalternativen helt) som ännu inte fått ett
+  slutgiltigt svar. Uppdatera den här noten när frågan är besvarad.
 - **Chips är vanliga `<a href>`, inte htmx** - se
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md). En borttagning
   måste uppdatera hela verktygsraden (kryssrutor, sökfält), inte bara
@@ -520,6 +553,16 @@ AVVIKER från användarens sparade default - annars hade badgen alltid
 visat minst 1 för varje inloggad användare, även utan något aktivt val
 i den aktuella sessionen.
 
+**`User.ownRatingFromScale` (WINE-50)** styr om `vin-formular.html`
+erbjuder "Eget betyg" som ett fritextfält (default, avmarkerad, för både
+nya och redan existerande konton) eller en dropdown med munskänkarnas 29
+etiketter - redigerbart i Inställningar (`SettingsController`/
+`installningar.html`, `POST /installningar/eget-betyg-skala`). Samma
+NULLABLE-i-Java/NOT NULL-i-SQL-mönster som `defaultMinQuantityFilter`
+ovan (kolumnen `users.own_rating_from_scale` skärps till NOT NULL
+DEFAULT false i `schema.sql`). Se "Domänmodell - nuläge" ovan för varför
+inställningen bara styr FORMULÄRET, inte vad som faktiskt sparas.
+
 Den fulla migreringsresan (Fas 1, WINE-9 till WINE-18: datamodell,
 formulärinloggning, registrering, scopead vinlista, borttagning av
 ADMIN/READONLY, produktionsmigrering av ~30 befintliga viner) finns i
@@ -537,6 +580,10 @@ Webbaserad (Fas 2), inte längre ett fristående CLI-verktyg - det gamla
 är borttaget. `WineRowParser`/`WineRowWriter`/`ImageMatcher` lever kvar
 i `infrastructure/excel/`.
 
+- **"Eget betyg" (kolumn N) är sedan WINE-50 fri text** - läses/skrivs
+  rakt av, utan validering mot de 29 kända etiketterna. "Munskänkarnas
+  betyg" (kolumn R) är oförändrat validerat mot dem (`Rating.fromLabel`,
+  kastar ett tydligt fel annars).
 - **Export:** `GET /export/xlsx` (den inloggade användarens egna viner,
   sorterade på namn) och `GET /export/bilder.zip` (en fil per vin med
   bild, namngiven enligt bildnamnskonventionen nedan). Exporten är

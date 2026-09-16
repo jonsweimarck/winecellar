@@ -18,13 +18,21 @@ import java.time.Instant;
  * "minst 1", dvs. utdruckna viner (antal 0) döljs som standard, utan att
  * kräva ett obekvämt negativt värde för att visa dem igen (sätt filtret
  * till 0 för det).
+ *
+ * `ownRatingFromScale` (WINE-50) styr hur vinformuläret låter användaren
+ * fylla i "Eget betyg" - avmarkerad (default för nya konton, se
+ * RegistrationService) ger ett fritextfält, ikryssad ger en dropdown med
+ * munskänkarnas 29 fasta etiketter. Oavsett vilket sparas alltid bara den
+ * rena textsträngen i `Wine.ownRating()` - inställningen styr bara
+ * FORMULÄRET, inte vad som faktiskt lagras (se Wine.java).
  */
 public record User(
         UserId id,
         String username,
         String hashedPassword,
         Instant createdAt,
-        int defaultMinQuantityFilter
+        int defaultMinQuantityFilter,
+        boolean ownRatingFromScale
 ) {
 
     public record UserId(Long value) {

@@ -64,7 +64,7 @@ class ChatControllerTest {
 
     private void inloggadAnvändareFinns() {
         when(userRepository.findByUsername("testperson"))
-                .thenReturn(Optional.of(new User(ÄGARE, "testperson", "hash", Instant.now(), 1)));
+                .thenReturn(Optional.of(new User(ÄGARE, "testperson", "hash", Instant.now(), 1, false)));
     }
 
     @Test

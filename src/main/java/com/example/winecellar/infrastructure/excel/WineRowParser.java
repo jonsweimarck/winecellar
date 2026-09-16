@@ -41,6 +41,10 @@ import java.util.regex.Pattern;
  * **Namn och antal flaskor är obligatoriska** (se ADR 0016) - samma regel
  * som webb-UI:t använder. Alla övriga fält, inklusive vintyp/land/producent
  * som tidigare krävdes, tolkas som valfria och blir `null` om cellen är tom.
+ *
+ * **"Eget betyg" (kolumn N) är sedan WINE-50 fri text** - läses rakt av,
+ * utan validering mot de 29 kända betygen (till skillnad från
+ * "Munskänkarnas betyg", som fortfarande måste matcha exakt ett av dem).
  */
 public final class WineRowParser {
 
@@ -113,7 +117,7 @@ public final class WineRowParser {
                 .quantity(quantity)
                 .purchaseReason(text(row, COL_PURCHASE_REASON))
                 .tastingNotes(text(row, COL_TASTING_NOTES))
-                .ownRating(rating(row, COL_OWN_RATING, row.getRowNum() + 1, "eget betyg"))
+                .ownRating(text(row, COL_OWN_RATING))
                 .systembolagetProductNumber(text(row, COL_SYSTEMBOLAGET_PRODUCT_NUMBER))
                 .systembolagetDescription(text(row, COL_SYSTEMBOLAGET))
                 .munskankarnaReview(text(row, COL_MUNSKANKARNA_REVIEW))

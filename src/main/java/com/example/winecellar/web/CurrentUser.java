@@ -53,4 +53,17 @@ final class CurrentUser {
                 .map(User::defaultMinQuantityFilter)
                 .orElse(1);
     }
+
+    /**
+     * WINE-50: styr om vinformuläret visar "Eget betyg" som en dropdown
+     * (munskänkarnas 29 etiketter) eller ett fritextfält - `false` (samma
+     * default som ett nytt konto får, se RegistrationService) om
+     * användaren av någon anledning inte skulle hittas, samma ofarliga
+     * skyddsnät som `defaultMinQuantityFilter` ovan.
+     */
+    static boolean ownRatingFromScale(Authentication authentication, UserRepository userRepository) {
+        return userRepository.findByUsername(authentication.getName())
+                .map(User::ownRatingFromScale)
+                .orElse(false);
+    }
 }

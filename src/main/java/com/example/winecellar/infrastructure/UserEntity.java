@@ -41,6 +41,17 @@ public class UserEntity {
     @Column(name = "default_min_quantity_filter")
     private Integer defaultMinQuantityFilter;
 
+    /**
+     * WINE-50: styr om vinformuläret erbjuder "Eget betyg" som en dropdown
+     * (munskänkarnas 29 etiketter) eller ett fritextfält. Medvetet UTAN
+     * `nullable = false`, samma mönster/skäl som
+     * `defaultMinQuantityFilter` ovan - kolumnen skärps till NOT NULL
+     * (DEFAULT false, engångsbackfill av redan existerande användare) i
+     * schema.sql i stället.
+     */
+    @Column(name = "own_rating_from_scale")
+    private Boolean ownRatingFromScale;
+
     protected UserEntity() {
     }
 
@@ -82,5 +93,13 @@ public class UserEntity {
 
     void setDefaultMinQuantityFilter(Integer defaultMinQuantityFilter) {
         this.defaultMinQuantityFilter = defaultMinQuantityFilter;
+    }
+
+    Boolean getOwnRatingFromScale() {
+        return ownRatingFromScale;
+    }
+
+    void setOwnRatingFromScale(Boolean ownRatingFromScale) {
+        this.ownRatingFromScale = ownRatingFromScale;
     }
 }

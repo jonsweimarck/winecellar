@@ -148,3 +148,76 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS default_min_quantity_filter integer;;
 UPDATE users SET default_min_quantity_filter = 1 WHERE default_min_quantity_filter IS NULL;;
 ALTER TABLE users ALTER COLUMN default_min_quantity_filter SET DEFAULT 1;;
 ALTER TABLE users ALTER COLUMN default_min_quantity_filter SET NOT NULL;;
+
+-- WINE-50: "Eget betyg" (own_rating) blir fritext i stället för en sluten
+-- betygsskala - munskankarna_rating är HELT OFÖRÄNDRAT (fortsatt
+-- Rating-enum + CHECK). own_rating ingår inte i search_vector-uttrycket
+-- ovan, så den här ändringen kan inte trigga sagan om ALTER mot en
+-- kolumn en genererad kolumn beror på (se CLAUDE.md) - verifierat
+-- explicit innan den här migreringen skrevs, inte antaget.
+--
+-- Konverterar först redan lagrade korta konstantnamn (t.ex. "R16") till
+-- sina fulla svenska etiketter - annars hade befintliga viner plötsligt
+-- visat en rå enum-konstant i UI:t efter att CHECK-constrainten och
+-- Java-typen ändrats. CASE-satsen är självläkande/idempotent: en rad vars
+-- own_rating redan är en full etikett (eller ett fritextvärde, eller
+-- NULL) matchar ingen av grenarna och lämnas orörd av ELSE own_rating,
+-- så satsen kan köras om vid varje appstart utan att skada redan
+-- konverterad eller ny fritextdata - samma "konvergera mot filens
+-- definition"-princip som resten av den här filen.
+UPDATE wines SET own_rating = CASE own_rating
+    WHEN 'R20' THEN '20 (18 - 20 Exceptionellt vin)'
+    WHEN 'R19_5' THEN '19,5 (18 - 20 Exceptionellt vin)'
+    WHEN 'R19' THEN '19 (18 - 20 Exceptionellt vin)'
+    WHEN 'R18_5' THEN '18,5 (18 - 20 Exceptionellt vin)'
+    WHEN 'R18' THEN '18 (18 - 20 Exceptionellt vin)'
+    WHEN 'R17_5' THEN '17,5 (15 - 17,5 Högklassigt vin)'
+    WHEN 'R17' THEN '17 (15 - 17,5 Högklassigt vin)'
+    WHEN 'R16_5' THEN '16,5 (15 - 17,5 Högklassigt vin)'
+    WHEN 'R16' THEN '16 (15 - 17,5 Högklassigt vin)'
+    WHEN 'R15_5' THEN '15,5 (15 - 17,5 Högklassigt vin)'
+    WHEN 'R15' THEN '15 (15 - 17,5 Högklassigt vin)'
+    WHEN 'R14_5' THEN '14,5 (12 - 14,5 Bra till mycket bra vin)'
+    WHEN 'R14' THEN '14 (12 - 14,5 Bra till mycket bra vin)'
+    WHEN 'R13_5' THEN '13,5 (12 - 14,5 Bra till mycket bra vin)'
+    WHEN 'R13' THEN '13 (12 - 14,5 Bra till mycket bra vin)'
+    WHEN 'R12_5' THEN '12,5 (12 - 14,5 Bra till mycket bra vin)'
+    WHEN 'R12' THEN '12 (12 - 14,5 Bra till mycket bra vin)'
+    WHEN 'R11_5' THEN '11,5 (9 - 11,5 Medelbra vin)'
+    WHEN 'R11' THEN '11 (9 - 11,5 Medelbra vin)'
+    WHEN 'R10_5' THEN '10,5 (9 - 11,5 Medelbra vin)'
+    WHEN 'R10' THEN '10 (9 - 11,5 Medelbra vin)'
+    WHEN 'R9_5' THEN '9,5 (9 - 11,5 Medelbra vin)'
+    WHEN 'R9' THEN '9 (9 - 11,5 Medelbra vin)'
+    WHEN 'R8_5' THEN '8,5 (6 - 8,5 Enkel vin)'
+    WHEN 'R8' THEN '8 (6 - 8,5 Enkel vin)'
+    WHEN 'R7_5' THEN '7,5 (6 - 8,5 Enkel vin)'
+    WHEN 'R7' THEN '7 (6 - 8,5 Enkel vin)'
+    WHEN 'R6_5' THEN '6,5 (6 - 8,5 Enkel vin)'
+    WHEN 'R6' THEN '6 (6 - 8,5 Enkel vin)'
+    ELSE own_rating
+END
+WHERE own_rating IS NOT NULL;;
+
+-- Constraintnamnet är Hibernates egen genererade konvention för
+-- @Enumerated(EnumType.STRING) (verifierat mot en riktig lokal databas
+-- innan den här migreringen skrevs, inte antaget) - DROP CONSTRAINT IF
+-- EXISTS är ett ofarligt no-op vid upprepad körning eller mot en
+-- databas som redan konverterats. Kolumnen breddas samtidigt från
+-- varchar(255) (samma Hibernate-default som gav wine_type/
+-- munskankarna_rating sin bredd) till text, samma mönster som
+-- 2026-07-25-widen-text-columns-directly.sql - fri text ska inte vara
+-- begränsad till 255 tecken. ALTER COLUMN ... TYPE text är ett ofarligt
+-- no-op om kolumnen redan är text.
+ALTER TABLE wines DROP CONSTRAINT IF EXISTS wines_own_rating_check;;
+ALTER TABLE wines ALTER COLUMN own_rating TYPE text;;
+
+-- Vinformulärets val mellan dropdown (munskänkarnas 29 etiketter) och
+-- fritextfält för "Eget betyg" - sparat per användare, samma NULLABLE-i-
+-- Java/NOT NULL-i-SQL-mönster som default_min_quantity_filter ovan.
+-- Default false (fritext) för både nya konton (RegistrationService) och
+-- redan existerande konton (som aldrig aktivt valt något).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS own_rating_from_scale boolean;;
+UPDATE users SET own_rating_from_scale = false WHERE own_rating_from_scale IS NULL;;
+ALTER TABLE users ALTER COLUMN own_rating_from_scale SET DEFAULT false;;
+ALTER TABLE users ALTER COLUMN own_rating_from_scale SET NOT NULL;;

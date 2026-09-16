@@ -41,7 +41,12 @@ class WineRowWriterTest {
                 .quantity(3)
                 .purchaseReason("Prisvärt enligt munskänkarna")
                 .tastingNotes("Ljusröd, doft av jordgubbe.")
-                .ownRating(Rating.R16)
+                // WINE-50: fri text, inte längre begränsad till Rating - ett
+                // värde som medvetet INTE matchar någon av munskänkarnas 29
+                // etiketter verifierar bäst att roundtrippen är textbaserad,
+                // inte enum-baserad (till skillnad från munskankarnaRating
+                // nedan, oförändrat).
+                .ownRating("Fantastiskt, dricka nu!")
                 .systembolagetProductNumber("9363301")
                 .systembolagetDescription("Nyanserad, kryddig smak.")
                 .munskankarnaReview("Mer än prisvärt")

@@ -68,7 +68,7 @@ class WineRowParserTest {
         assertThat(wine.quantity()).isEqualTo(3);
         assertThat(wine.purchaseReason()).isEqualTo("Prisvärt enligt munskänkarna");
         assertThat(wine.tastingNotes()).isEqualTo("Ljusröd, doft av jordgubbe.");
-        assertThat(wine.ownRating()).isEqualTo(Rating.R16);
+        assertThat(wine.ownRating()).isEqualTo("16 (15 - 17,5 Högklassigt vin)");
         assertThat(wine.systembolagetProductNumber()).isEqualTo("9363301");
         assertThat(wine.systembolagetDescription()).isEqualTo("Nyanserad, kryddig smak.");
         assertThat(wine.munskankarnaReview()).isEqualTo("Mer än prisvärt\n\nNågot återhållen doft.");
@@ -161,15 +161,37 @@ class WineRowParserTest {
         assertThat(wine.quantity()).isEqualTo(1);
     }
 
+    /**
+     * WINE-50: "Munskänkarnas betyg" (kolumn 17, till skillnad från "Eget
+     * betyg" i kolumn 13) är oförändrat en sluten betygsskala som
+     * fortfarande normaliserar mellanslag - det här testet flyttades hit
+     * från kolumn 13, som inte längre validerar/normaliserar något (se
+     * skaLäsaEgetBetygSomFriTextUtanValidering nedan).
+     */
     @Test
-    void skaMatchaBetygMedDubblaMellanslagIKällfilen() {
+    void skaMatchaMunskänkarnasBetygMedDubblaMellanslagIKällfilen() {
         Row row = minimalRow();
         // Källfilens rad för 8,5 har dubbla mellanslag: "8,5  (6 - 8,5  Enkel vin)".
-        writeCell(row, 13, "8,5  (6 - 8,5  Enkel vin)");
+        writeCell(row, 17, "8,5  (6 - 8,5  Enkel vin)");
 
         Wine wine = parser.parse(row);
 
-        assertThat(wine.ownRating()).isEqualTo(Rating.R8_5);
+        assertThat(wine.munskankarnaRating()).isEqualTo(Rating.R8_5);
+    }
+
+    /**
+     * WINE-50: "Eget betyg" är fri text sedan denna story - till skillnad
+     * från "Munskänkarnas betyg" (se ovan/nedan) läses kolumnen rakt av,
+     * utan normalisering eller validering mot de 29 kända betygen.
+     */
+    @Test
+    void skaLäsaEgetBetygSomFriTextUtanValidering() {
+        Row row = minimalRow();
+        writeCell(row, 13, "999 (påhittat betyg, inte alls i skalan)");
+
+        Wine wine = parser.parse(row);
+
+        assertThat(wine.ownRating()).isEqualTo("999 (påhittat betyg, inte alls i skalan)");
     }
 
     @Test
@@ -195,13 +217,13 @@ class WineRowParserTest {
     }
 
     @Test
-    void skaKastaTydligtFelOmBetygetInteMatcharNågotAvDe29Kända() {
+    void skaKastaTydligtFelOmMunskänkarnasBetygInteMatcharNågotAvDe29Kända() {
         Row row = minimalRow();
-        writeCell(row, 13, "999 (påhittat betyg)");
+        writeCell(row, 17, "999 (påhittat betyg)");
 
         assertThatThrownBy(() -> parser.parse(row))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("eget betyg");
+                .hasMessageContaining("munskänkarna-betyg");
     }
 
     private Row minimalRow() {

@@ -98,7 +98,7 @@ class ExportControllerTest {
     @BeforeEach
     void stubbaInloggadAnvändare() {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false)));
     }
 
     /**

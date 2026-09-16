@@ -27,7 +27,8 @@ public class RegistrationService {
         if (userRepository.findByUsername(username).isPresent()) {
             return new RegistrationResult.UsernameTaken();
         }
-        User user = userRepository.save(new User(null, username, passwordEncoder.encode(password), Instant.now(), 1));
+        User user = userRepository.save(
+                new User(null, username, passwordEncoder.encode(password), Instant.now(), 1, false));
         return new RegistrationResult.Registered(user);
     }
 }

@@ -27,6 +27,10 @@ import java.util.Map;
  * export) - samma flikamn/rubrikrad som den tidigare CLI-exporten
  * (`ExportExcel`, borttagen i WINE-20) skrev, flyttade hit eftersom de
  * hör till samma delade kolumnlayout som resten av klassen.
+ *
+ * "Eget betyg" (kolumn N) skrivs sedan WINE-50 rakt av som text - `Wine`
+ * har inte längre en `Rating` för det fältet (till skillnad från
+ * "Munskänkarnas betyg", oförändrat).
  */
 public final class WineRowWriter {
 
@@ -66,7 +70,7 @@ public final class WineRowWriter {
         integer(row, WineRowParser.COL_QUANTITY, wine.quantity());
         text(row, WineRowParser.COL_PURCHASE_REASON, wine.purchaseReason());
         text(row, WineRowParser.COL_TASTING_NOTES, wine.tastingNotes());
-        text(row, WineRowParser.COL_OWN_RATING, wine.ownRating() == null ? null : wine.ownRating().label());
+        text(row, WineRowParser.COL_OWN_RATING, wine.ownRating());
         text(row, WineRowParser.COL_SYSTEMBOLAGET_PRODUCT_NUMBER, wine.systembolagetProductNumber());
         text(row, WineRowParser.COL_SYSTEMBOLAGET, wine.systembolagetDescription());
         text(row, WineRowParser.COL_MUNSKANKARNA_REVIEW, wine.munskankarnaReview());

@@ -221,7 +221,7 @@ class WineControllerTest {
         @BeforeEach
         void stubbaTestanvändare() {
             User testAnvändare = new User(
-                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0);
+                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false);
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
         }
 
@@ -402,7 +402,7 @@ class WineControllerTest {
                 @BeforeEach
                 void stubbaTestanvändare() {
                     User testAnvändare = new User(
-                            new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0);
+                            new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false);
                     when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
                 }
 
@@ -554,7 +554,7 @@ class WineControllerTest {
                     .region("Piemonte").subregion("Langhe").grapes("Nebbiolo")
                     .purchaseDate(LocalDate.of(2024, 3, 15)).price(new BigDecimal("450.00"))
                     .purchaseReason("Rekommenderat").tastingNotes("Kraftfullt")
-                    .ownRating(Rating.R16)
+                    .ownRating(Rating.R16.label())
                     .systembolagetProductNumber("12345").systembolagetDescription("Beskrivning")
                     .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
                     .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
@@ -611,7 +611,7 @@ class WineControllerTest {
             Wine barolo = BAROLO.toBuilder()
                     .purchaseReason("Rekommenderat")
                     .tastingNotes("Kraftfullt")
-                    .ownRating(Rating.R16)
+                    .ownRating(Rating.R16.label())
                     .build();
             when(wineService.search(any(), any())).thenReturn(List.of(barolo));
 
@@ -646,7 +646,7 @@ class WineControllerTest {
                     .region("Piemonte").subregion("Langhe").grapes("Nebbiolo")
                     .purchaseDate(LocalDate.of(2024, 3, 15)).price(new BigDecimal("450.00"))
                     .purchaseReason("Rekommenderat").tastingNotes("Kraftfullt")
-                    .ownRating(Rating.R16)
+                    .ownRating(Rating.R16.label())
                     .systembolagetProductNumber("12345").systembolagetDescription("Beskrivning")
                     .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
                     .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")
@@ -919,7 +919,7 @@ class WineControllerTest {
         void skaAnvändaSparadDefaultFörMinQuantity() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
 
             mockMvc.perform(get("/").with(user("testperson")).with(csrf()))
                     .andExpect(status().isOk())
@@ -937,7 +937,7 @@ class WineControllerTest {
         void skaLåtaExplicitMinQuantityÅsidosättaSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -963,7 +963,7 @@ class WineControllerTest {
         void skaFallaTillbakaPåSparadDefaultFörOparsbartMinQuantity() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -987,7 +987,7 @@ class WineControllerTest {
         void skaInteVisaBadgeNärMinQuantityMotsvararSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
 
             mockMvc.perform(get("/").with(user("testperson")).with(csrf()))
                     .andExpect(status().isOk())
@@ -999,7 +999,7 @@ class WineControllerTest {
         void skaVisaBadgeNärMinQuantityAvvikerFrånSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -1170,6 +1170,82 @@ class WineControllerTest {
             mockMvc.perform(get("/wines/nytt").with(user("admin").roles("ADMIN")).with(csrf()))
                     .andExpect(status().isOk())
                     .andExpect(content().string(not(containsString("id=\"oppna-radera-dialog\""))));
+        }
+    }
+
+    /**
+     * WINE-50: vin-formular.html visar "Eget betyg" antingen som ett
+     * fritextfält eller som en dropdown med munskänkarnas 29 etiketter,
+     * beroende på den inloggade användarens sparade inställning
+     * (User.ownRatingFromScale) - default (ingen stubbad användare i
+     * userRepository-mocken, samma som en oregistrerad/okänd inloggning)
+     * är fritext, precis som ett nytt konto får (se RegistrationService).
+     * "Munskänkarnas betyg" är oförändrat alltid en dropdown, oavsett
+     * inställningen - testas inte här (redan täckt av övriga tester i den
+     * här klassen).
+     */
+    @Nested
+    @DisplayName("Eget betyg - fritext kontra dropdown beroende på kontots inställning")
+    class EgetBetygFritextKontraDropdown {
+
+        @Test
+        @DisplayName("ska visa ett fritextfält som standard (ingen sparad inställning)")
+        void skaVisaFritextfältSomStandard() throws Exception {
+            mockMvc.perform(get("/wines/nytt").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("<input type=\"text\" name=\"ownRating\""),
+                            not(containsString("<select name=\"ownRating\""))
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska visa en dropdown med munskänkarnas etiketter när inställningen är påslagen")
+        void skaVisaDropdownNärInställningenÄrPåslagen() throws Exception {
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+
+            mockMvc.perform(get("/wines/nytt").with(user("testperson")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("<select name=\"ownRating\""),
+                            not(containsString("<input type=\"text\" name=\"ownRating\"")),
+                            // Alternativets VÄRDE är etiketten själv, inte Rating-
+                            // konstantens korta namn - annars hade "R16" sparats
+                            // rakt av i stället för den fulla texten (se
+                            // WineController.applyFormFields). Kan INTE kolla
+                            // frånvaro av "value=\"R16\"" i hela sidan - den
+                            // oförändrade munskankarnaRating-dropdownen använder
+                            // fortfarande just Rating-konstantens korta namn som
+                            // värde, helt legitimt för det fältet.
+                            containsString("value=\"" + Rating.R16.label() + "\"")
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska förvälja det sparade värdet i dropdownen när det matchar en av munskänkarnas etiketter")
+        void skaFörväljaSparatVärdeIDropdown() throws Exception {
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+            when(wineService.findById(eq(new WineId(1L)), any()))
+                    .thenReturn(Optional.of(BAROLO.toBuilder().ownRating(Rating.R16.label()).build()));
+
+            mockMvc.perform(get("/wines/1/redigera").with(user("testperson")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(
+                            containsString("value=\"" + Rating.R16.label() + "\" selected")));
+        }
+
+        @Test
+        @DisplayName("ska visa det sparade fritextvärdet i textfältet när inställningen är avslagen")
+        void skaVisaSparatFritextvärdeITextfältet() throws Exception {
+            when(wineService.findById(eq(new WineId(1L)), any()))
+                    .thenReturn(Optional.of(BAROLO.toBuilder().ownRating("Riktigt bra, dricka nu").build()));
+
+            mockMvc.perform(get("/wines/1/redigera").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(
+                            containsString("<input type=\"text\" name=\"ownRating\" value=\"Riktigt bra, dricka nu\"")));
         }
     }
 
@@ -1531,6 +1607,11 @@ class WineControllerTest {
     @DisplayName("när ett vin redigeras")
     class NärEttVinRedigeras {
 
+        /**
+         * WINE-50: "ownRating" postas som fri text och sparas rakt av,
+         * utan tolkning mot Rating (till skillnad från
+         * "munskankarnaRating" nedan, oförändrat).
+         */
         @Test
         @DisplayName("ska alla fält skickas till WineService och sidan omdirigera till startsidan")
         void skaAllaFältSkickasTillServiceOchOmdirigera() throws Exception {
@@ -1551,7 +1632,7 @@ class WineControllerTest {
                             .param("quantity", "3")
                             .param("purchaseReason", "Rekommenderat")
                             .param("tastingNotes", "Kraftfullt")
-                            .param("ownRating", "R16")
+                            .param("ownRating", "Mycket bra, men lite ungt just nu")
                             .param("systembolagetProductNumber", "12345")
                             .param("systembolagetDescription", "Beskrivning")
                             .param("munskankarnaReview", "Recension")
@@ -1566,7 +1647,7 @@ class WineControllerTest {
                     .region("Piemonte").subregion("Langhe").grapes("Nebbiolo")
                     .purchaseDate(LocalDate.of(2024, 3, 15)).price(new BigDecimal("450.00"))
                     .purchaseReason("Rekommenderat").tastingNotes("Kraftfullt")
-                    .ownRating(Rating.R16)
+                    .ownRating("Mycket bra, men lite ungt just nu")
                     .systembolagetProductNumber("12345").systembolagetDescription("Beskrivning")
                     .munskankarnaReview("Recension").munskankarnaRating(Rating.R14_5)
                     .vivinoRating(new BigDecimal("4.1")).otherReference("https://example.com")

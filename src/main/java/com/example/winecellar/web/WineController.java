@@ -282,10 +282,21 @@ public class WineController {
     }
 
     @GetMapping("/wines/nytt")
-    public String newWineForm(Model model) {
+    public String newWineForm(Model model, Authentication authentication) {
         model.addAttribute("wine", emptyDraft());
         model.addAttribute("ratings", Rating.values());
+        model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
         return "vin-formular";
+    }
+
+    /**
+     * WINE-50: styr om vin-formular.html erbjuder "Eget betyg" som en
+     * dropdown (munskänkarnas 29 etiketter) eller ett fritextfält -
+     * påverkar ALDRIG hur ett inskickat värde tolkas/sparas (se
+     * applyFormFields), bara vad formuläret RENDERAR.
+     */
+    private boolean currentOwnRatingFromScale(Authentication authentication) {
+        return CurrentUser.ownRatingFromScale(authentication, userRepository);
     }
 
     /**
@@ -297,9 +308,11 @@ public class WineController {
      * rutt kopplad till redigeringsformuläret.
      */
     @PostMapping("/wines/tolka-etikett")
-    public String interpretLabel(@RequestParam("bild") MultipartFile image, Model model) throws IOException {
+    public String interpretLabel(
+            @RequestParam("bild") MultipartFile image, Model model, Authentication authentication) throws IOException {
         LabelInterpretationResult result = labelInterpretationService.interpret(image.getBytes(), image.getContentType());
         model.addAttribute("ratings", Rating.values());
+        model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
         if (result instanceof LabelInterpretationResult.Interpreted interpreted) {
             model.addAttribute("wine", interpreted.draft());
             model.addAttribute("interpretedFields", interpreted.interpretedFields());
@@ -381,11 +394,12 @@ public class WineController {
 
         if (!"true".equals(confirmAdd)) {
             DuplicateCheck duplicateCheck = wineService.checkForDuplicate(candidate, owner);
+            boolean ownRatingFromScale = currentOwnRatingFromScale(authentication);
             if (duplicateCheck instanceof DuplicateCheck.FullDuplicate full) {
-                return renderDuplicateWarning(model, candidate, full.existing(), true);
+                return renderDuplicateWarning(model, candidate, full.existing(), true, ownRatingFromScale);
             }
             if (duplicateCheck instanceof DuplicateCheck.PartialDuplicate partial) {
-                return renderDuplicateWarning(model, candidate, partial.existing(), false);
+                return renderDuplicateWarning(model, candidate, partial.existing(), false, ownRatingFromScale);
             }
         }
         wineService.save(candidate);
@@ -401,9 +415,11 @@ public class WineController {
      * dubblett) bekräfta att det ska sparas som ett nytt vin ändå via
      * "confirmAdd"-knappen i vin-formular.html.
      */
-    private static String renderDuplicateWarning(Model model, Wine candidate, Wine existing, boolean fullDuplicate) {
+    private static String renderDuplicateWarning(
+            Model model, Wine candidate, Wine existing, boolean fullDuplicate, boolean ownRatingFromScale) {
         model.addAttribute("wine", candidate);
         model.addAttribute("ratings", Rating.values());
+        model.addAttribute("ownRatingFromScale", ownRatingFromScale);
         model.addAttribute("duplicateExisting", existing);
         model.addAttribute("duplicateIsFull", fullDuplicate);
         return "vin-formular";
@@ -462,6 +478,7 @@ public class WineController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         model.addAttribute("wine", wine);
         model.addAttribute("ratings", Rating.values());
+        model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
         return "vin-formular";
     }
 
@@ -536,6 +553,11 @@ public class WineController {
      * ändå kommer in tomt. Övriga fält tolkas alla till null om blanka,
      * inklusive wineType/vintage/producer/country/location som tidigare
      * krävdes ifyllda.
+     *
+     * `ownRating` (WINE-50) sparas rakt av som text, oavsett om formuläret
+     * visade en dropdown eller ett fritextfält (se
+     * User.ownRatingFromScale/vin-formular.html) - till skillnad från
+     * `munskankarnaRating`, som fortfarande tolkas som ett `Rating`-namn.
      */
     private static Wine.Builder applyFormFields(
             Wine.Builder builder,
@@ -554,7 +576,7 @@ public class WineController {
                 .vintage(parseInteger(vintage)).purchaseDate(parseDate(purchaseDate)).price(parseDecimal(price))
                 .quantity(parseQuantity(quantity))
                 .purchaseReason(blankToNull(purchaseReason)).tastingNotes(blankToNull(tastingNotes))
-                .ownRating(parseRating(ownRating))
+                .ownRating(blankToNull(ownRating))
                 .systembolagetProductNumber(blankToNull(systembolagetProductNumber))
                 .systembolagetDescription(blankToNull(systembolagetDescription))
                 .munskankarnaReview(blankToNull(munskankarnaReview))

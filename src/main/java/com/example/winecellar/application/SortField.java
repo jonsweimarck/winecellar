@@ -57,9 +57,18 @@ public enum SortField {
             return withDirection(Wine::purchaseDate, Comparator.naturalOrder(), direction);
         }
     },
+    /**
+     * WINE-50: `ownRating` blev fri text (ingen `Rating` längre, se
+     * Wine.java) - det finns alltså ingen inbyggd betygsordning kvar att
+     * sortera efter. Sorterar PROVISORISKT alfabetiskt (skiftlägesokänsligt,
+     * samma mönster som NAME/PRODUCER/COUNTRY) tills det är bekräftat om
+     * det är rätt beteende, eller om fältet i stället borde försöka tolka
+     * texten som ett känt Rating-namn med fallback, eller helt tas bort ur
+     * sorteringsalternativen - se ADR-frågan flaggad i PR:en för WINE-50.
+     */
     OWN_RATING("Eget betyg") {
         public Comparator<Wine> comparator(SortDirection direction) {
-            return withDirection(Wine::ownRating, RATING_ASCENDING, direction);
+            return withDirection(Wine::ownRating, String.CASE_INSENSITIVE_ORDER, direction);
         }
     },
     MUNSKANKARNA_RATING("Munskänkarnas betyg") {

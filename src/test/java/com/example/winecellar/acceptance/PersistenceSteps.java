@@ -114,6 +114,17 @@ public class PersistenceSteps {
         wineService.save(StepSupport.wineWithName(name).toBuilder().grapes(druva).owner(ägare).build());
     }
 
+    /**
+     * WINE-50: verifierar mot en RIKTIG Postgres (inte bara
+     * InMemoryWineRepository) att "eget betyg" faktiskt är fri text -
+     * ett värde som inte matchar någon av munskänkarnas 29 etiketter hade
+     * kraschat mot den gamla CHECK-constrainten.
+     */
+    @Givet("att vinet {string} med eget betyg {string} är sparat i källaren")
+    public void attVinetMedEgetBetygÄrSparatIKällaren(String name, String ownRating) {
+        wineService.save(StepSupport.wineWithName(name).toBuilder().ownRating(ownRating).owner(ägare).build());
+    }
+
     @När("applikationen startas om")
     public void applikationenStartasOm() {
         entityManager.clear();
@@ -127,6 +138,11 @@ public class PersistenceSteps {
     @Så("ska vinet {string} fortfarande finnas i källaren")
     public void skaVinetFortfarandeFinnasIKällaren(String name) {
         assertThat(wineService.listWines(null)).anySatisfy(wine -> assertThat(wine.name()).isEqualTo(name));
+    }
+
+    @Så("ska vinet {string} fortfarande ha eget betyg {string}")
+    public void skaVinetFortfarandeHaEgetBetyg(String name, String ownRating) {
+        assertThat(StepSupport.findWine(wineService, name).ownRating()).isEqualTo(ownRating);
     }
 
     @Så("ska vinet {string} finnas i sökresultatet")

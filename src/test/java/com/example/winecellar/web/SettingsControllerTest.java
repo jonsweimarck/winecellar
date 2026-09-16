@@ -69,7 +69,7 @@ class SettingsControllerTest {
     @Test
     void skaVisaSparatStandardvärdeFörAntalFlaskorFilter() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -86,7 +86,7 @@ class SettingsControllerTest {
     @Test
     void skaInteVisaEnSparaKnappFörAntalFlaskorFilter() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -96,7 +96,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaNyttStandardvärdeOchOmdirigeraTillbaka() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -112,7 +112,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaEttOmFältetLämnasTomt() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -133,7 +133,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaEttOmFältetInteGårAttTolkaSomEttTal() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -149,6 +149,79 @@ class SettingsControllerTest {
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(csrf())
                         .param("minQuantity", "2"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    /**
+     * WINE-50: "Välj eget betyg från munskänkarnas betygsskala" - en
+     * kryssruta som styr vin-formular.html (se WineControllerTest), men
+     * som i sig bara är kontobunden data precis som "Antal flaskor
+     * minst" ovan.
+     */
+    @Test
+    void skaVisaKryssrutaFörEgetBetygFrånSkala() throws Exception {
+        when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false)));
+
+        mockMvc.perform(get("/installningar").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Välj eget betyg från munskänkarnas betygsskala")))
+                .andExpect(content().string(containsString("name=\"ownRatingFromScale\"")))
+                .andExpect(content().string(not(containsString("checked"))));
+    }
+
+    @Test
+    void skaVisaKryssrutanIkryssadNärInställningenÄrPå() throws Exception {
+        when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true)));
+
+        mockMvc.perform(get("/installningar").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("checked")));
+    }
+
+    @Test
+    void skaSättaOwnRatingFromScaleTillSantNärRutanKryssasI() throws Exception {
+        when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false)));
+
+        mockMvc.perform(post("/installningar/eget-betyg-skala")
+                        .with(user("testperson")).with(csrf())
+                        .param("ownRatingFromScale", "on"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/installningar"))
+                .andExpect(flash().attribute("feedback", "Inställning sparad"));
+
+        verify(userRepository).save(argThat(saved ->
+                saved.id().equals(MIN_ANVÄNDARE_ID) && saved.ownRatingFromScale()
+                        && saved.defaultMinQuantityFilter() == 1));
+    }
+
+    /**
+     * En obockad kryssruta postar INGET fält alls (HTML-standardbeteende) -
+     * inte "false" - så avsaknaden av parametern måste tolkas som avstängd.
+     */
+    @Test
+    void skaSättaOwnRatingFromScaleTillFalsktNärRutanLämnasOkryssad() throws Exception {
+        when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true)));
+
+        mockMvc.perform(post("/installningar/eget-betyg-skala")
+                        .with(user("testperson")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/installningar"));
+
+        verify(userRepository).save(argThat(saved -> !saved.ownRatingFromScale()));
+    }
+
+    @Test
+    void skaNekaSparningAvEgetBetygInställningUtanInloggning() throws Exception {
+        mockMvc.perform(post("/installningar/eget-betyg-skala")
+                        .with(csrf())
+                        .param("ownRatingFromScale", "on"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrlPattern("**/login"));
 
