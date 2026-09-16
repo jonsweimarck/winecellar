@@ -184,15 +184,16 @@ dem:
   sorteringsalternativ (arkitektbeslut efter eskalering - varken en
   Rating-igenkänning av texten eller en borttagning ur
   sorteringsalternativen byggdes). `SortField.OWN_RATING` sorterar i
-  stället på en ren, skiftlägesokänslig strängjämförelse, men med
-  stigande/fallande MEDVETET OMVÄNDA jämfört med NAME/PRODUCER/COUNTRY
-  (`OWN_RATING_ASCENDING`) - motiverat av att betyg typiskt anges med
-  ett inledande siffervärde där låga siffror betyder låga betyg, vilket
-  gör en omvänd strängjämförelse mer intuitiv för den vanligaste
-  kollisionen (ett en- kontra ett tvåsiffrigt betyg). En medveten,
-  pragmatisk approximation - inte konsekvent för alla kombinationer
-  (t.ex. två tvåsiffriga betyg), och ingen tolkning av texten byggs för
-  att fixa det kvarvarande felet.
+  stället på en ren, skiftlägesokänslig strängjämförelse - EXAKT samma
+  mönster och riktningssemantik som NAME/PRODUCER/COUNTRY, ingen
+  specialbehandling av riktningen (bekräftat av användaren: "stigande"/
+  "fallande" ska följa den vanliga alfabetiska ordningen, precis som för
+  alla andra textfält). Ingen tolkning/parsning av texten byggs för att
+  efterlikna en numerisk ordning - fältet ger alltså INTE en riktig
+  betygsrangordning (till skillnad från `MUNSKANKARNA_RATING`): "10 ..."
+  hamnar t.ex. FÖRE "9 ..." i stigande ordning, eftersom "1" < "9"
+  bokstavsordning. Ett medvetet accepterat beteende för ett fält som är
+  fri text per design, inte en bugg att fixa.
 - **Chips är vanliga `<a href>`, inte htmx** - se
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md). En borttagning
   måste uppdatera hela verktygsraden (kryssrutor, sökfält), inte bara

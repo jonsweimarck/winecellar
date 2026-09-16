@@ -31,14 +31,11 @@ Egenskap: Sortera vinlistan
     När jag sorterar vinlistan på "Årgång" i fallande ordning
     Så visas vinerna i ordningen "Albariño, Chablis, Barolo"
 
-  # WINE-50 (arkitektbeslut efter eskalering, se CLAUDE.md/SortField.java):
-  # "fallande" på Eget betyg (fri text) använder numera en RAK
-  # (skiftlägesokänslig) strängjämförelse, medvetet omvänd jämfört med
-  # övriga textfält - se OWN_RATING_ASCENDING. En pragmatisk approximation,
-  # inte en riktig numerisk sortering: "16 ..." hamnar här FÖRE "19 ..."
-  # trots "fallande", eftersom "1" < "1" och "6" < "9" bokstavsordning. Det
-  # null-hanteringen (Albariño sist) som scenariot egentligen verifierar är
-  # oförändrad, oavsett riktning.
+  # WINE-50 (se ADR 0022): "Eget betyg" (fri text) sorteras med en ren,
+  # skiftlägesokänslig strängjämförelse - exakt samma mönster och
+  # riktningssemantik som NAME/PRODUCER/COUNTRY, ingen specialbehandling.
+  # Det null-hanteringen (Albariño sist) som scenariot egentligen
+  # verifierar är oförändrad, oavsett riktning.
   Scenario: Viner utan värde för det sorterade fältet hamnar sist, oavsett riktning
     Givet att källaren innehåller följande viner:
       | namn     | eget betyg                      |
@@ -46,7 +43,7 @@ Egenskap: Sortera vinlistan
       | Albariño |                                  |
       | Chablis  | 19 (18 - 20 Exceptionellt vin)   |
     När jag sorterar vinlistan på "Eget betyg" i fallande ordning
-    Så visas vinerna i ordningen "Barolo, Chablis, Albariño"
+    Så visas vinerna i ordningen "Chablis, Barolo, Albariño"
 
   # "Munskänkarnas betyg" är oförändrat en sluten betygsskala (WINE-50
   # rörde bara "Eget betyg", se scenariot nedan) - sorteringen ska
@@ -61,22 +58,21 @@ Egenskap: Sortera vinlistan
     När jag sorterar vinlistan på "Munskänkarnas betyg" i stigande ordning
     Så visas vinerna i ordningen "Alfa, Beta"
 
-  # WINE-50 (arkitektbeslut efter eskalering, se CLAUDE.md/SortField.java):
-  # "Eget betyg" (till skillnad från "Munskänkarnas betyg" ovan) blev fri
-  # text - ingen Rating.fromLabel-igenkänning byggs (för komplext för ett
-  # fält som är fri text per design), och fältet togs INTE bort ur
-  # sorteringsalternativen. "Stigande" använder i stället en MEDVETET
-  # OMVÄND strängjämförelse (motsatsen mot NAME/PRODUCER/COUNTRY) -
-  # motiverat av att betyg typiskt anges med ett inledande siffervärde
-  # där låga siffror betyder låga betyg, vilket gör att en omvänd
-  # alfabetisk jämförelse råkar ge rätt resultat för just den vanliga
-  # kombinationen ett-/tvåsiffrigt betyg nedan. En pragmatisk
-  # approximation, inte en riktig numerisk sortering - fungerar inte lika
-  # konsekvent för alla kombinationer (se SortField.OWN_RATING_ASCENDING).
-  Scenario: Sortering på Eget betyg (fritext) använder en medvetet omvänd strängjämförelse som "stigande"
+  # WINE-50 (se ADR 0022): "Eget betyg" (till skillnad från "Munskänkarnas
+  # betyg" ovan) blev fri text - ingen Rating.fromLabel-igenkänning byggs
+  # (för komplext för ett fält som är fri text per design), och fältet
+  # togs INTE bort ur sorteringsalternativen. Sorteringen är i stället en
+  # ren, skiftlägesokänslig strängjämförelse - EXAKT samma riktnings-
+  # semantik som NAME/PRODUCER/COUNTRY, ingen specialbehandling. Ger
+  # alltså INTE en betygsrangordning (till skillnad från Munskänkarnas
+  # betyg ovan) - "10 ..." hamnar här FÖRE "9 ..." i stigande ordning,
+  # eftersom "1" < "9" bokstavsordning. Ett medvetet accepterat beteende
+  # för ett fält som är fri text per design, inte en bugg att fixa genom
+  # att börja tolka texten.
+  Scenario: Sortering på Eget betyg (fritext) använder ren alfabetisk ordning, till skillnad från Munskänkarnas betyg
     Givet att källaren innehåller följande viner:
       | namn | eget betyg                  |
       | Alfa | 9 (9 - 11,5 Medelbra vin)    |
       | Beta | 10 (9 - 11,5 Medelbra vin)   |
     När jag sorterar vinlistan på "Eget betyg" i stigande ordning
-    Så visas vinerna i ordningen "Alfa, Beta"
+    Så visas vinerna i ordningen "Beta, Alfa"

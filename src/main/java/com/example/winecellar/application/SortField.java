@@ -10,10 +10,9 @@ import java.util.function.Function;
  * De fält vinlistan kan sorteras på. Varje konstant bygger sin egen
  * comparator() från en fältutläsare (t.ex. Wine::name) plus en "stigande
  * ordning"-comparator för fältets typ - Rating (inte Comparable) får en
- * egen (se RATING_ASCENDING), OWN_RATING (fri text, men med en medvetet
- * omvänd strängjämförelse som "stigande", se OWN_RATING_ASCENDING) också,
- * övriga fält använder Comparator.naturalOrder() eller
- * String.CASE_INSENSITIVE_ORDER rakt av.
+ * egen (se RATING_ASCENDING), övriga fält (inklusive OWN_RATING, som är
+ * fri text - se dess klasskommentar) använder Comparator.naturalOrder()
+ * eller String.CASE_INSENSITIVE_ORDER rakt av.
  *
  * Riktning (stigande/fallande) vänder bara på jämförelsen av faktiska
  * värden, INTE på null-hanteringen - null (t.ex. inget pris/betyg satt)
@@ -61,17 +60,22 @@ public enum SortField {
         }
     },
     /**
-     * WINE-50 (arkitektbeslut efter eskalering): `ownRating` blev fri text
-     * (ingen `Rating` längre, se Wine.java) - `Rating.fromLabel`-igenkänning
-     * byggs medvetet INTE (för komplext för ett fält som är fri text per
+     * WINE-50 (se ADR 0022): `ownRating` blev fri text (ingen `Rating`
+     * längre, se Wine.java) - `Rating.fromLabel`-igenkänning byggs
+     * medvetet INTE (för komplext för ett fält som är fri text per
      * design), och fältet tas INTE bort ur sorteringsalternativen.
-     * Sorterar i stället på ren strängjämförelse (skiftlägesokänsligt), men
-     * med "stigande"/"fallande" MEDVETET OMVÄNDA jämfört med övriga
-     * textfält (NAME/PRODUCER/COUNTRY) - se OWN_RATING_ASCENDING.
+     * Sorterar i stället på ren, skiftlägesokänslig strängjämförelse,
+     * exakt samma mönster och riktningssemantik som NAME/PRODUCER/COUNTRY
+     * - "stigande"/"fallande" beter sig identiskt för alla textfält, ingen
+     * specialbehandling. Ingen tolkning/parsning av texten byggs för att
+     * efterlikna en numerisk ordning - det ger alltså INTE en perfekt
+     * numerisk sortering för blandade en-/tvåsiffriga betyg (t.ex. hamnar
+     * "10 ..." före "9 ..." i bokstavsordning), men det är ett medvetet
+     * accepterat beteende för det här fältet, inte en bugg.
      */
     OWN_RATING("Eget betyg") {
         public Comparator<Wine> comparator(SortDirection direction) {
-            return withDirection(Wine::ownRating, OWN_RATING_ASCENDING, direction);
+            return withDirection(Wine::ownRating, String.CASE_INSENSITIVE_ORDER, direction);
         }
     },
     MUNSKANKARNA_RATING("Munskänkarnas betyg") {
@@ -95,25 +99,6 @@ public enum SortField {
      * eftersom "10" < "9" bokstavsordning men 10 > 9 betygsmässigt.
      */
     private static final Comparator<Rating> RATING_ASCENDING = Comparator.comparing(Rating::ordinal).reversed();
-
-    /**
-     * WINE-50 (arkitektbeslut efter eskalering, se CLAUDE.md): betyg
-     * anges typiskt med ett inledande siffervärde där låga siffror
-     * betyder låga betyg - en OMVÄND alfabetisk jämförelse känns då mer
-     * naturlig som "stigande" än en vanlig strängjämförelse (samma
-     * grundtanke som RATING_ASCENDING ovan, fast applicerad på ren
-     * strängjämförelse i stället för på en enums ordinal). "Stigande" för
-     * OWN_RATING blir alltså detsamma som vad en normal "fallande"
-     * strängsortering hade gett för NAME/PRODUCER/COUNTRY, och tvärtom.
-     * En MEDVETEN, PRAGMATISK APPROXIMATION - INTE en riktig numerisk
-     * sortering. Fungerar väl för det vanligaste fallet (ett ensiffrigt
-     * kontra ett tvåsiffrigt betyg, t.ex. "9 ..." kontra "10 ..."), men
-     * inte konsekvent för alla kombinationer (två tvåsiffriga betyg, t.ex.
-     * "16 ..." kontra "19 ...", eller siffror med decimalkomma) - fältet
-     * är fri text per design, så ingen tolkning/parsning av texten byggs
-     * för att fixa detta, se klasskommentaren på OWN_RATING.
-     */
-    private static final Comparator<String> OWN_RATING_ASCENDING = String.CASE_INSENSITIVE_ORDER.reversed();
 
     private final String label;
 

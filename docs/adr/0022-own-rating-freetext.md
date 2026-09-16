@@ -44,17 +44,15 @@ inbyggda rangordning, eftersom fältet inte har någon sluten mängd
 värden kvar. Fältet behålls ändå som ett sorteringsalternativ - att ta
 bort det hade varit en regression för de användare som fortsätter
 fylla i det via munskänkarnas etiketter. Sorteringen görs i stället som
-en vanlig, skiftlägesokänslig textjämförelse, men med stigande och
-fallande riktning medvetet omvända jämfört med hur andra textfält
-(namn, producent, land) sorteras. Motiveringen är att ett betyg
-typiskt anges med ett inledande siffervärde där låga siffror betyder
-låga betyg - en omvänd textjämförelse råkar då ge ett mer intuitivt
-resultat för den vanligaste kollisionen (ett en- och ett tvåsiffrigt
-betyg). Det är en medveten, pragmatisk approximation, inte ett försök
-att bygga en riktig numerisk tolkning av fritexten - den ger fortsatt
-missvisande resultat för vissa kombinationer (t.ex. två tvåsiffriga
-betyg, eller tal med decimaler), och det anses vara en rimlig kostnad
-snarare än något att lösa med en särskild tolkning av innehållet.
+en vanlig, skiftlägesokänslig textjämförelse, med exakt samma
+riktningssemantik (stigande/fallande) som andra textfält (namn,
+producent, land) - ingen specialbehandling. Det är en medveten
+avvägning, inte ett försök att bygga en riktig numerisk tolkning av
+fritexten - en text som anges med ett inledande siffervärde sorterar
+alfabetiskt, inte numeriskt, vilket kan ge missvisande resultat för
+vissa kombinationer (t.ex. ett en- och ett tvåsiffrigt betyg), och det
+anses vara en rimlig kostnad snarare än något att lösa med en särskild
+tolkning av innehållet.
 
 Redan lagrade värden (de korta interna namnen skalan använde internt)
 konverteras till sin fullständiga textetikett i en engångsmigrering,
@@ -72,10 +70,10 @@ betyg plötsligt visats som en teknisk kod i stället för läsbar text.
   matchar någon av de 29 kända etiketterna - godtycklig text
   rundtrippar oförändrat. Munskänkarnas bedömning kräver fortfarande
   exakt matchning vid import.
-- Sorteringen på det egna betyget är en pragmatisk approximation utan
-  någon garanti om en fullt konsekvent numerisk ordning - en känd och
-  accepterad begränsning, inte en bugg att fixa i efterhand genom att
-  börja tolka fritexten.
+- Sorteringen på det egna betyget är en ren alfabetisk textjämförelse,
+  utan någon garanti om en numerisk ordning - en känd och accepterad
+  begränsning, inte en bugg att fixa i efterhand genom att börja tolka
+  fritexten.
 - En användares val att fylla i betyget via en dropdown eller fritt är
   reversibelt när som helst och påverkar aldrig redan sparad data -
   bara vilket formulärelement som visas nästa gång vinet redigeras.
