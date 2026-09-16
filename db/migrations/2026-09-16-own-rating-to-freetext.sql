@@ -8,16 +8,27 @@
 -- "cannot alter type of a column used by a generated column"-fällan
 -- (CLAUDE.md) kan inte uppstå här.
 --
--- Konverterar först redan lagrade korta konstantnamn (t.ex. "R16") till
--- sina fulla svenska etiketter (Rating.R16.label() m.fl.) - annars hade
--- befintliga viner plötsligt visat en rå enum-konstant i UI:t efter att
--- CHECK-constrainten och Java-typen ändrats. Släpper sedan CHECK-
--- constrainten (namnet är Hibernates egen genererade konvention för
--- @Enumerated(EnumType.STRING), bekräftat mot en riktig lokal databas
--- innan den här migreringen skrevs) och breddar kolumnen från
--- varchar(255) till text (samma mönster som
--- 2026-07-25-widen-text-columns-directly.sql) - fri text ska inte vara
--- begränsad till 255 tecken.
+-- Släpper FÖRST CHECK-constrainten (namnet är Hibernates egen genererade
+-- konvention för @Enumerated(EnumType.STRING), bekräftat mot en riktig
+-- lokal databas innan den här migreringen skrevs) och breddar kolumnen
+-- från varchar(255) till text (samma mönster som
+-- 2026-07-25-widen-text-columns-directly.sql - fri text ska inte vara
+-- begränsad till 255 tecken, även om ingen av de 29 etiketterna är i
+-- närheten av så lång - längst är 40 tecken, kontrollerat explicit).
+-- Konverterar DÄREFTER redan lagrade korta konstantnamn (t.ex. "R16")
+-- till sina fulla svenska etiketter (Rating.R16.label() m.fl.) - annars
+-- hade befintliga viner plötsligt visat en rå enum-konstant i UI:t efter
+-- att CHECK-constrainten och Java-typen ändrats.
+--
+-- ORDNINGEN ÄR KRITISK - en verklig produktionskrasch hittades här (se
+-- CLAUDE.md): en vanlig Postgres CHECK-constraint valideras per statement,
+-- inte vid COMMIT, så BEGIN/COMMIT runt hela skriptet räddar INTE en
+-- UPDATE som skriver en full etikett till en kolumn som fortfarande har
+-- den gamla, bara-29-korta-koder-tillåtande CHECK-constrainten kvar -
+-- satsen kraschar direkt med en constraint-överträdelse. Det missades
+-- ursprungligen eftersom `mvn verify`s Testcontainers-databaser alltid är
+-- färska och tomma (UPDATE-satsen blir då ett ofarligt no-op) - bara en
+-- databas med FAKTISKA gamla data avslöjar felet.
 --
 -- Samma sats är även tillagd i schema.sql (körs automatiskt vid varje
 -- appstart, självläkande/idempotent) - den här filen appliceras EN gång,
@@ -29,6 +40,9 @@
 -- gången, se CLAUDE.md.
 
 BEGIN;
+
+ALTER TABLE wines DROP CONSTRAINT IF EXISTS wines_own_rating_check;
+ALTER TABLE wines ALTER COLUMN own_rating TYPE text;
 
 UPDATE wines SET own_rating = CASE own_rating
     WHEN 'R20' THEN '20 (18 - 20 Exceptionellt vin)'
@@ -63,8 +77,5 @@ UPDATE wines SET own_rating = CASE own_rating
     ELSE own_rating
 END
 WHERE own_rating IS NOT NULL;
-
-ALTER TABLE wines DROP CONSTRAINT IF EXISTS wines_own_rating_check;
-ALTER TABLE wines ALTER COLUMN own_rating TYPE text;
 
 COMMIT;

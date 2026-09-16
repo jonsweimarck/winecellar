@@ -743,6 +743,34 @@ i `infrastructure/excel/`.
   vanlig kolumn har ingen Postgres-begränsning mot att ALTER:a det den
   "hör ihop med". Se `docs/devlog.md` (WINE-10/WINE-15) för den
   fullständiga, tre rundor långa resan fram till den här slutsatsen.
+- **En handskriven datamigrering som både KONVERTERAR data och LÄTTAR
+  PÅ/TAR BORT en begränsning måste göra det i rätt ordning: släpp/lätta
+  på begränsningen FÖRE konverteringen, inte efter (WINE-50, hittat av
+  användaren mot en riktig, långlivad lokal databas med gamla data -
+  hade kraschat en riktig produktionsdeploy).** `own_rating`s
+  engångsmigrering (både `schema.sql` och den fristående SQL-filen)
+  körde ursprungligen en `UPDATE ... CASE`-sats som skrev fulla
+  betygsetiketter INNAN den gamla `CHECK`-constrainten (som bara
+  tillät de 29 korta koderna) togs bort - `UPDATE`-satsen kraschade
+  alltså mot sitt eget, ännu inte borttagna villkor. **En vanlig
+  Postgres `CHECK`-constraint valideras per statement, inte vid
+  `COMMIT`** - att slå in hela migreringen i en transaktion räddar
+  INTE den här klassen av fel, till skillnad från vad man kan tro.
+  **Varför `mvn verify` inte fångade det:** alla Testcontainers-baserade
+  tester kör mot en FÄRSK, tom databas, där en sådan `UPDATE ... WHERE
+  <kolumn> IS NOT NULL` blir ett ofarligt no-op (inga rader matchar) -
+  statement-ordningen mellan konvertering och begränsningsändring syns
+  alltså aldrig i testsviten, oavsett hur grön den är. Samma
+  grundklass av fälla som `ddl-auto: update`/`search_vector`-sagan
+  ovan (ett schema-relaterat ordningsproblem som bara en databas med
+  FAKTISKA, redan existerande data avslöjar) - fast för en handskriven
+  migrering den här gången, inte Hibernates auto-DDL. **Verifieringsmetod
+  värd att återanvända för framtida liknande migreringar:** starta en
+  riktig lokal databas, sätt in en rad som representerar det GAMLA
+  tillståndet (t.ex. via en tillfällig, manuellt återskapad gammal
+  begränsning + ett gammalt värde), kör migreringen mot den, och
+  bekräfta både att den lyckas OCH att datat konverterades korrekt -
+  en tom Testcontainers-databas bevisar ingetdera.
 - **Spring Boots `ScriptUtils` (kör `schema.sql` via `spring.sql.init.
   mode: always`) delar upp filen i separata JDBC-anrop genom enkel
   strängsökning efter `;`** - den förstår inte PL/pgSQL:s

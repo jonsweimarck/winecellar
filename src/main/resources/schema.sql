@@ -156,10 +156,40 @@ ALTER TABLE users ALTER COLUMN default_min_quantity_filter SET NOT NULL;;
 -- kolumn en genererad kolumn beror på (se CLAUDE.md) - verifierat
 -- explicit innan den här migreringen skrevs, inte antaget.
 --
--- Konverterar först redan lagrade korta konstantnamn (t.ex. "R16") till
--- sina fulla svenska etiketter - annars hade befintliga viner plötsligt
--- visat en rå enum-konstant i UI:t efter att CHECK-constrainten och
--- Java-typen ändrats. CASE-satsen är självläkande/idempotent: en rad vars
+-- ORDNINGEN NEDAN ÄR KRITISK (produktionskrasch hittad och fixad,
+-- se CLAUDE.md): CHECK-constrainten och kolumnbreddningen måste tas bort
+-- FÖRE konverteringen av redan lagrade korta konstantnamn, inte efter.
+-- En vanlig Postgres CHECK-constraint valideras per statement (inte vid
+-- COMMIT), så en UPDATE som skriver en full etikett (t.ex. "17 (15 -
+-- 17,5 Högklassigt vin)") till en kolumn som fortfarande har den gamla
+-- CHECK-constrainten (som bara tillåter de 29 KORTA koderna) kraschar
+-- direkt med en constraint-överträdelse - oavsett i vilken transaktion
+-- satsen körs. Det här missades ursprungligen eftersom Testcontainers-
+-- baserade tester alltid kör mot en FÄRSK, tom databas där UPDATE-satsen
+-- blir ett ofarligt no-op (inga rader matchar) - bara en databas med
+-- FAKTISKA gamla data (en riktig lokal databas som körts mot tidigare
+-- versioner, eller produktionsdatabasen) avslöjar felet.
+--
+-- Constraintnamnet är Hibernates egen genererade konvention för
+-- @Enumerated(EnumType.STRING) (verifierat mot en riktig lokal databas
+-- innan den här migreringen skrevs, inte antaget) - DROP CONSTRAINT IF
+-- EXISTS är ett ofarligt no-op vid upprepad körning eller mot en
+-- databas som redan konverterats. Kolumnen breddas samtidigt från
+-- varchar(255) (samma Hibernate-default som gav wine_type/
+-- munskankarna_rating sin bredd) till text, samma mönster som
+-- 2026-07-25-widen-text-columns-directly.sql - fri text ska inte vara
+-- begränsad till 255 tecken (ingen av de 29 etiketterna är i närheten av
+-- så lång, men bredden måste ändå vara text FÖRE konverteringen nedan,
+-- eftersom en text-kolumn aldrig kan bli för smal för en varchar(255)-
+-- kompatibel sträng). ALTER COLUMN ... TYPE text är ett ofarligt no-op
+-- om kolumnen redan är text.
+ALTER TABLE wines DROP CONSTRAINT IF EXISTS wines_own_rating_check;;
+ALTER TABLE wines ALTER COLUMN own_rating TYPE text;;
+
+-- Konverterar redan lagrade korta konstantnamn (t.ex. "R16") till sina
+-- fulla svenska etiketter - annars hade befintliga viner plötsligt visat
+-- en rå enum-konstant i UI:t efter att CHECK-constrainten och Java-typen
+-- ändrats. CASE-satsen är självläkande/idempotent: en rad vars
 -- own_rating redan är en full etikett (eller ett fritextvärde, eller
 -- NULL) matchar ingen av grenarna och lämnas orörd av ELSE own_rating,
 -- så satsen kan köras om vid varje appstart utan att skada redan
@@ -198,19 +228,6 @@ UPDATE wines SET own_rating = CASE own_rating
     ELSE own_rating
 END
 WHERE own_rating IS NOT NULL;;
-
--- Constraintnamnet är Hibernates egen genererade konvention för
--- @Enumerated(EnumType.STRING) (verifierat mot en riktig lokal databas
--- innan den här migreringen skrevs, inte antaget) - DROP CONSTRAINT IF
--- EXISTS är ett ofarligt no-op vid upprepad körning eller mot en
--- databas som redan konverterats. Kolumnen breddas samtidigt från
--- varchar(255) (samma Hibernate-default som gav wine_type/
--- munskankarna_rating sin bredd) till text, samma mönster som
--- 2026-07-25-widen-text-columns-directly.sql - fri text ska inte vara
--- begränsad till 255 tecken. ALTER COLUMN ... TYPE text är ett ofarligt
--- no-op om kolumnen redan är text.
-ALTER TABLE wines DROP CONSTRAINT IF EXISTS wines_own_rating_check;;
-ALTER TABLE wines ALTER COLUMN own_rating TYPE text;;
 
 -- Vinformulärets val mellan dropdown (munskänkarnas 29 etiketter) och
 -- fritextfält för "Eget betyg" - sparat per användare, samma NULLABLE-i-
