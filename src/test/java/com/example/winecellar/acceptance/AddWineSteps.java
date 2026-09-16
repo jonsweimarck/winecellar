@@ -49,6 +49,11 @@ public class AddWineSteps {
                 .vintage(Integer.parseInt(data.get("årgång")))
                 .quantity(Integer.parseInt(data.get("flaskor")))
                 .location(data.get("plats"))
+                // WINE-50: "eget betyg" är en valfri kolumn (fri text,
+                // oberoende av formulärläge - se WineService.save/
+                // applyFormFields) - null om raden inte anger den, samma
+                // mönster som SearchAndFilterSteps redan använder.
+                .ownRating(data.get("eget betyg"))
                 .build();
         wineService.save(newWine);
     }
@@ -68,6 +73,18 @@ public class AddWineSteps {
         Wine wine = StepSupport.findWine(wineService, name);
         assertThat(wine.quantity()).isEqualTo(bottles);
         assertThat(wine.location()).isEqualTo(location);
+    }
+
+    /**
+     * WINE-50: verifierar att ett eget betyg satt som fri text (som INTE
+     * matchar någon av munskänkarnas 29 etiketter) sparas oförändrat vid
+     * TILLÄGG - ren applikationslager-/domännivåtäckning, oberoende av
+     * vilket formulärläge (fritext/dropdown) som råkar vara valt (det
+     * styr bara vad webblagret RENDERAR, se WineControllerTest).
+     */
+    @Och("vinet {string} ska ha eget betyg {string}")
+    public void vinetSkaHaEgetBetyg(String name, String ownRating) {
+        assertThat(StepSupport.findWine(wineService, name).ownRating()).isEqualTo(ownRating);
     }
 
     @Och("vinet {string} ska sakna övriga uppgifter")

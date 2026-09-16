@@ -1410,6 +1410,60 @@ class WineControllerTest {
         }
 
         /**
+         * Täckningsglapp hittat av användaren efter granskningen av PR #32:
+         * "Eget betyg"s fritext-/dropdown-läge hade bara tester för
+         * REDIGERING (se EgetBetygFritextKontraDropdown-klassen och
+         * NärEttVinRedigeras nedan), inget för TILLÄGG - trots att båda
+         * flödena delar samma applyFormFields-metod. Default (ingen stubbad
+         * användare i userRepository-mocken) är fritext, samma default som
+         * ett nytt konto får (se RegistrationService).
+         */
+        @Test
+        @DisplayName("ska spara eget betyg som fri text när formuläret postas i fritextläge (default)")
+        void skaSparaEgetBetygSomFriTextVidTillägg() throws Exception {
+            mockMvc.perform(post("/wines")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "Barolo")
+                            .param("quantity", "3")
+                            .param("ownRating", "Riktigt gott, testa igen om ett år"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+
+            verify(wineService).save(Wine.builder()
+                    .name("Barolo").quantity(3)
+                    .ownRating("Riktigt gott, testa igen om ett år")
+                    .build());
+        }
+
+        /**
+         * Bevisar att tillägg och redigering beter sig identiskt (delad
+         * applyFormFields), inte bara antar det: när kontot har
+         * dropdown-läge påslaget och formuläret postar en av munskänkarnas
+         * etiketter (som om användaren valt den i dropdownen) ska
+         * ETIKETT-STRÄNGEN sparas rakt av - aldrig en Rating-konstant.
+         */
+        @Test
+        @DisplayName("ska spara eget betyg som etikett-text (inte en Rating-konstant) när dropdown-läget är påslaget")
+        void skaSparaEgetBetygSomEtikettTextVidTilläggMedDropdownPåslagen() throws Exception {
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+
+            mockMvc.perform(post("/wines")
+                            .with(user("testperson")).with(csrf())
+                            .param("name", "Barolo")
+                            .param("quantity", "3")
+                            .param("ownRating", Rating.R16.label()))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+
+            verify(wineService).save(Wine.builder()
+                    .name("Barolo").quantity(3)
+                    .owner(new UserId(1L))
+                    .ownRating(Rating.R16.label())
+                    .build());
+        }
+
+        /**
          * Måste vara ett FLASH-attribut, inte ett vanligt model-attribut:
          * metoden redirectar till GET /, en helt ny request som inte ser
          * det ursprungliga anropets Model. addFlashAttribute sparar värdet
