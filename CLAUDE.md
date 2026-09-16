@@ -124,12 +124,12 @@ dem:
   Postgres faktiskt lagrar, med den fulla svenska etiketten som ett
   separat `label`-fält. `Rating.fromLabel(text)` normaliserar
   mellanslag innan matchning (källfilen har inkonsekvent dubbla
-  mellanslag i några rader). **Gäller sedan WINE-50 bara
-  `munskankarnaRating`** (Munskänkarnas egen bedömning av vinet) -
+  mellanslag i några rader). **Gäller sedan WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md)
+  bara `munskankarnaRating`** (Munskänkarnas egen bedömning av vinet) -
   `Wine.ownRating` (det egna, personliga betyget) är i stället ren
   fritext (`String`, ingen `CHECK`-constraint), se nästa punkt.
-- **`Wine.ownRating` är fri text (WINE-50), `munskankarnaRating` är
-  OFÖRÄNDRAT en sluten `Rating`-skala.** En användare kan i
+- **`Wine.ownRating` är fri text ([ADR 0022](docs/adr/0022-own-rating-freetext.md)),
+  `munskankarnaRating` är OFÖRÄNDRAT en sluten `Rating`-skala.** En användare kan i
   Inställningar ("Välj eget betyg från munskänkarnas betygsskala",
   `User.ownRatingFromScale`, default avmarkerad/fritext för både nya och
   redan existerande konton) välja att fylla i "Eget betyg" via en
@@ -178,14 +178,21 @@ dem:
   `Comparator.comparing(Rating::ordinal).reversed()` är "stigande" för
   ett betygsfält. Se `docs/devlog.md` för de Gherkin-scenarier som
   ursprungligen avslöjade båda varianterna av felet. **Gäller sedan
-  WINE-50 bara `MUNSKANKARNA_RATING`** - `OWN_RATING` blev fri text (se
-  ovan) och har ingen betygsordning kvar att sortera efter.
-  `SortField.OWN_RATING` sorterar PROVISORISKT skiftlägesokänsligt
-  alfabetiskt (samma mönster som NAME/PRODUCER/COUNTRY) - en öppen fråga
-  flaggad till arkitekten i WINE-50-PR:en (alfabetiskt kontra ett försök
-  att tolka texten som ett känt Rating-namn med fallback, kontra att ta
-  bort fältet ur sorteringsalternativen helt) som ännu inte fått ett
-  slutgiltigt svar. Uppdatera den här noten när frågan är besvarad.
+  WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md) bara
+  `MUNSKANKARNA_RATING`** - `OWN_RATING` blev fri text (se ovan) och har
+  ingen betygsordning kvar att sortera efter. Fältet behölls ändå som
+  sorteringsalternativ (arkitektbeslut efter eskalering - varken en
+  Rating-igenkänning av texten eller en borttagning ur
+  sorteringsalternativen byggdes). `SortField.OWN_RATING` sorterar i
+  stället på en ren, skiftlägesokänslig strängjämförelse, men med
+  stigande/fallande MEDVETET OMVÄNDA jämfört med NAME/PRODUCER/COUNTRY
+  (`OWN_RATING_ASCENDING`) - motiverat av att betyg typiskt anges med
+  ett inledande siffervärde där låga siffror betyder låga betyg, vilket
+  gör en omvänd strängjämförelse mer intuitiv för den vanligaste
+  kollisionen (ett en- kontra ett tvåsiffrigt betyg). En medveten,
+  pragmatisk approximation - inte konsekvent för alla kombinationer
+  (t.ex. två tvåsiffriga betyg), och ingen tolkning av texten byggs för
+  att fixa det kvarvarande felet.
 - **Chips är vanliga `<a href>`, inte htmx** - se
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md). En borttagning
   måste uppdatera hela verktygsraden (kryssrutor, sökfält), inte bara
@@ -553,7 +560,8 @@ AVVIKER från användarens sparade default - annars hade badgen alltid
 visat minst 1 för varje inloggad användare, även utan något aktivt val
 i den aktuella sessionen.
 
-**`User.ownRatingFromScale` (WINE-50)** styr om `vin-formular.html`
+**`User.ownRatingFromScale` (WINE-50, se [ADR 0022](docs/adr/0022-own-rating-freetext.md))**
+styr om `vin-formular.html`
 erbjuder "Eget betyg" som ett fritextfält (default, avmarkerad, för både
 nya och redan existerande konton) eller en dropdown med munskänkarnas 29
 etiketter - redigerbart i Inställningar (`SettingsController`/
@@ -580,7 +588,8 @@ Webbaserad (Fas 2), inte längre ett fristående CLI-verktyg - det gamla
 är borttaget. `WineRowParser`/`WineRowWriter`/`ImageMatcher` lever kvar
 i `infrastructure/excel/`.
 
-- **"Eget betyg" (kolumn N) är sedan WINE-50 fri text** - läses/skrivs
+- **"Eget betyg" (kolumn N) är sedan WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md)
+  fri text** - läses/skrivs
   rakt av, utan validering mot de 29 kända etiketterna. "Munskänkarnas
   betyg" (kolumn R) är oförändrat validerat mot dem (`Rating.fromLabel`,
   kastar ett tydligt fel annars).

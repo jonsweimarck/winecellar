@@ -31,6 +31,14 @@ Egenskap: Sortera vinlistan
     När jag sorterar vinlistan på "Årgång" i fallande ordning
     Så visas vinerna i ordningen "Albariño, Chablis, Barolo"
 
+  # WINE-50 (arkitektbeslut efter eskalering, se CLAUDE.md/SortField.java):
+  # "fallande" på Eget betyg (fri text) använder numera en RAK
+  # (skiftlägesokänslig) strängjämförelse, medvetet omvänd jämfört med
+  # övriga textfält - se OWN_RATING_ASCENDING. En pragmatisk approximation,
+  # inte en riktig numerisk sortering: "16 ..." hamnar här FÖRE "19 ..."
+  # trots "fallande", eftersom "1" < "1" och "6" < "9" bokstavsordning. Det
+  # null-hanteringen (Albariño sist) som scenariot egentligen verifierar är
+  # oförändrad, oavsett riktning.
   Scenario: Viner utan värde för det sorterade fältet hamnar sist, oavsett riktning
     Givet att källaren innehåller följande viner:
       | namn     | eget betyg                      |
@@ -38,7 +46,7 @@ Egenskap: Sortera vinlistan
       | Albariño |                                  |
       | Chablis  | 19 (18 - 20 Exceptionellt vin)   |
     När jag sorterar vinlistan på "Eget betyg" i fallande ordning
-    Så visas vinerna i ordningen "Chablis, Barolo, Albariño"
+    Så visas vinerna i ordningen "Barolo, Chablis, Albariño"
 
   # "Munskänkarnas betyg" är oförändrat en sluten betygsskala (WINE-50
   # rörde bara "Eget betyg", se scenariot nedan) - sorteringen ska
@@ -53,17 +61,22 @@ Egenskap: Sortera vinlistan
     När jag sorterar vinlistan på "Munskänkarnas betyg" i stigande ordning
     Så visas vinerna i ordningen "Alfa, Beta"
 
+  # WINE-50 (arkitektbeslut efter eskalering, se CLAUDE.md/SortField.java):
   # "Eget betyg" (till skillnad från "Munskänkarnas betyg" ovan) blev fri
-  # text i WINE-50 - det finns ingen betygsrangordning kvar att sortera
-  # efter. Sorteringen är PROVISORISKT alfabetisk (skiftlägesokänslig,
-  # samma som Namn/Producent/Land) - se SortField.OWN_RATING och den
-  # öppna arkitekturfrågan i WINE-50-PR:en om det här faktiskt är rätt
-  # beteende, eller om fältet i stället borde försöka tolka texten som ett
-  # känt betygsnamn, eller tas bort ur sorteringsalternativen helt.
-  Scenario: Sortering på Eget betyg (fritext) är alfabetisk, inte betygsrangordning
+  # text - ingen Rating.fromLabel-igenkänning byggs (för komplext för ett
+  # fält som är fri text per design), och fältet togs INTE bort ur
+  # sorteringsalternativen. "Stigande" använder i stället en MEDVETET
+  # OMVÄND strängjämförelse (motsatsen mot NAME/PRODUCER/COUNTRY) -
+  # motiverat av att betyg typiskt anges med ett inledande siffervärde
+  # där låga siffror betyder låga betyg, vilket gör att en omvänd
+  # alfabetisk jämförelse råkar ge rätt resultat för just den vanliga
+  # kombinationen ett-/tvåsiffrigt betyg nedan. En pragmatisk
+  # approximation, inte en riktig numerisk sortering - fungerar inte lika
+  # konsekvent för alla kombinationer (se SortField.OWN_RATING_ASCENDING).
+  Scenario: Sortering på Eget betyg (fritext) använder en medvetet omvänd strängjämförelse som "stigande"
     Givet att källaren innehåller följande viner:
       | namn | eget betyg                  |
       | Alfa | 9 (9 - 11,5 Medelbra vin)    |
       | Beta | 10 (9 - 11,5 Medelbra vin)   |
     När jag sorterar vinlistan på "Eget betyg" i stigande ordning
-    Så visas vinerna i ordningen "Beta, Alfa"
+    Så visas vinerna i ordningen "Alfa, Beta"

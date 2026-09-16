@@ -84,10 +84,11 @@ begränsad till exakt de 29 värdena från källfilens `Listor`-flik.
 `Rating` (`domain/Rating.java`) har korta konstantnamn (`R16`, `R14_5`)
 med den fulla svenska etiketten som ett separat fält;
 `Rating.fromLabel(text)` normaliserar mellanslag innan matchning.
-`own_rating` (det egna, personliga betyget) är sedan WINE-50 ren
-fritext - en användare kan i Inställningar välja att fylla i fältet via
-en dropdown med samma 29 etiketter i stället för att skriva fritt, men
-det som sparas är alltid bara textsträngen, aldrig en `Rating`-referens.
+`own_rating` (det egna, personliga betyget) är sedan
+[ADR 0022](docs/adr/0022-own-rating-freetext.md) ren fritext - en
+användare kan i Inställningar välja att fylla i fältet via en dropdown
+med samma 29 etiketter i stället för att skriva fritt, men det som
+sparas är alltid bara textsträngen, aldrig en `Rating`-referens.
 
 Se [ADR 0004](docs/adr/0004-images-in-bytea.md) för varför bilder
 lagras i `bytea` och [ADR 0016](docs/adr/0016-quantity-also-mandatory.md)
