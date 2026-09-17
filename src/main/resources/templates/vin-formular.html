@@ -198,7 +198,7 @@
                     <option value="">Inget betyg</option>
                     <option th:each="r : ${ratings}" th:value="${r.label()}" th:text="${r.label()}"
                             th:selected="${wine.ownRating == r.label()}"></option>
-                    <option th:if="${ownRatingUnmatched}" th:value="${wine.ownRating}" selected="selected" th:text="|${wine.ownRating} (sparad text, matchar ingen etikett)|"></option>
+                    <option th:if="${ownRatingUnmatched}" th:value="${wine.ownRating}" selected="selected" th:text="${wine.ownRating}"></option>
                 </select>
             </label>
         </div>

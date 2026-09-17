@@ -1270,7 +1270,7 @@ class WineControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(content().string(
                             containsString("<option value=\"Fantastiskt, dricka nu!\" "
-                                    + "selected=\"selected\">Fantastiskt, dricka nu! (sparad text, matchar ingen etikett)</option>")));
+                                    + "selected=\"selected\">Fantastiskt, dricka nu!</option>")));
         }
 
         /**

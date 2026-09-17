@@ -79,15 +79,18 @@
         </div>
     </form>
 
+    <p class="sektionsrubrik">Nytt vin</p>
     <!-- WINE-50: styr om vin-formular.html erbjuder "Eget betyg" som en
          dropdown (munskänkarnas 29 etiketter) eller ett fritextfält -
          sparas oavsett alltid som ren text (se WineController/Wine.java).
-         Egen <form>/kort, samma "sparas automatiskt vid ändring"-mönster
-         som Antal flaskor minst ovan, men en enklare
-         requestSubmit()-lyssnare (se skriptet nedan) - en kryssrutas
-         "change" kan aldrig avfyras flera gånger i snabb följd på samma
-         sätt som ett number-fälts spinnerpilar, så samma dublett-/
-         kapplöpningsskydd behövs inte här. -->
+         Egen sektion/rubrik, skild från "Vinlista" ovan (som bara rör
+         listvyns filter) - det här fältet styr i stället formuläret för
+         att lägga till/redigera ett vin. Egen <form>/kort, samma "sparas
+         automatiskt vid ändring"-mönster som Antal flaskor minst ovan,
+         men en enklare requestSubmit()-lyssnare (se skriptet nedan) - en
+         kryssrutas "change" kan aldrig avfyras flera gånger i snabb följd
+         på samma sätt som ett number-fälts spinnerpilar, så samma
+         dublett-/kapplöpningsskydd behövs inte här. -->
     <form method="post" th:action="@{/installningar/eget-betyg-skala}" id="egetBetygSkalaFormular">
         <div class="kort">
             <label class="falt falt-kryssruta">
