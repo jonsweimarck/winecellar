@@ -10,7 +10,9 @@ import java.util.function.Function;
  * De fält vinlistan kan sorteras på. Varje konstant bygger sin egen
  * comparator() från en fältutläsare (t.ex. Wine::name) plus en "stigande
  * ordning"-comparator för fältets typ - Rating (inte Comparable) får en
- * egen (se RATING_ASCENDING), övriga fält använder Comparator.naturalOrder().
+ * egen (se RATING_ASCENDING), övriga fält (inklusive OWN_RATING, som är
+ * fri text - se dess klasskommentar) använder Comparator.naturalOrder()
+ * eller String.CASE_INSENSITIVE_ORDER rakt av.
  *
  * Riktning (stigande/fallande) vänder bara på jämförelsen av faktiska
  * värden, INTE på null-hanteringen - null (t.ex. inget pris/betyg satt)
@@ -57,9 +59,23 @@ public enum SortField {
             return withDirection(Wine::purchaseDate, Comparator.naturalOrder(), direction);
         }
     },
+    /**
+     * WINE-50 (se ADR 0022): `ownRating` blev fri text (ingen `Rating`
+     * längre, se Wine.java) - `Rating.fromLabel`-igenkänning byggs
+     * medvetet INTE (för komplext för ett fält som är fri text per
+     * design), och fältet tas INTE bort ur sorteringsalternativen.
+     * Sorterar i stället på ren, skiftlägesokänslig strängjämförelse,
+     * exakt samma mönster och riktningssemantik som NAME/PRODUCER/COUNTRY
+     * - "stigande"/"fallande" beter sig identiskt för alla textfält, ingen
+     * specialbehandling. Ingen tolkning/parsning av texten byggs för att
+     * efterlikna en numerisk ordning - det ger alltså INTE en perfekt
+     * numerisk sortering för blandade en-/tvåsiffriga betyg (t.ex. hamnar
+     * "10 ..." före "9 ..." i bokstavsordning), men det är ett medvetet
+     * accepterat beteende för det här fältet, inte en bugg.
+     */
     OWN_RATING("Eget betyg") {
         public Comparator<Wine> comparator(SortDirection direction) {
-            return withDirection(Wine::ownRating, RATING_ASCENDING, direction);
+            return withDirection(Wine::ownRating, String.CASE_INSENSITIVE_ORDER, direction);
         }
     },
     MUNSKANKARNA_RATING("Munskänkarnas betyg") {

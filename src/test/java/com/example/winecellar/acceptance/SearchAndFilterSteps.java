@@ -66,10 +66,15 @@ public class SearchAndFilterSteps {
                     .location("Okänd plats")
                     .tastingNotes(blankToNull(row.get("tasting notes")))
                     .systembolagetDescription(blankToNull(row.get("systembolagets beskrivning")))
-                    .munskankarnaReview(blankToNull(row.get("munskänkarnas bedömning")));
-            String ratingLabel = row.get("eget betyg");
-            if (ratingLabel != null && !ratingLabel.isBlank()) {
-                wine.ownRating(Rating.fromLabel(ratingLabel));
+                    .munskankarnaReview(blankToNull(row.get("munskänkarnas bedömning")))
+                    // WINE-50: "eget betyg" är fri text - Gherkin-tabellens
+                    // värde sparas rakt av, ingen Rating-tolkning längre
+                    // (till skillnad från "munskänkarnas betyg" nedan, som
+                    // är oförändrat en sluten betygsskala).
+                    .ownRating(blankToNull(row.get("eget betyg")));
+            String munskänkarnasBetygLabel = row.get("munskänkarnas betyg");
+            if (munskänkarnasBetygLabel != null && !munskänkarnasBetygLabel.isBlank()) {
+                wine.munskankarnaRating(Rating.fromLabel(munskänkarnasBetygLabel));
             }
             wineService.save(wine.build());
         }

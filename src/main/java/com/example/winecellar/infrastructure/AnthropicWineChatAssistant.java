@@ -118,7 +118,7 @@ public class AnthropicWineChatAssistant implements WineChatAssistant {
                         label("pris", wine.price()),
                         label("varför köpt", wine.purchaseReason()),
                         label("tasting notes", wine.tastingNotes()),
-                        wine.ownRating() == null ? null : label("eget betyg", wine.ownRating().label()),
+                        label("eget betyg", wine.ownRating()),
                         wine.munskankarnaRating() == null ? null : label("Munskänkarnas betyg", wine.munskankarnaRating().label()),
                         label("Munskänkarnas bedömning", wine.munskankarnaReview()),
                         label("Vivino-betyg", wine.vivinoRating()),

@@ -64,11 +64,11 @@ Tabell `wines`:
 | quantity | `integer`, **NOT NULL** | `int` i Java, se [ADR 0016](docs/adr/0016-quantity-also-mandatory.md) |
 | purchase_reason | `text`, nullable | |
 | tasting_notes | `text`, nullable | |
-| own_rating | `text` + `CHECK`, nullable | 29 fasta värden, se `Rating` |
+| own_rating | `text`, nullable | Fri text, se "Domänmodell" nedan |
 | systembolaget_product_number | `text`, nullable | |
 | systembolaget_description | `text`, nullable | |
 | munskankarna_review | `text`, nullable | Egennamn (Munskänkarna) |
-| munskankarna_rating | `text` + `CHECK`, nullable | Samma 29 värden som `own_rating` |
+| munskankarna_rating | `text` + `CHECK`, nullable | 29 fasta värden, se `Rating` |
 | vivino_rating | `numeric(2,1)`, nullable | |
 | other_reference | `text`, nullable | |
 | location | `text`, nullable | Fritext (Låda 1, Öppen, etc.) |
@@ -79,11 +79,16 @@ Namngivningsprincip: engelska för kolumner/tabeller, men svenska
 egennamn som syftar på svenska institutioner behåller sitt svenska namn
 (`munskankarna_review`, `systembolaget_*`).
 
-`own_rating`/`munskankarna_rating` är begränsade till exakt de 29
-värdena från källfilens `Listor`-flik. `Rating` (`domain/Rating.java`)
-har korta konstantnamn (`R16`, `R14_5`) med den fulla svenska etiketten
-som ett separat fält; `Rating.fromLabel(text)` normaliserar mellanslag
-innan matchning.
+`munskankarna_rating` (Munskänkarnas egen bedömning av vinet) är
+begränsad till exakt de 29 värdena från källfilens `Listor`-flik.
+`Rating` (`domain/Rating.java`) har korta konstantnamn (`R16`, `R14_5`)
+med den fulla svenska etiketten som ett separat fält;
+`Rating.fromLabel(text)` normaliserar mellanslag innan matchning.
+`own_rating` (det egna, personliga betyget) är sedan
+[ADR 0022](docs/adr/0022-own-rating-freetext.md) ren fritext - en
+användare kan i Inställningar välja att fylla i fältet via en dropdown
+med samma 29 etiketter i stället för att skriva fritt, men det som
+sparas är alltid bara textsträngen, aldrig en `Rating`-referens.
 
 Se [ADR 0004](docs/adr/0004-images-in-bytea.md) för varför bilder
 lagras i `bytea` och [ADR 0016](docs/adr/0016-quantity-also-mandatory.md)

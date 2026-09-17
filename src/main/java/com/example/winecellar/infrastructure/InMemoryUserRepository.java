@@ -23,7 +23,7 @@ public class InMemoryUserRepository implements UserRepository {
         User toStore = user.id() != null
                 ? user
                 : new User(new UserId(nextId.getAndIncrement()), user.username(), user.hashedPassword(),
-                        user.createdAt(), user.defaultMinQuantityFilter());
+                        user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale());
         users.put(toStore.id().value(), toStore);
         return toStore;
     }

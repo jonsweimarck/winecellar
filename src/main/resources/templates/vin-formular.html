@@ -168,11 +168,37 @@
             <label class="falt"><span>Tasting notes</span>
                 <textarea name="tastingNotes" th:text="${wine.tastingNotes}"></textarea>
             </label>
-            <label class="falt"><span>Eget betyg</span>
+            <!-- WINE-50: "Eget betyg" är ren fritext i grunden (till skillnad
+                 från "Munskänkarnas betyg" nedan, oförändrat en sluten
+                 dropdown) - men en användare kan i Inställningar välja att
+                 fylla i fältet via munskänkarnas 29 etiketter i stället för
+                 att skriva fritt. Oavsett vilket sparas alltid bara den rena
+                 textsträngen (se WineController.applyFormFields) - därför
+                 delar båda varianterna samma fältnamn, och skillnaden syns
+                 aldrig i vad som faktiskt skickas in. Dropdownens
+                 alternativvärden är etiketten själv (r.label()), inte
+                 Rating-konstantens korta namn (r.name()) - annars hade
+                 konstantnamnet (t.ex. "R16") sparats rakt av. -->
+            <label class="falt" th:if="${!ownRatingFromScale}"><span>Eget betyg</span>
+                <input type="text" name="ownRating" th:value="${wine.ownRating}">
+            </label>
+            <!-- Granskningsfynd (kodgranskning av PR #32): ett redan sparat
+                 ownRating som INTE matchar någon av de 29 etiketterna (satt
+                 innan inställningen fanns, eller i fritextläge innan kontot
+                 bytte till dropdown-läge) fick annars dropdownen att tyst
+                 falla tillbaka till "Inget betyg" - en oförändrad sparning
+                 (användaren rörde aldrig fältet) nollade då tyst ut det
+                 gamla värdet. Det extra alternativet nedan håller kvar det
+                 ursprungliga värdet, förvalt, så att en oförändrad sparning
+                 bevarar det - användaren kan fortfarande medvetet välja
+                 "Inget betyg" eller en riktig etikett för att ändra/nolla
+                 det, precis som innan. -->
+            <label class="falt" th:if="${ownRatingFromScale}"><span>Eget betyg</span>
                 <select name="ownRating">
                     <option value="">Inget betyg</option>
-                    <option th:each="r : ${ratings}" th:value="${r.name()}" th:text="${r.label()}"
-                            th:selected="${wine.ownRating == r}"></option>
+                    <option th:each="r : ${ratings}" th:value="${r.label()}" th:text="${r.label()}"
+                            th:selected="${wine.ownRating == r.label()}"></option>
+                    <option th:if="${ownRatingUnmatched}" th:value="${wine.ownRating}" selected="selected" th:text="${wine.ownRating}"></option>
                 </select>
             </label>
         </div>

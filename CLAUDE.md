@@ -122,9 +122,34 @@ dem:
   uppslagstabell - 29 fasta strängar är overengineering att normalisera
   bort. `Rating` har korta konstantnamn (`R16`, `R14_5`) som är det
   Postgres faktiskt lagrar, med den fulla svenska etiketten som ett
-  separat `label`-fält. `Rating.fraEtikett(text)` normaliserar
+  separat `label`-fält. `Rating.fromLabel(text)` normaliserar
   mellanslag innan matchning (källfilen har inkonsekvent dubbla
-  mellanslag i några rader).
+  mellanslag i några rader). **Gäller sedan WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md)
+  bara `munskankarnaRating`** (Munskänkarnas egen bedömning av vinet) -
+  `Wine.ownRating` (det egna, personliga betyget) är i stället ren
+  fritext (`String`, ingen `CHECK`-constraint), se nästa punkt.
+- **`Wine.ownRating` är fri text ([ADR 0022](docs/adr/0022-own-rating-freetext.md)),
+  `munskankarnaRating` är OFÖRÄNDRAT en sluten `Rating`-skala.** En användare kan i
+  Inställningar ("Välj eget betyg från munskänkarnas betygsskala",
+  `User.ownRatingFromScale`, default avmarkerad/fritext för både nya och
+  redan existerande konton) välja att fylla i "Eget betyg" via en
+  dropdown med munskänkarnas 29 etiketter i stället för att skriva fritt
+  - men **oavsett vilket sparas alltid bara den valda/skrivna
+  textsträngen rakt av**, aldrig `Rating`-enumets korta konstantnamn.
+  Inställningen styr bara vilket FORMULÄRELEMENT `vin-formular.html`
+  renderar (`WineController.currentOwnRatingFromScale`/
+  `CurrentUser.ownRatingFromScale`) - den påverkar aldrig hur ett
+  inskickat värde tolkas eller sparas. Excel-import/export (kolumn N)
+  läser/skriver `own_rating` som ren text, utan validering mot de 29
+  kända etiketterna (till skillnad från "Munskänkarnas betyg",
+  fortfarande validerat via `Rating.fromLabel`). En engångsmigrering
+  (`db/migrations/2026-09-16-own-rating-to-freetext.sql`, speglad i
+  `schema.sql` för nya databaser) konverterar redan lagrade korta
+  konstantnamn (`"R16"`) till sina fulla etiketter och släpper
+  CHECK-constrainten INNAN kolumnen breddas - `own_rating` ingår inte i
+  `search_vector`-uttrycket, verifierat explicit (inte antaget) innan
+  migreringen skrevs, så den kända "cannot alter type of a column used
+  by a generated column"-fällan (se Kända fällor) gäller inte här.
 - **`WineService` har en enda `save`-metod**, inte separata
   `addWine`/`updateWine` - ingen skillnad i validering/sidoeffekter
   mellan att skapa och uppdatera.
@@ -152,7 +177,23 @@ dem:
   betygsordning), inte etikettens bokstavsordning -
   `Comparator.comparing(Rating::ordinal).reversed()` är "stigande" för
   ett betygsfält. Se `docs/devlog.md` för de Gherkin-scenarier som
-  ursprungligen avslöjade båda varianterna av felet.
+  ursprungligen avslöjade båda varianterna av felet. **Gäller sedan
+  WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md) bara
+  `MUNSKANKARNA_RATING`** - `OWN_RATING` blev fri text (se ovan) och har
+  ingen betygsordning kvar att sortera efter. Fältet behölls ändå som
+  sorteringsalternativ (arkitektbeslut efter eskalering - varken en
+  Rating-igenkänning av texten eller en borttagning ur
+  sorteringsalternativen byggdes). `SortField.OWN_RATING` sorterar i
+  stället på en ren, skiftlägesokänslig strängjämförelse - EXAKT samma
+  mönster och riktningssemantik som NAME/PRODUCER/COUNTRY, ingen
+  specialbehandling av riktningen (bekräftat av användaren: "stigande"/
+  "fallande" ska följa den vanliga alfabetiska ordningen, precis som för
+  alla andra textfält). Ingen tolkning/parsning av texten byggs för att
+  efterlikna en numerisk ordning - fältet ger alltså INTE en riktig
+  betygsrangordning (till skillnad från `MUNSKANKARNA_RATING`): "10 ..."
+  hamnar t.ex. FÖRE "9 ..." i stigande ordning, eftersom "1" < "9"
+  bokstavsordning. Ett medvetet accepterat beteende för ett fält som är
+  fri text per design, inte en bugg att fixa.
 - **Chips är vanliga `<a href>`, inte htmx** - se
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md). En borttagning
   måste uppdatera hela verktygsraden (kryssrutor, sökfält), inte bara
@@ -520,6 +561,17 @@ AVVIKER från användarens sparade default - annars hade badgen alltid
 visat minst 1 för varje inloggad användare, även utan något aktivt val
 i den aktuella sessionen.
 
+**`User.ownRatingFromScale` (WINE-50, se [ADR 0022](docs/adr/0022-own-rating-freetext.md))**
+styr om `vin-formular.html`
+erbjuder "Eget betyg" som ett fritextfält (default, avmarkerad, för både
+nya och redan existerande konton) eller en dropdown med munskänkarnas 29
+etiketter - redigerbart i Inställningar (`SettingsController`/
+`installningar.html`, `POST /installningar/eget-betyg-skala`). Samma
+NULLABLE-i-Java/NOT NULL-i-SQL-mönster som `defaultMinQuantityFilter`
+ovan (kolumnen `users.own_rating_from_scale` skärps till NOT NULL
+DEFAULT false i `schema.sql`). Se "Domänmodell - nuläge" ovan för varför
+inställningen bara styr FORMULÄRET, inte vad som faktiskt sparas.
+
 Den fulla migreringsresan (Fas 1, WINE-9 till WINE-18: datamodell,
 formulärinloggning, registrering, scopead vinlista, borttagning av
 ADMIN/READONLY, produktionsmigrering av ~30 befintliga viner) finns i
@@ -537,6 +589,11 @@ Webbaserad (Fas 2), inte längre ett fristående CLI-verktyg - det gamla
 är borttaget. `WineRowParser`/`WineRowWriter`/`ImageMatcher` lever kvar
 i `infrastructure/excel/`.
 
+- **"Eget betyg" (kolumn N) är sedan WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md)
+  fri text** - läses/skrivs
+  rakt av, utan validering mot de 29 kända etiketterna. "Munskänkarnas
+  betyg" (kolumn R) är oförändrat validerat mot dem (`Rating.fromLabel`,
+  kastar ett tydligt fel annars).
 - **Export:** `GET /export/xlsx` (den inloggade användarens egna viner,
   sorterade på namn) och `GET /export/bilder.zip` (en fil per vin med
   bild, namngiven enligt bildnamnskonventionen nedan). Exporten är
@@ -686,6 +743,34 @@ i `infrastructure/excel/`.
   vanlig kolumn har ingen Postgres-begränsning mot att ALTER:a det den
   "hör ihop med". Se `docs/devlog.md` (WINE-10/WINE-15) för den
   fullständiga, tre rundor långa resan fram till den här slutsatsen.
+- **En handskriven datamigrering som både KONVERTERAR data och LÄTTAR
+  PÅ/TAR BORT en begränsning måste göra det i rätt ordning: släpp/lätta
+  på begränsningen FÖRE konverteringen, inte efter (WINE-50, hittat av
+  användaren mot en riktig, långlivad lokal databas med gamla data -
+  hade kraschat en riktig produktionsdeploy).** `own_rating`s
+  engångsmigrering (både `schema.sql` och den fristående SQL-filen)
+  körde ursprungligen en `UPDATE ... CASE`-sats som skrev fulla
+  betygsetiketter INNAN den gamla `CHECK`-constrainten (som bara
+  tillät de 29 korta koderna) togs bort - `UPDATE`-satsen kraschade
+  alltså mot sitt eget, ännu inte borttagna villkor. **En vanlig
+  Postgres `CHECK`-constraint valideras per statement, inte vid
+  `COMMIT`** - att slå in hela migreringen i en transaktion räddar
+  INTE den här klassen av fel, till skillnad från vad man kan tro.
+  **Varför `mvn verify` inte fångade det:** alla Testcontainers-baserade
+  tester kör mot en FÄRSK, tom databas, där en sådan `UPDATE ... WHERE
+  <kolumn> IS NOT NULL` blir ett ofarligt no-op (inga rader matchar) -
+  statement-ordningen mellan konvertering och begränsningsändring syns
+  alltså aldrig i testsviten, oavsett hur grön den är. Samma
+  grundklass av fälla som `ddl-auto: update`/`search_vector`-sagan
+  ovan (ett schema-relaterat ordningsproblem som bara en databas med
+  FAKTISKA, redan existerande data avslöjar) - fast för en handskriven
+  migrering den här gången, inte Hibernates auto-DDL. **Verifieringsmetod
+  värd att återanvända för framtida liknande migreringar:** starta en
+  riktig lokal databas, sätt in en rad som representerar det GAMLA
+  tillståndet (t.ex. via en tillfällig, manuellt återskapad gammal
+  begränsning + ett gammalt värde), kör migreringen mot den, och
+  bekräfta både att den lyckas OCH att datat konverterades korrekt -
+  en tom Testcontainers-databas bevisar ingetdera.
 - **Spring Boots `ScriptUtils` (kör `schema.sql` via `spring.sql.init.
   mode: always`) delar upp filen i separata JDBC-anrop genom enkel
   strängsökning efter `;`** - den förstår inte PL/pgSQL:s

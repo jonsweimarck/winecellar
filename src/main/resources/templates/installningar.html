@@ -36,6 +36,14 @@
         .temaval button:hover { background: var(--yta-hover); }
         .temaval button[aria-pressed="true"] { background: var(--accent); color: var(--pa-accent);
             border-color: var(--accent); }
+
+        /* Kryssrutefältet (WINE-50) avviker medvetet från .falt > span:s
+           vanliga stapling (dämpad, mindre etikett OVANFÖR kontrollen) -
+           en kryssruta läses naturligare med sin etikett direkt bredvid
+           sig, på samma rad. */
+        .falt-kryssruta { display: flex; align-items: center; gap: 0.6rem; }
+        .falt-kryssruta input { width: auto; margin: 0; }
+        .falt-kryssruta > span { display: inline; margin-bottom: 0; font-size: 0.9rem; color: var(--text); }
     </style>
 </head>
 <body>
@@ -67,6 +75,28 @@
             <label class="falt"><span>Antal flaskor minst</span>
                 <input type="number" name="minQuantity" th:value="${minQuantityFilterDefault}"
                        id="minQuantityFilterFalt">
+            </label>
+        </div>
+    </form>
+
+    <p class="sektionsrubrik">Nytt vin</p>
+    <!-- WINE-50: styr om vin-formular.html erbjuder "Eget betyg" som en
+         dropdown (munskänkarnas 29 etiketter) eller ett fritextfält -
+         sparas oavsett alltid som ren text (se WineController/Wine.java).
+         Egen sektion/rubrik, skild från "Vinlista" ovan (som bara rör
+         listvyns filter) - det här fältet styr i stället formuläret för
+         att lägga till/redigera ett vin. Egen <form>/kort, samma "sparas
+         automatiskt vid ändring"-mönster som Antal flaskor minst ovan,
+         men en enklare requestSubmit()-lyssnare (se skriptet nedan) - en
+         kryssrutas "change" kan aldrig avfyras flera gånger i snabb följd
+         på samma sätt som ett number-fälts spinnerpilar, så samma
+         dublett-/kapplöpningsskydd behövs inte här. -->
+    <form method="post" th:action="@{/installningar/eget-betyg-skala}" id="egetBetygSkalaFormular">
+        <div class="kort">
+            <label class="falt falt-kryssruta">
+                <input type="checkbox" name="ownRatingFromScale" th:checked="${ownRatingFromScale}"
+                       id="egetBetygSkalaFalt">
+                <span>Välj eget betyg från munskänkarnas betygsskala</span>
             </label>
         </div>
     </form>
@@ -266,6 +296,23 @@
                     }
                 }
             });
+        })();
+
+        // Sparar "Välj eget betyg från munskänkarnas betygsskala"
+        // automatiskt vid ändring (WINE-50), samma grundmönster som Antal
+        // flaskor minst ovan - men utan dubblett-/kapplöpningsskyddet:
+        // en kryssruta kan bara skicka två olika värden (av/på), aldrig
+        // samma värde flera gånger i snabb följd som ett number-fälts
+        // spinnerpilar kan, så det scenariot det skyddet finns för kan
+        // inte uppstå här.
+        (function () {
+            var kryssruta = document.getElementById('egetBetygSkalaFalt');
+            var formular = document.getElementById('egetBetygSkalaFormular');
+            if (kryssruta && formular) {
+                kryssruta.addEventListener('change', function () {
+                    formular.requestSubmit();
+                });
+            }
         })();
 
         // Tonar bort återkopplingsbrickan efter sparat standardfilter -

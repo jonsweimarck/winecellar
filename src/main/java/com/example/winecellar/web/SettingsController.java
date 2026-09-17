@@ -30,6 +30,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * localStorage, eftersom det ska gälla den inloggade användaren oavsett
  * vilken enhet hen loggar in från nästa gång (till skillnad från temat,
  * som medvetet är per webbläsare).
+ *
+ * Detsamma gäller "Välj eget betyg från munskänkarnas betygsskala"
+ * (WINE-50, {@code User.ownRatingFromScale}) - styr om
+ * {@code vin-formular.html} erbjuder "Eget betyg" som en dropdown eller
+ * ett fritextfält, se {@link com.example.winecellar.web.WineController}.
  */
 @Controller
 public class SettingsController {
@@ -44,6 +49,8 @@ public class SettingsController {
     public String installningar(Model model, Authentication authentication) {
         model.addAttribute("minQuantityFilterDefault",
                 CurrentUser.defaultMinQuantityFilter(authentication, userRepository));
+        model.addAttribute("ownRatingFromScale",
+                CurrentUser.ownRatingFromScale(authentication, userRepository));
         return "installningar";
     }
 
@@ -61,8 +68,30 @@ public class SettingsController {
             Authentication authentication, RedirectAttributes redirectAttributes) {
         int value = parseMinQuantity(minQuantity);
         userRepository.findByUsername(authentication.getName()).ifPresent(user ->
-                userRepository.save(new User(user.id(), user.username(), user.hashedPassword(), user.createdAt(), value)));
+                userRepository.save(new User(
+                        user.id(), user.username(), user.hashedPassword(), user.createdAt(),
+                        value, user.ownRatingFromScale())));
         redirectAttributes.addFlashAttribute("feedback", "Standardfilter sparat");
+        return "redirect:/installningar";
+    }
+
+    /**
+     * Sparar "Välj eget betyg från munskänkarnas betygsskala" (WINE-50) -
+     * en obockad kryssruta postar INGET (HTML-standardbeteende), inte ett
+     * "false"-värde, så {@code ownRatingFromScale != null} är den
+     * korrekta tolkningen av "ikryssad" här, inte
+     * {@code Boolean.parseBoolean(...)}.
+     */
+    @PostMapping("/installningar/eget-betyg-skala")
+    public String saveOwnRatingFromScale(
+            @RequestParam(required = false) String ownRatingFromScale,
+            Authentication authentication, RedirectAttributes redirectAttributes) {
+        boolean value = ownRatingFromScale != null;
+        userRepository.findByUsername(authentication.getName()).ifPresent(user ->
+                userRepository.save(new User(
+                        user.id(), user.username(), user.hashedPassword(), user.createdAt(),
+                        user.defaultMinQuantityFilter(), value)));
+        redirectAttributes.addFlashAttribute("feedback", "Inställning sparad");
         return "redirect:/installningar";
     }
 
