@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 @Controller
@@ -429,12 +430,11 @@ public class WineController {
         if (!"true".equals(confirmAdd)) {
             DuplicateCheck duplicateCheck = wineService.checkForDuplicate(candidate, owner);
             boolean ownRatingFromScale = currentOwnRatingFromScale(authentication);
-            List<String> tagSuggestions = wineService.distinctTags(owner);
             if (duplicateCheck instanceof DuplicateCheck.FullDuplicate full) {
-                return renderDuplicateWarning(model, candidate, full.existing(), true, ownRatingFromScale, tagSuggestions);
+                return renderDuplicateWarning(model, candidate, full.existing(), true, ownRatingFromScale, wineService.distinctTags(owner));
             }
             if (duplicateCheck instanceof DuplicateCheck.PartialDuplicate partial) {
-                return renderDuplicateWarning(model, candidate, partial.existing(), false, ownRatingFromScale, tagSuggestions);
+                return renderDuplicateWarning(model, candidate, partial.existing(), false, ownRatingFromScale, wineService.distinctTags(owner));
             }
         }
         wineService.save(candidate);
@@ -641,14 +641,23 @@ public class WineController {
         return (value == null || value.isBlank()) ? null : value;
     }
 
+    /**
+     * Trimmar, filtrerar bort tomma värden, och dedupliceras
+     * skiftlägesokänsligt (behåller den FÖRSTA skrivningen av en given
+     * tagg) - konsekvent med klient-JS:ens (vin-formular.html) egen
+     * `.toLowerCase()`-baserade dedupliceringslogik, så att t.ex.
+     * "Favorit" och "favorit" inte kan sparas som två skilda taggar.
+     */
     private static Set<String> normalizeTags(Set<String> tags) {
         if (tags == null) {
             return Set.of();
         }
-        return tags.stream()
+        Set<String> normalized = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        tags.stream()
                 .map(String::trim)
                 .filter(t -> !t.isBlank())
-                .collect(Collectors.toSet());
+                .forEach(normalized::add);
+        return normalized;
     }
 
     private static WineType parseWineType(String value) {

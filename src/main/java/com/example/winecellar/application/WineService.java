@@ -113,12 +113,13 @@ public class WineService {
      * uppslagstabell, taggar är fri text, se CLAUDE.md). Används både av
      * filterpanelens kryssrutor (vinkallare.html) och av
      * vinformulärets `<datalist>`-autocomplete (vin-formular.html). Redan
-     * alfabetiskt sorterad - Wine.tags() är alltid en TreeSet (se
-     * Wine.Builder), så en vanlig TreeSet här räcker för att slå ihop och
-     * deduplicera utan ett extra sorteringssteg.
+     * alfabetiskt, skiftlägesokänsligt sorterad - Wine.tags() är alltid
+     * en skiftlägesokänslig TreeSet (se Wine.Builder), och samma
+     * ordning används här för att slå ihop och deduplicera utan ett
+     * extra sorteringssteg.
      */
     public List<String> distinctTags(UserId owner) {
-        Set<String> allTags = new TreeSet<>();
+        Set<String> allTags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         for (Wine wine : wineRepository.findAllByOwner(owner)) {
             allTags.addAll(wine.tags());
         }

@@ -42,10 +42,11 @@ import java.util.TreeSet;
  * separat uppslagstabell, bara en junction-tabell (`wine_tags`, se
  * WineEntity/schema.sql). ALDRIG `null` (till skillnad från de flesta
  * andra fälten) - `Builder.tags(...)` normaliserar `null` till en tom
- * mängd, och lagrar alltid en ny `TreeSet` så att iterationsordningen
- * (alfabetisk) är deterministisk överallt taggar visas eller jämförs,
- * utan att varje anropsplats (mallar, filterpanelen) behöver sortera
- * själv.
+ * mängd, och lagrar alltid en ny, skiftlägesokänslig `TreeSet`
+ * (`String.CASE_INSENSITIVE_ORDER`) så att iterationsordningen
+ * (alfabetisk, oavsett gemener/versaler) är deterministisk överallt
+ * taggar visas eller jämförs, utan att varje anropsplats (mallar,
+ * filterpanelen) behöver sortera själv.
  */
 public record Wine(
         WineId id,
@@ -180,7 +181,7 @@ public record Wine(
         private String location;
         private byte[] image;
         private String imageMimeType;
-        private Set<String> tags = new TreeSet<>();
+        private Set<String> tags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
         public Builder id(WineId id) {
             this.id = id;
@@ -309,10 +310,14 @@ public record Wine(
 
         /**
          * `null` normaliseras till en tom mängd, och värdet lagras alltid
-         * som en ny `TreeSet` - se Wine-klassens Javadoc för varför.
+         * som en ny, skiftlägesokänslig `TreeSet` - se Wine-klassens
+         * Javadoc för varför.
          */
         public Builder tags(Set<String> tags) {
-            this.tags = tags == null ? new TreeSet<>() : new TreeSet<>(tags);
+            this.tags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            if (tags != null) {
+                this.tags.addAll(tags);
+            }
             return this;
         }
 

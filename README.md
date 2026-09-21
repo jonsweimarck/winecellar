@@ -137,7 +137,7 @@ media query, verifierat av `WineListResponsiveIT` (Playwright) - se
 
 Ett vin kan ha valfritt antal fria taggar (t.ex. "Favorit", "Vardag"),
 lagda till/borttagna på vinets sida för tillägg/redigering -
-ett textfält med en "Lägg till"-knapp, tillagda taggar visas som
+ett textfält med en "Ny tagg"-knapp, tillagda taggar visas som
 borttagningsbara chips under fältet. Fältet har autocomplete
 (`<datalist>`) mot den inloggade användarens egna, redan använda
 taggar. Taggarna visas som chips direkt på vinlistans kort (både bred
