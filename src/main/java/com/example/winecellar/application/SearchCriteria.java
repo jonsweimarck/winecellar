@@ -3,6 +3,7 @@ package com.example.winecellar.application;
 import com.example.winecellar.domain.WineType;
 
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Facetterna är oberoende av varandra och kombineras med OCH (ett vin
@@ -83,10 +84,18 @@ public record SearchCriteria(
         /**
          * WINE-51: samma OCH-mellan-facetter/ELLER-inom-facetten-princip
          * som övriga facetter (se klassens Javadoc) - ett vin matchar om
-         * det har MINST EN av de valda taggarna.
+         * det har MINST EN av de valda taggarna. Normaliseras till samma
+         * skiftlägesokänsliga `TreeSet` (`String.CASE_INSENSITIVE_ORDER`)
+         * som `Wine.tags()` redan använder - annars blir
+         * `WineService.search(...)`s `criteria.tags()::contains`-jämförelse
+         * mot `Wine.tags()` skiftlägeskänslig, trots att `Wine.tags()`
+         * själv inte är det (granskningsfynd, WINE-51).
          */
         public Builder tags(Set<String> tags) {
-            this.tags = tags;
+            this.tags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            if (tags != null) {
+                this.tags.addAll(tags);
+            }
             return this;
         }
 

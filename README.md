@@ -25,7 +25,7 @@ Domänlagret är tunt - inga affärsregler att skydda, se
 [ADR 0001](docs/adr/0001-thin-domain-layer.md). `WineService` har en
 enda `save`-metod för både tillägg och redigering.
 
-`Wine` har 23 fält och byggs alltid via `Wine.builder()...build()`
+`Wine` har 24 fält och byggs alltid via `Wine.builder()...build()`
 (eller `vin.toBuilder()...build()` för ändringar), aldrig via en
 positionell konstruktor - se [ADR 0003](docs/adr/0003-wine-builder-pattern.md).
 

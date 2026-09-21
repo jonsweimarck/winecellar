@@ -270,7 +270,7 @@ dem:
   uppladdning och används oförändrat som `Content-Type` vid visning.
   Vinlistan bäddar aldrig in bilddata i HTML-fragmentet - `<img>` pekar
   mot `GET /wines/{id}/bild`.
-- **`Wine` har 23 fält, byggs alltid via `Wine.builder()...build()`**
+- **`Wine` har 24 fält, byggs alltid via `Wine.builder()...build()`**
   (eller `.toBuilder()...build()` för ändringar) - se
   [ADR 0003](docs/adr/0003-wine-builder-pattern.md). Samma mall/sida
   (`vin-formular.html`) för tillägg och redigering; `POST /wines` och

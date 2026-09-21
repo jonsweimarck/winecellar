@@ -128,3 +128,18 @@ Egenskap: Filtrera vinlistan
       | tagg   | Favorit |
     Så ska vinlistan innehålla "Barolo"
     Och vinlistan ska inte innehålla "Chianti, Chablis"
+
+  # WINE-51 (granskningsrunda 2): taggfiltret ska vara skiftlägesokänsligt,
+  # precis som Wine.tags() (Wine.Builder.tags() lagrar alltid i en
+  # CASE_INSENSITIVE_ORDER-TreeSet) och distinctTags()/filterpanelens
+  # kryssrutor redan är - ett vin taggat med gemener ska matchas av ett
+  # filter angivet med versaler, eller tvärtom.
+  Scenario: Taggfiltret är skiftlägesokänsligt
+    Givet att källaren innehåller följande viner:
+      | namn    | taggar  |
+      | Barolo  | favorit |
+      | Chablis | vardag  |
+    När jag filtrerar vinlistan på:
+      | tagg | Favorit |
+    Så ska vinlistan innehålla "Barolo"
+    Och vinlistan ska inte innehålla "Chablis"

@@ -86,4 +86,35 @@ class TagListCsvTest {
 
         assertThat(parsed).isEqualTo(new TreeSet<>(original));
     }
+
+    /**
+     * Granskningsfynd, WINE-51 rond 2: explicit täckning för de två
+     * kantfallen som tidigare bara verifierats manuellt (inledande/
+     * avslutande mellanslag - citeras eftersom en ociterad tagg annars
+     * skulle trimmas vid läsning, se `quoteIfNeeded`).
+     */
+    @Test
+    void skaFormateraOchTolkaEnTaggMedInledandeOchAvslutandeMellanslag() {
+        Set<String> tags = Set.of(" Favorit ");
+
+        String formatted = TagListCsv.format(tags);
+
+        assertThat(formatted).isEqualTo("\" Favorit \"");
+        assertThat(TagListCsv.parse(formatted)).containsExactly(" Favorit ");
+    }
+
+    /**
+     * Granskningsfynd, WINE-51 rond 2: en tagg som bara är ett enda
+     * citattecken - ett minimalt exempel på escape-fallet
+     * (dubblerat `""` för ett citattecken inuti en citerad tagg).
+     */
+    @Test
+    void skaFormateraOchTolkaEnTaggSomBaraÄrEttCitattecken() {
+        Set<String> tags = Set.of("\"");
+
+        String formatted = TagListCsv.format(tags);
+
+        assertThat(formatted).isEqualTo("\"\"\"\"");
+        assertThat(TagListCsv.parse(formatted)).containsExactly("\"");
+    }
 }
