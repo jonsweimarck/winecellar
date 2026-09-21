@@ -139,7 +139,7 @@ dem:
   Inställningen styr bara vilket FORMULÄRELEMENT `vin-formular.html`
   renderar (`WineController.currentOwnRatingFromScale`/
   `CurrentUser.ownRatingFromScale`) - den påverkar aldrig hur ett
-  inskickat värde tolkas eller sparas. Excel-import/export (kolumn N)
+  inskickat värde tolkas eller sparas. Excel-import/export (kolumn O)
   läser/skriver `own_rating` som ren text, utan validering mot de 29
   kända etiketterna (till skillnad från "Munskänkarnas betyg",
   fortfarande validerat via `Rating.fromLabel`). En engångsmigrering
@@ -623,11 +623,18 @@ Webbaserad (Fas 2), inte längre ett fristående CLI-verktyg - det gamla
 är borttaget. `WineRowParser`/`WineRowWriter`/`ImageMatcher` lever kvar
 i `infrastructure/excel/`.
 
-- **"Eget betyg" (kolumn N) är sedan WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md)
+- **"Eget betyg" (kolumn O) är sedan WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md)
   fri text** - läses/skrivs
   rakt av, utan validering mot de 29 kända etiketterna. "Munskänkarnas
-  betyg" (kolumn R) är oförändrat validerat mot dem (`Rating.fromLabel`,
+  betyg" (kolumn S) är oförändrat validerat mot dem (`Rating.fromLabel`,
   kastar ett tydligt fel annars).
+- **Taggar (kolumn L, WINE-51)** läses/skrivs som en kommaseparerad
+  lista via en liten egenskriven `TagListCsv` (`infrastructure/excel/`,
+  standard CSV-citering - ett citattecken runt en tagg som själv
+  innehåller ett kommatecken, dubblerat citattecken för ett citattecken
+  inuti taggen). Ingen extern CSV-bibliotekdependency lades till -
+  reglerna var enkla nog att hålla små och egna, samma "normalisera
+  inte i onödan"-linje som resten av fritextfälten.
 - **Export:** `GET /export/xlsx` (den inloggade användarens egna viner,
   sorterade på namn) och `GET /export/bilder.zip` (en fil per vin med
   bild, namngiven enligt bildnamnskonventionen nedan). Exporten är

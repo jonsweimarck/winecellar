@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,6 +41,10 @@ class WineRowWriterTest {
                 .purchaseDate(LocalDate.of(2024, 3, 15))
                 .price(new BigDecimal("260.00"))
                 .quantity(3)
+                // WINE-51: en tagg som INNEHÅLLER ett kommatecken verifierar
+                // bäst att rundtrippen faktiskt går via TagListCsv:s
+                // citeringslogik, inte en naiv String.split(",").
+                .tags(new TreeSet<>(Set.of("Favorit", "Fest, jul")))
                 .purchaseReason("Prisvärt enligt munskänkarna")
                 .tastingNotes("Ljusröd, doft av jordgubbe.")
                 // WINE-50: fri text, inte längre begränsad till Rating - ett
@@ -85,6 +91,9 @@ class WineRowWriterTest {
         assertThat(row.getCell(WineRowParser.COL_VIVINO)).isNull();
         assertThat(row.getCell(WineRowParser.COL_PURCHASE_DATE)).isNull();
         assertThat(row.getCell(WineRowParser.COL_OWN_RATING)).isNull();
+        // WINE-51: `Wine.tags()` är aldrig `null` (bara tom) - cellen ska
+        // ändå lämnas helt tom, inte skrivas som en tom sträng.
+        assertThat(row.getCell(WineRowParser.COL_TAGS)).isNull();
     }
 
     /**

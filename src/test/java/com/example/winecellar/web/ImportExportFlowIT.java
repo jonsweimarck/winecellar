@@ -129,6 +129,9 @@ class ImportExportFlowIT extends SharedPostgres {
 
                 sida.navigate("http://localhost:" + port + "/");
                 assertThat(sida.locator("body").textContent()).contains("Barolo").contains("Pio Cesare");
+                // WINE-51: taggen (kolumn L i xlsx-exporten) ska ha följt
+                // med genom hela webbflödet - export, uppladdning, import.
+                assertThat(sida.locator("body").textContent()).contains("Favorit");
 
                 // INTE byte-identisk med originalet - klientsidans Canvas-
                 // nedskalning (import.html, WINE-24) skriver ALLTID om bilden
@@ -234,6 +237,12 @@ class ImportExportFlowIT extends SharedPostgres {
         // vanliga, synliga fältet.
         sida.locator("input[name=bild]").nth(1).setInputFiles(
                 new FilePayload(filnamn, mimeTyp, bildBytes));
+
+        // WINE-51: lägg till en tagg så att export/import-rundtrippen även
+        // verifierar att taggar (kolumn L i xlsx:en) följer med genom hela
+        // webbflödet, inte bara via WineRowParser/WineRowWriter-enhetstesterna.
+        sida.locator("#tagg-input").fill("Favorit");
+        sida.locator("#tagg-lagg-till").click();
 
         sida.locator("button:has-text(\"Lägg till\")").click();
         sida.waitForURL("http://localhost:" + port + "/");

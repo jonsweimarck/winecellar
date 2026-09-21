@@ -293,7 +293,7 @@ av ADR 0014) är borttagen - `WineRowParser`/`WineRowWriter`/
 `ImageMatcher` lever kvar som återanvändbar kod i huvudappen
 (`infrastructure/excel/`).
 
-Kolumnlayouten (A-U på `Vin`-fliken) är hårdkodad i `WineRowParser`.
+Kolumnlayouten (A-V på `Vin`-fliken) är hårdkodad i `WineRowParser`.
 Det finns ingen egen bild-kolumn (togs bort i WINE-32 - se
 [ADR 0011](docs/adr/0011-excel-image-roundtrip-dual-mechanism.md),
 Deprecated) - etikettbilder hanteras uteslutande via
@@ -301,22 +301,29 @@ Deprecated) - etikettbilder hanteras uteslutande via
 
 | Kolumn | Fält | Kolumn | Fält |
 |---|---|---|---|
-| A | Vintyp | L | Varför köpt |
-| B | Land | M | Tasting notes |
-| C | Region | N | Eget betyg |
-| D | Underregion | O | Systembolagets prodnummer |
-| E | Druvor | P | Systembolagets beskrivning |
-| F | Producent | Q | Munskänkarnas bedömning |
-| G | Namn | R | Munskänkarnas betyg |
-| H | Årgång | S | Vivino |
-| I | Inköpsdatum | T | Annan referens |
-| J | Pris | U | Plats |
+| A | Vintyp | M | Varför köpt |
+| B | Land | N | Tasting notes |
+| C | Region | O | Eget betyg |
+| D | Underregion | P | Systembolagets prodnummer |
+| E | Druvor | Q | Systembolagets beskrivning |
+| F | Producent | R | Munskänkarnas bedömning |
+| G | Namn | S | Munskänkarnas betyg |
+| H | Årgång | T | Vivino |
+| I | Inköpsdatum | U | Annan referens |
+| J | Pris | V | Plats |
 | K | Antal | | |
+| L | Taggar | | |
 
 Namn och antal flaskor är obligatoriska vid import (samma regel som
 webb-UI:t, se [ADR 0016](docs/adr/0016-quantity-also-mandatory.md)) - en
 rad som saknar något av de två fälten eller på annat sätt inte kan
 tolkas hoppas över, utan att stoppa resten av importen.
+
+**Taggar (kolumn L, WINE-51)** är en kommaseparerad lista - flera taggar
+skrivs `Favorit, Vardag`. En tagg som själv innehåller ett kommatecken
+citeras enligt standard CSV-citering (citattecken runt taggen,
+dubblerat citattecken för ett citattecken inuti taggen), t.ex.
+`Present, "Fest, jul"` betyder två taggar: `Present` och `Fest, jul`.
 
 ### Export
 

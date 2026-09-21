@@ -28,9 +28,12 @@ import java.util.Map;
  * (`ExportExcel`, borttagen i WINE-20) skrev, flyttade hit eftersom de
  * hör till samma delade kolumnlayout som resten av klassen.
  *
- * "Eget betyg" (kolumn N) skrivs sedan WINE-50 rakt av som text - `Wine`
+ * "Eget betyg" (kolumn O) skrivs sedan WINE-50 rakt av som text - `Wine`
  * har inte längre en `Rating` för det fältet (till skillnad från
  * "Munskänkarnas betyg", oförändrat).
+ *
+ * **Taggar (kolumn L, WINE-51)** skrivs som en kommaseparerad lista via
+ * {@link TagListCsv} - se den klassens Javadoc för citeringsregeln.
  */
 public final class WineRowWriter {
 
@@ -38,7 +41,7 @@ public final class WineRowWriter {
 
     private static final String[] HEADERS = {
             "Vintyp", "Land", "Region", "Underregion", "Druvor", "Producent", "Namn", "Årgång",
-            "Inköpsdatum", "Pris", "Antal", "Varför köpt", "Tasting notes", "Eget betyg",
+            "Inköpsdatum", "Pris", "Antal", "Taggar", "Varför köpt", "Tasting notes", "Eget betyg",
             "Systembolagets prodnummer", "Systembolagets beskrivning", "Munskänkarnas bedömning",
             "Munskänkarnas betyg", "Vivino", "Annan referens", "Plats"
     };
@@ -68,6 +71,7 @@ public final class WineRowWriter {
         date(row, WineRowParser.COL_PURCHASE_DATE, wine.purchaseDate(), dateFormat);
         decimal(row, WineRowParser.COL_PRICE, wine.price());
         integer(row, WineRowParser.COL_QUANTITY, wine.quantity());
+        text(row, WineRowParser.COL_TAGS, TagListCsv.format(wine.tags()));
         text(row, WineRowParser.COL_PURCHASE_REASON, wine.purchaseReason());
         text(row, WineRowParser.COL_TASTING_NOTES, wine.tastingNotes());
         text(row, WineRowParser.COL_OWN_RATING, wine.ownRating());

@@ -146,10 +146,13 @@ public record Wine(
 
     /**
      * Wine har vuxit till 24 fält (de flesta nullable, ett-till-ett mot
-     * Vinlista.xlsx - `tags` tillkom i WINE-51 och har ingen motsvarighet
-     * där) - en positionell 24-argumentskonstruktor vore oläsbar och
-     * felbenägen på anropsplatser. Byggaren är en direkt konsekvens av
-     * fältantalet, inte spekulativ ceremoni.
+     * Vinlista.xlsx - `tags` tillkom i WINE-51 utan motsvarighet i den
+     * ursprungliga källfilen, men fick sedan en egen Excel-kolumn i den
+     * webbaserade import-/exportfunktionen, se
+     * `infrastructure/excel/WineRowParser`/`WineRowWriter`) - en
+     * positionell 24-argumentskonstruktor vore oläsbar och felbenägen på
+     * anropsplatser. Byggaren är en direkt konsekvens av fältantalet,
+     * inte spekulativ ceremoni.
      */
     public static final class Builder {
         private WineId id;

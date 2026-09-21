@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 
 /**
  * Mappar en rad från Vin-fliken i Vinlista.xlsx till ett Wine. Kolumn-
- * layouten (A-U) är fast - se README:s Datamodell-avsnitt för vilket
+ * layouten (A-V) är fast - se README:s Datamodell-avsnitt för vilket
  * Wine-fält varje kolumn motsvarar. Etiketter importeras separat - se
  * {@link ImageMatcher}.
  *
@@ -42,9 +42,13 @@ import java.util.regex.Pattern;
  * som webb-UI:t använder. Alla övriga fält, inklusive vintyp/land/producent
  * som tidigare krävdes, tolkas som valfria och blir `null` om cellen är tom.
  *
- * **"Eget betyg" (kolumn N) är sedan WINE-50 fri text** - läses rakt av,
+ * **"Eget betyg" (kolumn O) är sedan WINE-50 fri text** - läses rakt av,
  * utan validering mot de 29 kända betygen (till skillnad från
  * "Munskänkarnas betyg", som fortfarande måste matcha exakt ett av dem).
+ *
+ * **Taggar (kolumn L, WINE-51)** läses som en kommaseparerad lista via
+ * {@link TagListCsv} - en tagg som själv innehåller ett kommatecken
+ * citeras (standard CSV-citering), se den klassens Javadoc.
  */
 public final class WineRowParser {
 
@@ -63,18 +67,21 @@ public final class WineRowParser {
     static final int COL_PURCHASE_DATE = 8;
     static final int COL_PRICE = 9;
     static final int COL_QUANTITY = 10;
-    static final int COL_PURCHASE_REASON = 11;
-    static final int COL_TASTING_NOTES = 12;
-    static final int COL_OWN_RATING = 13;
+    // Taggar - ny kolumn sedan WINE-51, infogad direkt efter Antal. Alla
+    // efterföljande kolumner (tidigare L-U) sköt ett steg åt höger (M-V).
+    static final int COL_TAGS = 11;
+    static final int COL_PURCHASE_REASON = 12;
+    static final int COL_TASTING_NOTES = 13;
+    static final int COL_OWN_RATING = 14;
     // "Systembolagets prodnummer" - egen kolumn sedan 2026-07-20, tidigare
     // ihopklistrad med beskrivningen i COL_SYSTEMBOLAGET (se git-historiken).
-    static final int COL_SYSTEMBOLAGET_PRODUCT_NUMBER = 14;
-    static final int COL_SYSTEMBOLAGET = 15;
-    static final int COL_MUNSKANKARNA_REVIEW = 16;
-    static final int COL_MUNSKANKARNA_RATING = 17;
-    static final int COL_VIVINO = 18;
-    static final int COL_OTHER_REFERENCE = 19;
-    static final int COL_LOCATION = 20;
+    static final int COL_SYSTEMBOLAGET_PRODUCT_NUMBER = 15;
+    static final int COL_SYSTEMBOLAGET = 16;
+    static final int COL_MUNSKANKARNA_REVIEW = 17;
+    static final int COL_MUNSKANKARNA_RATING = 18;
+    static final int COL_VIVINO = 19;
+    static final int COL_OTHER_REFERENCE = 20;
+    static final int COL_LOCATION = 21;
 
     private static final Map<String, WineType> WINE_TYPES = Map.of(
             "rött", WineType.RED,
@@ -115,6 +122,7 @@ public final class WineRowParser {
                 .purchaseDate(date(row, COL_PURCHASE_DATE))
                 .price(price(row, COL_PRICE))
                 .quantity(quantity)
+                .tags(TagListCsv.parse(text(row, COL_TAGS)))
                 .purchaseReason(text(row, COL_PURCHASE_REASON))
                 .tastingNotes(text(row, COL_TASTING_NOTES))
                 .ownRating(text(row, COL_OWN_RATING))
