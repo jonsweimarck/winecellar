@@ -466,6 +466,17 @@ dialog::backdrop {
     text-decoration: none;
 }
 
+/* Chips: den dämpade "bricka"-formen som visar ett aktivt filter-/
+   sökvärde i vinlistans verktygsrad (vinkallare.html, ADR 0008, vanliga
+   <a href>-länkar) - flyttad hit i WINE-51 eftersom vinformuläret nu
+   återanvänder EXAKT samma utseende för valda taggar (vin-formular.html,
+   <label>/<input type="checkbox">-par i stället för länkar) och
+   vinlistans kort (bara text, ingen länk/kontroll alls). Se
+   .obligatoriskt ovan, som redan beskrev formen som "samma bricka". */
+.chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0.1rem 0; }
+.chip { display: inline-flex; align-items: center; gap: 0.35rem; background: var(--yta-3); border: 1px solid var(--ram); border-radius: 1rem; padding: 0.2rem 0.65rem; font-size: 0.8rem; color: var(--text); text-decoration: none; }
+.chip:hover { background: var(--yta-hover); }
+
 /* Delad statusrad för "väntar på ett långsamt LLM-svar"-återkoppling
    (WINE-49) - samma dämpade, kursiva stil som etikettskanningens
    #etikett-status (vin-formular.html, WINE-8), men flyttad hit eftersom

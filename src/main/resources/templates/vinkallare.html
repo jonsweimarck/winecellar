@@ -115,9 +115,9 @@
         .tomt-lage p { margin: 0; }
         .tomt-lage-atgarder { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-top: 1.5rem; }
 
-        .chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0.1rem 0; }
-        .chip { display: inline-block; background: var(--yta-3); border: 1px solid var(--ram); border-radius: 1rem; padding: 0.2rem 0.65rem; font-size: 0.8rem; color: var(--text); text-decoration: none; }
-        .chip:hover { background: var(--yta-hover); }
+        /* .chips/.chip (den dämpade "bricka"-formen för aktiva filter/
+           taggar) flyttades till tema.css i WINE-51 - vinformuläret
+           återanvänder numera samma stil för valda taggar. */
 
         /* Breda kort på desktop, smala kort på mobil - #vinlista-tabell
            heter fortfarande "tabell" av historiska skäl (det var en
@@ -447,8 +447,8 @@
 
         <details class="filterpanel">
             <summary>Filter <span class="antal-badge"
-                                   th:if="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size() + (minQuantityFilterActive ? 1 : 0) > 0}"
-                                   th:text="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size() + (minQuantityFilterActive ? 1 : 0)}"></span></summary>
+                                   th:if="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size() + selectedTags.size() + (minQuantityFilterActive ? 1 : 0) > 0}"
+                                   th:text="${selectedWineTypes.size() + selectedCountries.size() + selectedRegions.size() + selectedSubregions.size() + selectedTags.size() + (minQuantityFilterActive ? 1 : 0)}"></span></summary>
             <div class="filterinnehall">
                 <fieldset>
                     <legend>Vintyp</legend>
@@ -499,6 +499,19 @@
                             </details>
                         </li>
                     </ul>
+                </fieldset>
+
+                <!-- WINE-51: flat lista, inte ett träd som Ursprung ovan -
+                     taggar har ingen hierarki. Döljs helt om ingen tagg
+                     finns ännu (härlett fräscht från samtliga av
+                     användarens viner, se WineService.distinctTags) - en
+                     tom sektion vore bara brus. -->
+                <fieldset th:if="${!allTags.isEmpty()}">
+                    <legend>Taggar</legend>
+                    <label class="kryssrad" th:each="t : ${allTags}">
+                        <input type="checkbox" name="tag" th:value="${t}" th:checked="${selectedTags.contains(t)}">
+                        <span th:text="${t}"></span>
+                    </label>
                 </fieldset>
 
                 <div class="filter-atgarder">
@@ -614,6 +627,9 @@
                         </p>
                         <p class="vk-typ" th:if="${vin.wineType != null}">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
                         <p th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
+                        <div class="chips" th:if="${!vin.tags.isEmpty()}">
+                            <span class="chip" th:each="t : ${vin.tags}" th:text="${t}"></span>
+                        </div>
                     </div>
                     <div class="vk-vivino" th:if="${vin.vivinoRating != null}">
                         <span class="vk-label">Vivino</span>
@@ -704,6 +720,9 @@
                         </p>
                         <p class="vinkort-typ" th:if="${vin.wineType != null}">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
                         <p class="vinkort-druvor" th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
+                        <div class="chips" th:if="${!vin.tags.isEmpty()}">
+                            <span class="chip" th:each="t : ${vin.tags}" th:text="${t}"></span>
+                        </div>
                     </div>
                 </div>
                 <div class="vinkort-betyg">

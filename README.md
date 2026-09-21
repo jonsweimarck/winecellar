@@ -75,6 +75,11 @@ Tabell `wines`:
 | search_vector | `tsvector`, triggerunderhållen | Se "Filtrering, sökning och sortering" |
 | created_at, updated_at | `timestamptz` | Inte byggda ännu |
 
+Ett vin kan dessutom ha valfritt antal taggar, lagrade i en egen
+junction-tabell `wine_tags` (`wine_id` FK → `wines.id`, `tag` text) -
+ingen separat uppslagstabell för taggarna själva, samma fri text-princip
+som `location`/`grapes`. Se "Taggar" nedan.
+
 Namngivningsprincip: engelska för kolumner/tabeller, men svenska
 egennamn som syftar på svenska institutioner behåller sitt svenska namn
 (`munskankarna_review`, `systembolaget_*`).
@@ -117,16 +122,28 @@ vinsamlingen" nedan och [ADR 0021](docs/adr/0021-wine-chat-conversational-llm-in
 
 Startsidan visar en överblick per vin: bild, namn, typ, producent,
 land, region, underregion, druvor, årgång, flaskor, eget betyg,
-Munskänkarnas betyg och Vivino-betyg. Övriga fält (plats, inköpsdatum,
-pris, inköpsanledning, tasting notes, Systembolagets
-produktnummer/beskrivning, Munskänkarnas bedömning, annan referens)
-visas infällt under en "Detaljer"-sektion på mobil - på desktop visas
-alla fält direkt utan infällning.
+Munskänkarnas betyg, Vivino-betyg och eventuella taggar. Övriga fält
+(plats, inköpsdatum, pris, inköpsanledning, tasting notes,
+Systembolagets produktnummer/beskrivning, Munskänkarnas bedömning,
+annan referens) visas infällt under en "Detaljer"-sektion på mobil - på
+desktop visas alla fält direkt utan infällning.
 
 Layouten växlar mellan en bred fyrkolumnslayout (desktop, >960px) och
 en smal kortlayout med infälld Detaljer (mobil, ≤960px) via en CSS
 media query, verifierat av `WineListResponsiveIT` (Playwright) - se
 [ADR 0002](docs/adr/0002-responsive-list-dual-layout.md).
+
+### Taggar
+
+Ett vin kan ha valfritt antal fria taggar (t.ex. "Favorit", "Vardag"),
+lagda till/borttagna på vinets sida för tillägg/redigering -
+ett textfält med en "Lägg till"-knapp, tillagda taggar visas som
+borttagningsbara chips under fältet. Fältet har autocomplete
+(`<datalist>`) mot den inloggade användarens egna, redan använda
+taggar. Taggarna visas som chips direkt på vinlistans kort (både bred
+och smal vy) och kan användas som ett eget filter i verktygsraden (se
+nedan) - ingen separat uppslagstabell, taggar är fri text precis som
+`location`/`grapes`.
 
 ### Filtrering, sökning och sortering
 
@@ -141,9 +158,12 @@ Verktygsraden ovanför listan har:
   betyg och Vivino-betyg. Viner utan värde för det sorterade fältet
   hamnar alltid sist, oavsett riktning.
 - En hopfällbar filterpanel med vintyp (fem kryssrutor), ett
-  "Antal flaskor minst"-fält och ursprung (land→region→underregion,
-  nästlade kryssrutor). Facetter kombineras med OCH sinsemellan, ELLER
-  inom en facett. Panelen fälls automatiskt ut runt redan valda filter.
+  "Antal flaskor minst"-fält, ursprung (land→region→underregion,
+  nästlade kryssrutor) och en flat lista med kryssrutor för taggar
+  (döljs helt om ingen tagg finns ännu). Facetter kombineras med OCH
+  sinsemellan, ELLER inom en facett - ett vin med minst en av de valda
+  taggarna matchar taggfacetten. Panelen fälls automatiskt ut runt
+  redan valda filter.
 - Chips som visar varje aktivt filter-/sökvärde, med en
   borttagningslänk per chip - se
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md).
@@ -160,7 +180,7 @@ filterpanelen för den aktuella sessionen) åsidosätter alltid det
 sparade valet, samma princip som `sort`/`direction`.
 
 Vald sortering/filtrering/sökning hamnar i URL:en
-(`?search=...&sort=...&direction=...&wineType=...&minQuantity=...`) -
+(`?search=...&sort=...&direction=...&wineType=...&tag=...&minQuantity=...`) -
 bokmärkbart och delbart. Orkestreringen ligger i
 `WineService.search(SearchCriteria)`, inte i controllern - se
 [ADR 0006](docs/adr/0006-search-orchestration-in-application-layer.md).

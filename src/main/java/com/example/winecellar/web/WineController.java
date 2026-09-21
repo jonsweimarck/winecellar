@@ -78,11 +78,12 @@ public class WineController {
             @RequestParam(required = false) Set<String> country,
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
+            @RequestParam(required = false) Set<String> tag,
             @RequestParam(required = false) String minQuantity,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             Model model, Authentication authentication) {
         Optional<User> currentUser = CurrentUser.find(authentication, userRepository);
-        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, minQuantity, currentUser);
+        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, tag, minQuantity, currentUser);
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
 
@@ -101,12 +102,13 @@ public class WineController {
      */
     private void populateWineListModel(
             Model model, String search, SortField sort, SortDirection direction,
-            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion,
+            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag,
             String minQuantity, Optional<User> currentUser) {
         Set<String> selectedWineTypes = emptyIfNull(wineType);
         Set<String> selectedCountries = emptyIfNull(country);
         Set<String> selectedRegions = emptyIfNull(region);
         Set<String> selectedSubregions = emptyIfNull(subregion);
+        Set<String> selectedTags = emptyIfNull(tag);
         UserId owner = currentUser.map(User::id).orElse(null);
 
         /*
@@ -129,12 +131,13 @@ public class WineController {
                 .countries(selectedCountries)
                 .regions(selectedRegions)
                 .subregions(selectedSubregions)
+                .tags(selectedTags)
                 .minQuantity(effectiveMinQuantity)
                 .build();
         List<Wine> result = wineService.search(criteria, owner);
         List<OriginNode> originTree = wineService.originTree(owner);
         ExpandedNodes expanded = calculateExpandedNodes(originTree, selectedRegions, selectedSubregions);
-        SearchView searchView = new SearchView(search, sort, direction, selectedWineTypes, selectedCountries, selectedRegions, selectedSubregions);
+        SearchView searchView = new SearchView(search, sort, direction, selectedWineTypes, selectedCountries, selectedRegions, selectedSubregions, selectedTags);
 
         model.addAttribute("wines", result);
         model.addAttribute("totalCount", wineService.listWines(owner).size());
@@ -149,6 +152,8 @@ public class WineController {
         model.addAttribute("selectedSubregions", selectedSubregions);
         model.addAttribute("expandedCountries", expanded.countries());
         model.addAttribute("expandedRegions", expanded.regions());
+        model.addAttribute("allTags", wineService.distinctTags(owner));
+        model.addAttribute("selectedTags", selectedTags);
         model.addAttribute("minQuantity", effectiveMinQuantity);
         model.addAttribute("minQuantityFilterActive", minQuantityFilterActive);
         model.addAttribute("chips", buildChips(searchView));
@@ -193,6 +198,9 @@ public class WineController {
         for (String subregion : searchView.subregions()) {
             chips.add(new Chip(subregion, searchView.urlWithout("subregion", subregion)));
         }
+        for (String tag : searchView.tags()) {
+            chips.add(new Chip(tag, searchView.urlWithout("tag", tag)));
+        }
         return chips;
     }
 
@@ -220,7 +228,7 @@ public class WineController {
      */
     private record SearchView(
             String search, SortField sort, SortDirection direction,
-            Set<String> wineTypes, Set<String> countries, Set<String> regions, Set<String> subregions
+            Set<String> wineTypes, Set<String> countries, Set<String> regions, Set<String> subregions, Set<String> tags
     ) {
         String urlWithout(String facet, String value) {
             UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/");
@@ -233,6 +241,7 @@ public class WineController {
             addAllExcept(builder, "country", countries, facet, value);
             addAllExcept(builder, "region", regions, facet, value);
             addAllExcept(builder, "subregion", subregions, facet, value);
+            addAllExcept(builder, "tag", tags, facet, value);
             return builder.build().encode().toUriString();
         }
 
@@ -289,6 +298,7 @@ public class WineController {
         model.addAttribute("ratings", Rating.values());
         model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
         model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(wine));
+        model.addAttribute("tagSuggestions", wineService.distinctTags(currentOwner(authentication)));
         return "vin-formular";
     }
 
@@ -343,6 +353,7 @@ public class WineController {
         model.addAttribute("ratings", Rating.values());
         model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
         model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(wine));
+        model.addAttribute("tagSuggestions", wineService.distinctTags(currentOwner(authentication)));
         return "vin-formular";
     }
 
@@ -401,6 +412,7 @@ public class WineController {
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
             @RequestParam(required = false) String location,
+            @RequestParam(required = false) Set<String> tags,
             @RequestParam(value = "bild", required = false) MultipartFile image,
             @RequestParam(required = false) String confirmAdd,
             Model model, Authentication authentication, RedirectAttributes redirectAttributes
@@ -410,18 +422,19 @@ public class WineController {
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                 systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
-                munskankarnaRating, vivinoRating, otherReference, location
+                munskankarnaRating, vivinoRating, otherReference, location, tags
         );
         Wine candidate = withImageIfProvided(builder, image).owner(owner).build();
 
         if (!"true".equals(confirmAdd)) {
             DuplicateCheck duplicateCheck = wineService.checkForDuplicate(candidate, owner);
             boolean ownRatingFromScale = currentOwnRatingFromScale(authentication);
+            List<String> tagSuggestions = wineService.distinctTags(owner);
             if (duplicateCheck instanceof DuplicateCheck.FullDuplicate full) {
-                return renderDuplicateWarning(model, candidate, full.existing(), true, ownRatingFromScale);
+                return renderDuplicateWarning(model, candidate, full.existing(), true, ownRatingFromScale, tagSuggestions);
             }
             if (duplicateCheck instanceof DuplicateCheck.PartialDuplicate partial) {
-                return renderDuplicateWarning(model, candidate, partial.existing(), false, ownRatingFromScale);
+                return renderDuplicateWarning(model, candidate, partial.existing(), false, ownRatingFromScale, tagSuggestions);
             }
         }
         wineService.save(candidate);
@@ -438,13 +451,15 @@ public class WineController {
      * "confirmAdd"-knappen i vin-formular.html.
      */
     private static String renderDuplicateWarning(
-            Model model, Wine candidate, Wine existing, boolean fullDuplicate, boolean ownRatingFromScale) {
+            Model model, Wine candidate, Wine existing, boolean fullDuplicate, boolean ownRatingFromScale,
+            List<String> tagSuggestions) {
         model.addAttribute("wine", candidate);
         model.addAttribute("ratings", Rating.values());
         model.addAttribute("ownRatingFromScale", ownRatingFromScale);
         model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(candidate));
         model.addAttribute("duplicateExisting", existing);
         model.addAttribute("duplicateIsFull", fullDuplicate);
+        model.addAttribute("tagSuggestions", tagSuggestions);
         return "vin-formular";
     }
 
@@ -503,6 +518,7 @@ public class WineController {
         model.addAttribute("ratings", Rating.values());
         model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
         model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(wine));
+        model.addAttribute("tagSuggestions", wineService.distinctTags(currentOwner(authentication)));
         return "vin-formular";
     }
 
@@ -530,6 +546,7 @@ public class WineController {
             @RequestParam(required = false) String vivinoRating,
             @RequestParam(required = false) String otherReference,
             @RequestParam(required = false) String location,
+            @RequestParam(required = false) Set<String> tags,
             @RequestParam(value = "bild", required = false) MultipartFile image,
             Authentication authentication, RedirectAttributes redirectAttributes
     ) throws IOException {
@@ -539,7 +556,7 @@ public class WineController {
                 name, wineType, producer, country, region, subregion, grapes, vintage,
                 purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                 systembolagetProductNumber, systembolagetDescription, munskankarnaReview,
-                munskankarnaRating, vivinoRating, otherReference, location
+                munskankarnaRating, vivinoRating, otherReference, location, tags
         );
         wineService.save(withImageIfProvided(wine, image).build());
         redirectAttributes.addFlashAttribute("feedback", "Ändringar sparade");
@@ -582,6 +599,15 @@ public class WineController {
      * visade en dropdown eller ett fritextfält (se
      * User.ownRatingFromScale/vin-formular.html) - till skillnad från
      * `munskankarnaRating`, som fortfarande tolkas som ett `Rating`-namn.
+     *
+     * `tags` (WINE-51) binds direkt som `Set<String>` av Spring (samma
+     * mönster som filterpanelens `wineType`/`country`-checkboxar, se
+     * `wineCellar` ovan) istället för att tas emot som en enda rå
+     * `String` och tolkas här - vin-formular.html postar en checkbox per
+     * tagg (`name="tags"`), inte ett kommaseparerat textfält.
+     * normalizeTags trimmar och filtrerar bort tomma värden;
+     * `Wine.Builder.tags(...)` normaliserar därefter `null`/dubbletter
+     * själv (se Wine.java).
      */
     private static Wine.Builder applyFormFields(
             Wine.Builder builder,
@@ -591,7 +617,7 @@ public class WineController {
             String purchaseReason, String tastingNotes, String ownRating,
             String systembolagetProductNumber, String systembolagetDescription,
             String munskankarnaReview, String munskankarnaRating, String vivinoRating,
-            String otherReference, String location
+            String otherReference, String location, Set<String> tags
     ) {
         return builder
                 .name(name).wineType(parseWineType(wineType))
@@ -607,11 +633,22 @@ public class WineController {
                 .munskankarnaRating(parseRating(munskankarnaRating))
                 .vivinoRating(parseDecimal(vivinoRating))
                 .otherReference(blankToNull(otherReference))
-                .location(blankToNull(location));
+                .location(blankToNull(location))
+                .tags(normalizeTags(tags));
     }
 
     private static String blankToNull(String value) {
         return (value == null || value.isBlank()) ? null : value;
+    }
+
+    private static Set<String> normalizeTags(Set<String> tags) {
+        if (tags == null) {
+            return Set.of();
+        }
+        return tags.stream()
+                .map(String::trim)
+                .filter(t -> !t.isBlank())
+                .collect(Collectors.toSet());
     }
 
     private static WineType parseWineType(String value) {

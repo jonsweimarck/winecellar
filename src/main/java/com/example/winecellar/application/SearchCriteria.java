@@ -34,6 +34,7 @@ public record SearchCriteria(
         Set<String> countries,
         Set<String> regions,
         Set<String> subregions,
+        Set<String> tags,
         int minQuantity,
         SortField sortField,
         SortDirection sortDirection
@@ -49,6 +50,7 @@ public record SearchCriteria(
         private Set<String> countries = Set.of();
         private Set<String> regions = Set.of();
         private Set<String> subregions = Set.of();
+        private Set<String> tags = Set.of();
         private int minQuantity = 0;
         private SortField sortField = SortField.NAME;
         private SortDirection sortDirection = SortDirection.ASCENDING;
@@ -78,6 +80,16 @@ public record SearchCriteria(
             return this;
         }
 
+        /**
+         * WINE-51: samma OCH-mellan-facetter/ELLER-inom-facetten-princip
+         * som övriga facetter (se klassens Javadoc) - ett vin matchar om
+         * det har MINST EN av de valda taggarna.
+         */
+        public Builder tags(Set<String> tags) {
+            this.tags = tags;
+            return this;
+        }
+
         public Builder minQuantity(int minQuantity) {
             this.minQuantity = minQuantity;
             return this;
@@ -94,7 +106,7 @@ public record SearchCriteria(
         }
 
         public SearchCriteria build() {
-            return new SearchCriteria(searchTerm, wineTypes, countries, regions, subregions, minQuantity, sortField, sortDirection);
+            return new SearchCriteria(searchTerm, wineTypes, countries, regions, subregions, tags, minQuantity, sortField, sortDirection);
         }
     }
 }

@@ -154,6 +154,45 @@ class WineListResponsiveIT extends SharedPostgres {
         }
     }
 
+    /**
+     * WINE-51: taggar ska visas direkt på kortet, i BÅDA layouterna, inte
+     * bara nämnas någonstans i HTML:en - `isVisible()` fångar den klass
+     * av bugg `content().string(containsString(...))` i WineControllerTest
+     * inte kan (t.ex. en chip som råkar hamna i en dold/fel gren).
+     */
+    @Test
+    void skaVisaVinetsTaggarSomChipsPåDesktop() {
+        wineService.save(BAROLO_MED_TAGGAR());
+
+        try (BrowserContext context = nyKontext(1280, 800, false)) {
+            Page page = öppnaVinkällaren(context);
+            Locator tabell = page.locator("#vinlista-tabell");
+
+            assertThat(tabell.locator(".chip:has-text(\"Favorit\")").isVisible()).isTrue();
+        }
+    }
+
+    @Test
+    void skaVisaVinetsTaggarSomChipsPåMobil() {
+        wineService.save(BAROLO_MED_TAGGAR());
+
+        try (BrowserContext context = nyKontext(375, 900, true)) {
+            Page page = öppnaVinkällaren(context);
+            Locator kort = page.locator("#vinlista-kort");
+
+            assertThat(kort.locator(".chip:has-text(\"Favorit\")").isVisible()).isTrue();
+        }
+    }
+
+    private Wine BAROLO_MED_TAGGAR() {
+        return Wine.builder()
+                .owner(testkontoId)
+                .name("Chianti").wineType(WineType.RED).producer("Antinori").country("Italien")
+                .vintage(2019).quantity(1)
+                .tags(java.util.Set.of("Favorit"))
+                .build();
+    }
+
     @Test
     void skaVisaFlaskbadgeOchDöljaRedigeraIkonTillsDetaljerFällsUtPåMobil() {
         // isMobile(true) krävs för att CSS-brytpunkten alls ska slå till, se

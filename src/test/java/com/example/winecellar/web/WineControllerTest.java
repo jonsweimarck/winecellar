@@ -778,6 +778,41 @@ class WineControllerTest {
                     )));
         }
 
+        /**
+         * WINE-51: taggfiltret är en flat kryssrutelista (till skillnad
+         * från Ursprungs träd), härledd fräscht från samtliga av
+         * användarens distinkta taggar - se WineService.distinctTags.
+         */
+        @Test
+        @DisplayName("ska rendera en kryssruta per distinkt tagg i filterpanelen")
+        void skaRenderaTaggkryssrutor() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+            when(wineService.distinctTags(any())).thenReturn(List.of("Favorit", "Vardag"));
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("name=\"tag\" value=\"Favorit\""),
+                            containsString("name=\"tag\" value=\"Vardag\"")
+                    )));
+        }
+
+        /**
+         * Granskningsfynd/robusthet: en tom källare (inga taggar ännu)
+         * ska inte visa en tom "Taggar"-sektion i filterpanelen - samma
+         * princip som badgen bara räknar aktiva avvikelser, inte bara
+         * existerande fält.
+         */
+        @Test
+        @DisplayName("ska dölja taggsektionen i filterpanelen när ingen tagg finns ännu")
+        void skaDöljaTaggsektionenUtanTaggar() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(not(containsString("name=\"tag\""))));
+        }
+
         @Test
         @DisplayName("filterpanelens knapp ska heta \"Dölj filter\", inte \"Använd filter\" - checkrutorna applicerar redan filtret vid ändring")
         void skaHaKnappenDöljFilter() throws Exception {
@@ -874,6 +909,23 @@ class WineControllerTest {
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .wineTypes(Set.of(WineType.RED, WineType.WHITE))
                     .countries(Set.of("Italien"))
+                    .minQuantity(1)
+                    .build(), null);
+        }
+
+        @Test
+        @DisplayName("ska skicka valda taggar vidare till WineService")
+        void skaSkickaValdaTaggarTillWineService() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("tag", "Favorit", "Vardag"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .tags(Set.of("Favorit", "Vardag"))
                     .minQuantity(1)
                     .build(), null);
         }
@@ -1094,6 +1146,53 @@ class WineControllerTest {
                     .contains("search=barolo");
         }
 
+        /**
+         * WINE-51: taggchippet i verktygsraden (ett aktivt filter) ska
+         * vara en vanlig <a href>-länk, precis som övriga facettchips
+         * (ADR 0008) - skild från vinkortens egna, icke-klickbara
+         * taggchips (se skaVisaVinetsTaggarSomChipsPåKorten nedan).
+         */
+        @Test
+        @DisplayName("ska visa en chip för ett aktivt taggfilter, med en borttagningslänk")
+        void skaVisaTaggChipMedBorttagningslänk() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+
+            String html = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("tag", "Favorit"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(html).contains("Favorit ×");
+            java.util.regex.Matcher chipLänk = java.util.regex.Pattern
+                    .compile("href=\"([^\"]+)\"[^>]*>Favorit ×")
+                    .matcher(html);
+            assertThat(chipLänk.find()).isTrue();
+            assertThat(chipLänk.group(1)).doesNotContain("tag=Favorit");
+        }
+
+        /**
+         * WINE-51: taggar visas direkt på korten (bekräftat av
+         * produktägaren), inte infällt under "Detaljer" - samma chip-stil
+         * som filterchipsen (.chip i tema.css), men utan länk eftersom de
+         * bara är informativa här, inte en handling.
+         */
+        @Test
+        @DisplayName("ska visa vinets taggar som chips direkt på både breda och smala kort")
+        void skaVisaVinetsTaggarSomChipsPåKorten() throws Exception {
+            Wine barolo = BAROLO.toBuilder().tags(Set.of("Favorit", "Festvin")).build();
+            when(wineService.search(any(), any())).thenReturn(List.of(barolo));
+
+            String html = mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(html)
+                    .contains("class=\"chip\"")
+                    .contains(">Favorit<")
+                    .contains(">Festvin<");
+        }
+
         @Test
         @DisplayName("sökchippet ska visa flera sökord ihopfogade med + istället för som en citerad fras, eftersom sökningen faktiskt är OCH mellan orden")
         void skaVisaFleraSökordMedPlusIChippet() throws Exception {
@@ -1152,6 +1251,29 @@ class WineControllerTest {
                             containsString("name=\"ownRating\""),
                             containsString("name=\"bild\""),
                             containsString("Lägg till")
+                    )));
+        }
+
+        /**
+         * WINE-51: autocompleten (ett vanligt HTML <datalist>, ingen egen
+         * JS-dropdown) fylls med den inloggade användarens redan använda,
+         * distinkta taggar - även vid TILLÄGG, inte bara redigering, så
+         * att en användare kan återanvända en tidigare tagg direkt när
+         * hen loggar in andra gången.
+         */
+        @Test
+        @DisplayName("ska rendera taggfältet med autocomplete-förslag från tidigare använda taggar")
+        void skaRenderaTaggfältetMedFörslag() throws Exception {
+            when(wineService.distinctTags(any())).thenReturn(List.of("Favorit", "Vardag"));
+
+            mockMvc.perform(get("/wines/nytt").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("id=\"tagg-input\""),
+                            containsString("list=\"tagg-forslag\""),
+                            containsString("id=\"tagg-forslag\""),
+                            containsString("value=\"Favorit\""),
+                            containsString("value=\"Vardag\"")
                     )));
         }
 
@@ -1497,6 +1619,30 @@ class WineControllerTest {
                     .build());
         }
 
+        /**
+         * WINE-51: taggar binds direkt till Set<String> (samma mönster som
+         * filterpanelens wineType/country-kryssrutor) - en kryssruta per
+         * tagg (name="tags"), inte ett kommaseparerat textfält. Ett
+         * whitespace-bara "smyg"-värde (kan inte uppstå via UI:t, men
+         * ofarligt att skydda mot ändå) filtreras bort av normalizeTags.
+         */
+        @Test
+        @DisplayName("ska spara taggarna som skickades med formuläret")
+        void skaSparaTaggarna() throws Exception {
+            mockMvc.perform(post("/wines")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "Barolo")
+                            .param("quantity", "3")
+                            .param("tags", "Favorit", "Festvin", "  "))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+
+            verify(wineService).save(Wine.builder()
+                    .name("Barolo").quantity(3)
+                    .tags(Set.of("Favorit", "Festvin"))
+                    .build());
+        }
+
         @Test
         @DisplayName("ska bilden sparas tillsammans med resten av vinet om en fil valdes")
         void skaBildenSparasTillsammansMedResten() throws Exception {
@@ -1695,6 +1841,25 @@ class WineControllerTest {
         }
 
         /**
+         * WINE-51: redan tillagda taggar ska renderas som förkryssade
+         * chips (kryssrutan ÄR "ta bort"-kontrollen, se vin-formular.html)
+         * - inte bara nämnda som text.
+         */
+        @Test
+        @DisplayName("ska förkryssa vinets redan tillagda taggar som chips")
+        void skaFörkryssaRedanTillagdaTaggar() throws Exception {
+            Wine barolo = BAROLO.toBuilder().tags(Set.of("Favorit", "Festvin")).build();
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(barolo));
+
+            mockMvc.perform(get("/wines/1/redigera").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("name=\"tags\" value=\"Favorit\" checked"),
+                            containsString("name=\"tags\" value=\"Festvin\" checked")
+                    )));
+        }
+
+        /**
          * WINE-44: raderingen (med sin bekräftelsedialog) ska bara vara
          * möjlig för ett redan sparat vin, inte på "lägg till"-formuläret
          * (se motsvarande test i NärFormuläretFörEttNyttVinVisas).
@@ -1796,6 +1961,35 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection());
 
             verify(wineService).save(BAROLO);
+        }
+
+        /**
+         * WINE-51: en redigering ERSÄTTER hela tagglistan med det
+         * formuläret faktiskt skickade in - en tidigare borttagen tagg
+         * (dess kryssruta togs bort ur DOM:en innan formuläret skickades,
+         * se vin-formular.html) finns alltså inte kvar bara för att den
+         * fanns på vinet innan.
+         */
+        @Test
+        @DisplayName("ska ersätta vinets taggar med de som skickades med formuläret")
+        void skaErsättaTaggarna() throws Exception {
+            Wine barolo = BAROLO.toBuilder().tags(Set.of("Gammal tagg")).build();
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(barolo));
+
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "Barolo")
+                            .param("quantity", "3")
+                            .param("tags", "Favorit"))
+                    .andExpect(status().is3xxRedirection());
+
+            // Övriga fält blir null eftersom de inte skickades med -
+            // samma "tomt formulärfält blir null"-regel som gäller
+            // resten av applyFormFields (se skaLämnaValfriaFältSomNullNärDeInteFyllsI).
+            verify(wineService).save(Wine.builder()
+                    .id(new WineId(1L)).name("Barolo").quantity(3)
+                    .tags(Set.of("Favorit"))
+                    .build());
         }
 
         @Test

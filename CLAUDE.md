@@ -197,7 +197,41 @@ dem:
 - **Chips är vanliga `<a href>`, inte htmx** - se
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md). En borttagning
   måste uppdatera hela verktygsraden (kryssrutor, sökfält), inte bara
-  vinlistans htmx-fragment.
+  vinlistans htmx-fragment. Sedan WINE-51 återanvänds SAMMA `.chips`/
+  `.chip`-grundstil (flyttad från `vinkallare.html` till `tema.css`,
+  ADR 0019) av tre olika saker som alla ser likadana ut men beter sig
+  olika: filterchipsen ovan (länkar), vinformulärets valda taggar
+  (`<span>`/`<input type="checkbox">`-par, kryssrutan ÄR "ta bort"-
+  kontrollen - se nedan) och vinlistans egna, rent informativa
+  tagg-chips på korten (varken länk eller kontroll).
+- **`Wine.tags` (WINE-51) är en egen junction-tabell (`wine_tags`,
+  `wine_id`/`tag`), INGEN separat taggar-uppslagstabell** - samma "fri
+  text, normalisera inte i onödan"-princip som `location`/`grapes`.
+  `Wine.tags()` är ALDRIG `null` (till skillnad från de flesta andra
+  fälten) - `Wine.Builder.tags(...)` normaliserar `null` till en tom
+  `TreeSet` och lagrar VARJE tilldelning som en ny `TreeSet`, så
+  iterationsordningen är alfabetisk och deterministisk överallt
+  (vinlistans kort, vinformulärets chips, filterpanelen) utan att någon
+  anropsplats behöver sortera själv. `WineEntity.tags` är en
+  `@ElementCollection(fetch = FetchType.EAGER)` - EAGER av exakt samma
+  skäl som `owner` (se nedan): `open-in-view: false` stänger Hibernate-
+  sessionen så fort ett repository-anrop returnerar, och en lat samling
+  hade kastat `LazyInitializationException`. Ett eget Cucumber-scenario
+  (`vin-persistens.feature`) verifierar detta mot en RIKTIG Postgres,
+  inte bara `InMemoryWineRepository` - taggar lever i en helt annan
+  tabell än resten av vinet, så en tyst trasig mappning hade annars
+  bara synts i produktion. `WineService.distinctTags(owner)` härleder
+  filterpanelens kryssrutor OCH vinformulärets `<datalist>`-
+  autocomplete från samma källa (samtliga av ägarens vinets distinkta
+  taggar) - ingen cachning, precis som `originTree()`.
+  Vinformulärets "Lägg till"-knapp för en ny tagg heter medvetet
+  **"Ny tagg", INTE någon text som innehåller "Lägg till"** - en
+  Playwright-strict-mode-krock mot huvudformulärets egen submit-knapp
+  (`ImportExportFlowIT`, som redan hade ett textbaserat
+  `button:has-text("Lägg till")`-locator-beroende) avslöjade att
+  Playwrights `has-text` är en delsträngsmatchning, inte en exakt
+  matchning - en första variant ("Lägg till tagg") löste INTE
+  kollisionen av det skälet.
 - **`location`** är fritext, inte en enum - lådor/förvaringsplatser
   förväntas läggas till över tid.
 - **`quantity`** är en enkel räknare som ändras direkt vid redigering.

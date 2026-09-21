@@ -42,6 +42,17 @@
         .radera-kort { margin-top: 2rem; }
         .farlig-zon-text { margin: 0 0 0.75rem; color: var(--text-dampad); }
         dialog p { margin: 0 0 1rem; }
+
+        /* Taggfältet (WINE-51): input + knapp på samma rad. .falt/input
+           sätter width: 100% globalt (se toppen av den här filen) - flex: 1
+           tillsammans med width: auto låter inputen dela raden med knappen
+           i stället för att själv fylla hela bredden. */
+        .tagg-inmatning { display: flex; gap: 0.5rem; }
+        .tagg-inmatning input { flex: 1; width: auto; }
+        /* Kryssrutan i en taggchip är "ta bort"-kontrollen, inte ett vanligt
+           formulärval - liten och indragen från textens baslinje, inte
+           full bredd (som input/select är som standard på den här sidan). */
+        .chip-tagg input[type="checkbox"] { width: auto; margin: 0; }
     </style>
 </head>
 <body>
@@ -146,6 +157,44 @@
             <label class="falt"><span>Plats</span>
                 <input type="text" name="location" th:value="${wine.location}">
             </label>
+            <!-- WINE-51: taggar - fri text, flera per vin. Precis som
+                 "Etikett" ovan är det en <div>, inte en <label>: fältet
+                 rymmer flera kontroller (textinput, knapp, en kryssruta
+                 per redan tillagd tagg), och en <label> får bara peka på
+                 EN kontroll. Autocomplete (list="tagg-forslag") är
+                 webbläsarens egen <datalist>-mekanism, ingen egen
+                 JS-dropdown behövs. -->
+            <div class="falt"><span>Taggar</span>
+                <div class="tagg-inmatning">
+                    <input type="text" id="tagg-input" list="tagg-forslag" placeholder="Skriv en tagg och lägg till">
+                    <!-- "Ny tagg", INTE en text som innehåller "Lägg till" -
+                         kolliderar annars (Playwrights strict mode, en
+                         delsträngsmatchning, inte bara en exakt matchning)
+                         med huvudformulärets egen submit-knapp
+                         ("Lägg till"/"Spara"), som redan har ett
+                         existerande textbaserat locator-beroende i
+                         ImportExportFlowIT. -->
+                    <button type="button" id="tagg-lagg-till" class="knapp-sekundar">Ny tagg</button>
+                </div>
+                <datalist id="tagg-forslag">
+                    <option th:each="t : ${tagSuggestions}" th:value="${t}"></option>
+                </datalist>
+                <!-- Varje redan tillagd tagg postas som en egen kryssruta
+                     (name="tags") - samma mönster som filterpanelens
+                     wineType/country-kryssrutor (WineController binder
+                     direkt till Set<String>). Kryssrutan ÄR "ta bort"-
+                     kontrollen: den är förkryssad, och att kryssa UR den
+                     tar bort hela chippen ur DOM:en (se skriptet nedan) -
+                     ett omarkerat fält postas aldrig av webbläsaren, så
+                     borttagning kräver ingen extra hantering server-sidan. -->
+                <div class="chips" id="tagg-chips">
+                    <span class="chip chip-tagg" th:each="t : ${wine.tags}">
+                        <input type="checkbox" name="tags" th:value="${t}" checked
+                               th:attr="aria-label=|Ta bort taggen ${t}|">
+                        <span th:text="${t}"></span>
+                    </span>
+                </div>
+            </div>
         </div>
 
         <p class="sektionsrubrik">Inköp</p>
@@ -344,6 +393,70 @@
             fält.addEventListener('input', släckMarkering);
             fält.addEventListener('change', släckMarkering);
         });
+
+        // Taggfältet (WINE-51): lägger till en ny chip i DOM:en utan
+        // sidladdning/htmx - hela tagglistan skickas i stället in som en
+        // vanlig del av formulärets POST (en kryssruta per tagg, se
+        // .chip-tagg ovan). Ingen egen backend-rutt per tagg.
+        (function () {
+            var input = document.getElementById('tagg-input');
+            var läggTillKnapp = document.getElementById('tagg-lagg-till');
+            var chipContainer = document.getElementById('tagg-chips');
+            if (!input || !läggTillKnapp || !chipContainer) {
+                return;
+            }
+
+            function redanTillagdaTaggar() {
+                return Array.from(chipContainer.querySelectorAll('.chip-tagg input[type="checkbox"]'))
+                    .map(function (kryssruta) {
+                        return kryssruta.value.toLowerCase();
+                    });
+            }
+
+            // Kryssrutan ÄR "ta bort"-kontrollen - att kryssa UR den tar
+            // bort hela chippen direkt, i stället för att lämna kvar en
+            // synligt avkryssad (men obrukbar) rest.
+            function bindTaBort(kryssruta) {
+                kryssruta.addEventListener('change', function () {
+                    if (!kryssruta.checked) {
+                        kryssruta.closest('.chip-tagg').remove();
+                    }
+                });
+            }
+            chipContainer.querySelectorAll('.chip-tagg input[type="checkbox"]').forEach(bindTaBort);
+
+            function läggTillTagg() {
+                var värde = input.value.trim();
+                if (!värde || redanTillagdaTaggar().indexOf(värde.toLowerCase()) !== -1) {
+                    input.value = '';
+                    return;
+                }
+                var chip = document.createElement('span');
+                chip.className = 'chip chip-tagg';
+                var kryssruta = document.createElement('input');
+                kryssruta.type = 'checkbox';
+                kryssruta.name = 'tags';
+                kryssruta.value = värde;
+                kryssruta.checked = true;
+                kryssruta.setAttribute('aria-label', 'Ta bort taggen ' + värde);
+                var text = document.createElement('span');
+                text.textContent = värde;
+                chip.appendChild(kryssruta);
+                chip.appendChild(text);
+                bindTaBort(kryssruta);
+                chipContainer.appendChild(chip);
+                input.value = '';
+                input.focus();
+            }
+
+            läggTillKnapp.addEventListener('click', läggTillTagg);
+            input.addEventListener('keydown', function (händelse) {
+                if (händelse.key === 'Enter') {
+                    händelse.preventDefault();
+                    läggTillTagg();
+                }
+            });
+        })();
 
         // Bekräftelsedialogen för "Radera vinet" (WINE-44) - se kommentaren
         // vid <dialog id="radera-dialog"> ovan för varför den bygger på
