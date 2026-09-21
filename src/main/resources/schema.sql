@@ -238,3 +238,22 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS own_rating_from_scale boolean;;
 UPDATE users SET own_rating_from_scale = false WHERE own_rating_from_scale IS NULL;;
 ALTER TABLE users ALTER COLUMN own_rating_from_scale SET DEFAULT false;;
 ALTER TABLE users ALTER COLUMN own_rating_from_scale SET NOT NULL;;
+
+-- WINE-51: taggar - en egen junction-tabell, inte en kolumn på wines och
+-- INGEN separat tags-uppslagstabell (samma "fri text, normalisera inte i
+-- onödan"-princip som location/grapes, se CLAUDE.md). Skapas direkt här
+-- (CREATE TABLE IF NOT EXISTS, inte bara Hibernates ddl-auto: update) -
+-- en helt ny tabell utan datamigrering av befintliga rader är säker att
+-- skapa så här, till skillnad från en ALTER av en redan existerande
+-- kolumn (se CLAUDE.md om search_vector-sagan). ON DELETE CASCADE är ett
+-- extra säkerhetsnät utöver det Hibernate själv redan gör (raderar
+-- @ElementCollection-raderna innan det ägande vinet raderas) - ofarligt
+-- om Hibernate redan hunnit göra jobbet, men skyddar mot att en framtida
+-- direkt SQL-radering av en wines-rad lämnar kvar föräldralösa taggar.
+-- Inget PK/ordningskolumn behövs - wine_tags(wine_id, tag) är exakt den
+-- form ett Set<String>-elementcollection (WineEntity.tags) förväntar sig.
+CREATE TABLE IF NOT EXISTS wine_tags (
+    wine_id bigint NOT NULL REFERENCES wines(id) ON DELETE CASCADE,
+    tag text NOT NULL
+);;
+CREATE INDEX IF NOT EXISTS wine_tags_wine_id_idx ON wine_tags (wine_id);;

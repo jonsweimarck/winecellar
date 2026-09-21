@@ -6,6 +6,7 @@ import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 import org.springframework.stereotype.Repository;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -83,6 +84,7 @@ public class JpaWineRepository implements WineRepository {
         entity.setLocation(wine.location());
         entity.setImage(wine.image());
         entity.setImageMimeType(wine.imageMimeType());
+        entity.setTags(new LinkedHashSet<>(wine.tags()));
         return entity;
     }
 
@@ -130,6 +132,7 @@ public class JpaWineRepository implements WineRepository {
                 .location(entity.getLocation())
                 .image(entity.getImage())
                 .imageMimeType(entity.getImageMimeType())
+                .tags(entity.getTags())
                 .build();
     }
 }

@@ -3,6 +3,7 @@ package com.example.winecellar.application;
 import com.example.winecellar.domain.WineType;
 
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Facetterna är oberoende av varandra och kombineras med OCH (ett vin
@@ -34,6 +35,7 @@ public record SearchCriteria(
         Set<String> countries,
         Set<String> regions,
         Set<String> subregions,
+        Set<String> tags,
         int minQuantity,
         SortField sortField,
         SortDirection sortDirection
@@ -49,6 +51,7 @@ public record SearchCriteria(
         private Set<String> countries = Set.of();
         private Set<String> regions = Set.of();
         private Set<String> subregions = Set.of();
+        private Set<String> tags = Set.of();
         private int minQuantity = 0;
         private SortField sortField = SortField.NAME;
         private SortDirection sortDirection = SortDirection.ASCENDING;
@@ -78,6 +81,24 @@ public record SearchCriteria(
             return this;
         }
 
+        /**
+         * WINE-51: samma OCH-mellan-facetter/ELLER-inom-facetten-princip
+         * som övriga facetter (se klassens Javadoc) - ett vin matchar om
+         * det har MINST EN av de valda taggarna. Normaliseras till samma
+         * skiftlägesokänsliga `TreeSet` (`String.CASE_INSENSITIVE_ORDER`)
+         * som `Wine.tags()` redan använder - annars blir
+         * `WineService.search(...)`s `criteria.tags()::contains`-jämförelse
+         * mot `Wine.tags()` skiftlägeskänslig, trots att `Wine.tags()`
+         * själv inte är det (granskningsfynd, WINE-51).
+         */
+        public Builder tags(Set<String> tags) {
+            this.tags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            if (tags != null) {
+                this.tags.addAll(tags);
+            }
+            return this;
+        }
+
         public Builder minQuantity(int minQuantity) {
             this.minQuantity = minQuantity;
             return this;
@@ -94,7 +115,7 @@ public record SearchCriteria(
         }
 
         public SearchCriteria build() {
-            return new SearchCriteria(searchTerm, wineTypes, countries, regions, subregions, minQuantity, sortField, sortDirection);
+            return new SearchCriteria(searchTerm, wineTypes, countries, regions, subregions, tags, minQuantity, sortField, sortDirection);
         }
     }
 }

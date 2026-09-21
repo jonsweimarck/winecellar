@@ -2,7 +2,9 @@ package com.example.winecellar.infrastructure;
 
 import com.example.winecellar.domain.Rating;
 import com.example.winecellar.domain.WineType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -18,6 +20,8 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * Entiteten har vuxit till att spegla hela Wine (se domain/Wine.java för
@@ -128,6 +132,21 @@ public class WineEntity {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "owner_id")
     private UserEntity owner;
+
+    /**
+     * WINE-51: en egen junction-tabell (wine_tags, se schema.sql), inte en
+     * kolumn på wines - samma "fri text, normalisera inte i onödan"-princip
+     * som location/grapes (se CLAUDE.md), bara flerval i stället för ett
+     * enda fält. EAGER av samma skäl som owner ovan: open-in-view: false
+     * stänger Hibernate-sessionen så fort ett repository-anrop returnerar,
+     * och JpaWineRepository.toDomain(...) läser samlingen EFTER det - en
+     * lat samling hade kastat LazyInitializationException precis som owner
+     * en gång gjorde.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "wine_tags", joinColumns = @JoinColumn(name = "wine_id"))
+    @Column(name = "tag", columnDefinition = "text")
+    private Set<String> tags = new LinkedHashSet<>();
 
     protected WineEntity() {
     }
@@ -330,5 +349,13 @@ public class WineEntity {
 
     void setOwner(UserEntity owner) {
         this.owner = owner;
+    }
+
+    Set<String> getTags() {
+        return tags;
+    }
+
+    void setTags(Set<String> tags) {
+        this.tags = tags;
     }
 }

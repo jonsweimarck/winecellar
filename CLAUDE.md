@@ -139,7 +139,7 @@ dem:
   Inställningen styr bara vilket FORMULÄRELEMENT `vin-formular.html`
   renderar (`WineController.currentOwnRatingFromScale`/
   `CurrentUser.ownRatingFromScale`) - den påverkar aldrig hur ett
-  inskickat värde tolkas eller sparas. Excel-import/export (kolumn N)
+  inskickat värde tolkas eller sparas. Excel-import/export (kolumn O)
   läser/skriver `own_rating` som ren text, utan validering mot de 29
   kända etiketterna (till skillnad från "Munskänkarnas betyg",
   fortfarande validerat via `Rating.fromLabel`). En engångsmigrering
@@ -197,7 +197,41 @@ dem:
 - **Chips är vanliga `<a href>`, inte htmx** - se
   [ADR 0008](docs/adr/0008-filter-chips-plain-links.md). En borttagning
   måste uppdatera hela verktygsraden (kryssrutor, sökfält), inte bara
-  vinlistans htmx-fragment.
+  vinlistans htmx-fragment. Sedan WINE-51 återanvänds SAMMA `.chips`/
+  `.chip`-grundstil (flyttad från `vinkallare.html` till `tema.css`,
+  ADR 0019) av tre olika saker som alla ser likadana ut men beter sig
+  olika: filterchipsen ovan (länkar), vinformulärets valda taggar
+  (`<span>`/`<input type="checkbox">`-par, kryssrutan ÄR "ta bort"-
+  kontrollen - se nedan) och vinlistans egna, rent informativa
+  tagg-chips på korten (varken länk eller kontroll).
+- **`Wine.tags` (WINE-51) är en egen junction-tabell (`wine_tags`,
+  `wine_id`/`tag`), INGEN separat taggar-uppslagstabell** - samma "fri
+  text, normalisera inte i onödan"-princip som `location`/`grapes`.
+  `Wine.tags()` är ALDRIG `null` (till skillnad från de flesta andra
+  fälten) - `Wine.Builder.tags(...)` normaliserar `null` till en tom
+  `TreeSet` och lagrar VARJE tilldelning som en ny `TreeSet`, så
+  iterationsordningen är alfabetisk och deterministisk överallt
+  (vinlistans kort, vinformulärets chips, filterpanelen) utan att någon
+  anropsplats behöver sortera själv. `WineEntity.tags` är en
+  `@ElementCollection(fetch = FetchType.EAGER)` - EAGER av exakt samma
+  skäl som `owner` (se nedan): `open-in-view: false` stänger Hibernate-
+  sessionen så fort ett repository-anrop returnerar, och en lat samling
+  hade kastat `LazyInitializationException`. Ett eget Cucumber-scenario
+  (`vin-persistens.feature`) verifierar detta mot en RIKTIG Postgres,
+  inte bara `InMemoryWineRepository` - taggar lever i en helt annan
+  tabell än resten av vinet, så en tyst trasig mappning hade annars
+  bara synts i produktion. `WineService.distinctTags(owner)` härleder
+  filterpanelens kryssrutor OCH vinformulärets `<datalist>`-
+  autocomplete från samma källa (samtliga av ägarens vinets distinkta
+  taggar) - ingen cachning, precis som `originTree()`.
+  Vinformulärets "Lägg till"-knapp för en ny tagg heter medvetet
+  **"Ny tagg", INTE någon text som innehåller "Lägg till"** - en
+  Playwright-strict-mode-krock mot huvudformulärets egen submit-knapp
+  (`ImportExportFlowIT`, som redan hade ett textbaserat
+  `button:has-text("Lägg till")`-locator-beroende) avslöjade att
+  Playwrights `has-text` är en delsträngsmatchning, inte en exakt
+  matchning - en första variant ("Lägg till tagg") löste INTE
+  kollisionen av det skälet.
 - **`location`** är fritext, inte en enum - lådor/förvaringsplatser
   förväntas läggas till över tid.
 - **`quantity`** är en enkel räknare som ändras direkt vid redigering.
@@ -236,7 +270,7 @@ dem:
   uppladdning och används oförändrat som `Content-Type` vid visning.
   Vinlistan bäddar aldrig in bilddata i HTML-fragmentet - `<img>` pekar
   mot `GET /wines/{id}/bild`.
-- **`Wine` har 23 fält, byggs alltid via `Wine.builder()...build()`**
+- **`Wine` har 24 fält, byggs alltid via `Wine.builder()...build()`**
   (eller `.toBuilder()...build()` för ändringar) - se
   [ADR 0003](docs/adr/0003-wine-builder-pattern.md). Samma mall/sida
   (`vin-formular.html`) för tillägg och redigering; `POST /wines` och
@@ -589,11 +623,18 @@ Webbaserad (Fas 2), inte längre ett fristående CLI-verktyg - det gamla
 är borttaget. `WineRowParser`/`WineRowWriter`/`ImageMatcher` lever kvar
 i `infrastructure/excel/`.
 
-- **"Eget betyg" (kolumn N) är sedan WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md)
+- **"Eget betyg" (kolumn O) är sedan WINE-50/[ADR 0022](docs/adr/0022-own-rating-freetext.md)
   fri text** - läses/skrivs
   rakt av, utan validering mot de 29 kända etiketterna. "Munskänkarnas
-  betyg" (kolumn R) är oförändrat validerat mot dem (`Rating.fromLabel`,
+  betyg" (kolumn S) är oförändrat validerat mot dem (`Rating.fromLabel`,
   kastar ett tydligt fel annars).
+- **Taggar (kolumn L, WINE-51)** läses/skrivs som en kommaseparerad
+  lista via en liten egenskriven `TagListCsv` (`infrastructure/excel/`,
+  standard CSV-citering - ett citattecken runt en tagg som själv
+  innehåller ett kommatecken, dubblerat citattecken för ett citattecken
+  inuti taggen). Ingen extern CSV-bibliotekdependency lades till -
+  reglerna var enkla nog att hålla små och egna, samma "normalisera
+  inte i onödan"-linje som resten av fritextfälten.
 - **Export:** `GET /export/xlsx` (den inloggade användarens egna viner,
   sorterade på namn) och `GET /export/bilder.zip` (en fil per vin med
   bild, namngiven enligt bildnamnskonventionen nedan). Exporten är

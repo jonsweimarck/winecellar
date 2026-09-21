@@ -17,6 +17,7 @@ import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,6 +126,19 @@ public class PersistenceSteps {
         wineService.save(StepSupport.wineWithName(name).toBuilder().ownRating(ownRating).owner(ägare).build());
     }
 
+    /**
+     * WINE-51: verifierar mot en RIKTIG Postgres att taggar (en egen
+     * junction-tabell, wine_tags, inte en kolumn på wines) faktiskt
+     * överlever bortom en enda transaktion - samma sorts fälla som
+     * owner-relationens EAGER/LAZY-saga en gång avslöjade (se CLAUDE.md).
+     */
+    @Givet("att vinet {string} med taggarna {string} är sparat i källaren")
+    public void attVinetMedTaggarnaÄrSparatIKällaren(String name, String tags) {
+        wineService.save(StepSupport.wineWithName(name).toBuilder()
+                .tags(new HashSet<>(List.of(tags.split(",\\s*"))))
+                .owner(ägare).build());
+    }
+
     @När("applikationen startas om")
     public void applikationenStartasOm() {
         entityManager.clear();
@@ -143,6 +157,12 @@ public class PersistenceSteps {
     @Så("ska vinet {string} fortfarande ha eget betyg {string}")
     public void skaVinetFortfarandeHaEgetBetyg(String name, String ownRating) {
         assertThat(StepSupport.findWine(wineService, name).ownRating()).isEqualTo(ownRating);
+    }
+
+    @Så("ska vinet {string} fortfarande ha taggarna {string}")
+    public void skaVinetFortfarandeHaTaggarna(String name, String tags) {
+        assertThat(StepSupport.findWine(wineService, name).tags())
+                .containsExactlyInAnyOrder(tags.split(",\\s*"));
     }
 
     @Så("ska vinet {string} finnas i sökresultatet")

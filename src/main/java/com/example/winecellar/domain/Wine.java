@@ -4,6 +4,8 @@ import com.example.winecellar.domain.User.UserId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * `image`s genererade equals()/hashCode() jämför referens, inte innehåll -
@@ -35,6 +37,16 @@ import java.time.LocalDate;
  * textsträngen rakt av (se `User.ownRatingFromScale`/`WineController`) -
  * `Rating`-enumet används alltså bara för att FYLLA I fältet i det läget,
  * aldrig för att TOLKA/VALIDERA det som sparas.
+ *
+ * `tags` (WINE-51) är fri text, precis som `location`/`grapes` - ingen
+ * separat uppslagstabell, bara en junction-tabell (`wine_tags`, se
+ * WineEntity/schema.sql). ALDRIG `null` (till skillnad från de flesta
+ * andra fälten) - `Builder.tags(...)` normaliserar `null` till en tom
+ * mängd, och lagrar alltid en ny, skiftlägesokänslig `TreeSet`
+ * (`String.CASE_INSENSITIVE_ORDER`) så att iterationsordningen
+ * (alfabetisk, oavsett gemener/versaler) är deterministisk överallt
+ * taggar visas eller jämförs, utan att varje anropsplats (mallar,
+ * filterpanelen) behöver sortera själv.
  */
 public record Wine(
         WineId id,
@@ -70,7 +82,8 @@ public record Wine(
         String otherReference,
         String location,
         byte[] image,
-        String imageMimeType
+        String imageMimeType,
+        Set<String> tags
 ) {
 
     public Wine withQuantity(int newQuantity) {
@@ -122,7 +135,7 @@ public record Wine(
                 .systembolagetDescription(systembolagetDescription)
                 .munskankarnaReview(munskankarnaReview).munskankarnaRating(munskankarnaRating)
                 .vivinoRating(vivinoRating).otherReference(otherReference)
-                .location(location).image(image).imageMimeType(imageMimeType);
+                .location(location).image(image).imageMimeType(imageMimeType).tags(tags);
     }
 
     public static Builder builder() {
@@ -133,10 +146,14 @@ public record Wine(
     }
 
     /**
-     * Wine har vuxit till 23 fält (de flesta nullable, ett-till-ett mot
-     * Vinlista.xlsx) - en positionell 23-argumentskonstruktor vore
-     * oläsbar och felbenägen på anropsplatser. Byggaren är en direkt
-     * konsekvens av fältantalet, inte spekulativ ceremoni.
+     * Wine har vuxit till 24 fält (de flesta nullable, ett-till-ett mot
+     * Vinlista.xlsx - `tags` tillkom i WINE-51 utan motsvarighet i den
+     * ursprungliga källfilen, men fick sedan en egen Excel-kolumn i den
+     * webbaserade import-/exportfunktionen, se
+     * `infrastructure/excel/WineRowParser`/`WineRowWriter`) - en
+     * positionell 24-argumentskonstruktor vore oläsbar och felbenägen på
+     * anropsplatser. Byggaren är en direkt konsekvens av fältantalet,
+     * inte spekulativ ceremoni.
      */
     public static final class Builder {
         private WineId id;
@@ -164,6 +181,7 @@ public record Wine(
         private String location;
         private byte[] image;
         private String imageMimeType;
+        private Set<String> tags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
         public Builder id(WineId id) {
             this.id = id;
@@ -290,11 +308,24 @@ public record Wine(
             return this;
         }
 
+        /**
+         * `null` normaliseras till en tom mängd, och värdet lagras alltid
+         * som en ny, skiftlägesokänslig `TreeSet` - se Wine-klassens
+         * Javadoc för varför.
+         */
+        public Builder tags(Set<String> tags) {
+            this.tags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            if (tags != null) {
+                this.tags.addAll(tags);
+            }
+            return this;
+        }
+
         public Wine build() {
             return new Wine(id, owner, name, wineType, producer, country, region, subregion, grapes,
                     vintage, purchaseDate, price, quantity, purchaseReason, tastingNotes, ownRating,
                     systembolagetProductNumber, systembolagetDescription, munskankarnaReview, munskankarnaRating,
-                    vivinoRating, otherReference, location, image, imageMimeType);
+                    vivinoRating, otherReference, location, image, imageMimeType, tags);
         }
     }
 }

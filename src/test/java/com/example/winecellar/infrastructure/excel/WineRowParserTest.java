@@ -42,16 +42,17 @@ class WineRowParserTest {
         writeCell(row, 8, DateUtil.getExcelDate(LocalDate.of(2024, 3, 15)));
         writeCell(row, 9, 260);
         writeCell(row, 10, 3);
-        writeCell(row, 11, "Prisvärt enligt munskänkarna");
-        writeCell(row, 12, "Ljusröd, doft av jordgubbe.");
-        writeCell(row, 13, "16 (15 - 17,5 Högklassigt vin)");
-        writeCell(row, 14, "9363301");
-        writeCell(row, 15, "Nyanserad, kryddig smak.");
-        writeCell(row, 16, "Mer än prisvärt\n\nNågot återhållen doft.");
-        writeCell(row, 17, "14,5 (12 - 14,5 Bra till mycket bra vin)");
-        writeCell(row, 18, 4.0999999999999996);
-        writeCell(row, 19, "https://example.com/vin");
-        writeCell(row, 20, "Låda 2");
+        writeCell(row, 11, "Favorit, \"Present, jul\"");
+        writeCell(row, 12, "Prisvärt enligt munskänkarna");
+        writeCell(row, 13, "Ljusröd, doft av jordgubbe.");
+        writeCell(row, 14, "16 (15 - 17,5 Högklassigt vin)");
+        writeCell(row, 15, "9363301");
+        writeCell(row, 16, "Nyanserad, kryddig smak.");
+        writeCell(row, 17, "Mer än prisvärt\n\nNågot återhållen doft.");
+        writeCell(row, 18, "14,5 (12 - 14,5 Bra till mycket bra vin)");
+        writeCell(row, 19, 4.0999999999999996);
+        writeCell(row, 20, "https://example.com/vin");
+        writeCell(row, 21, "Låda 2");
 
         Wine wine = parser.parse(row);
 
@@ -66,6 +67,7 @@ class WineRowParserTest {
         assertThat(wine.purchaseDate()).isEqualTo(LocalDate.of(2024, 3, 15));
         assertThat(wine.price()).isEqualByComparingTo("260.00");
         assertThat(wine.quantity()).isEqualTo(3);
+        assertThat(wine.tags()).containsExactlyInAnyOrder("Favorit", "Present, jul");
         assertThat(wine.purchaseReason()).isEqualTo("Prisvärt enligt munskänkarna");
         assertThat(wine.tastingNotes()).isEqualTo("Ljusröd, doft av jordgubbe.");
         assertThat(wine.ownRating()).isEqualTo("16 (15 - 17,5 Högklassigt vin)");
@@ -159,6 +161,25 @@ class WineRowParserTest {
         assertThat(wine.producer()).isNull();
         assertThat(wine.vintage()).isNull();
         assertThat(wine.quantity()).isEqualTo(1);
+        assertThat(wine.tags()).isEmpty();
+    }
+
+    /**
+     * WINE-51: taggkolumnen (L) är en kommaseparerad lista - en tagg som
+     * själv innehåller ett kommatecken citeras (standard CSV-citering).
+     * Den faktiska parsnings-/skrivningslogiken (inkl. citattecken-i-
+     * citattecken) testas i sin helhet i {@link TagListCsvTest} - det här
+     * testet verifierar bara att WineRowParser faktiskt kopplar rätt
+     * kolumn till {@link TagListCsv#parse(String)}.
+     */
+    @Test
+    void skaLäsaTaggarSomKommasepararadListaMedCitattecknadTaggInnehållandeKommatecken() {
+        Row row = minimalRow();
+        writeCell(row, 11, "Favorit, \"Fest, jul\"");
+
+        Wine wine = parser.parse(row);
+
+        assertThat(wine.tags()).containsExactlyInAnyOrder("Favorit", "Fest, jul");
     }
 
     /**
@@ -172,7 +193,7 @@ class WineRowParserTest {
     void skaMatchaMunskänkarnasBetygMedDubblaMellanslagIKällfilen() {
         Row row = minimalRow();
         // Källfilens rad för 8,5 har dubbla mellanslag: "8,5  (6 - 8,5  Enkel vin)".
-        writeCell(row, 17, "8,5  (6 - 8,5  Enkel vin)");
+        writeCell(row, 18, "8,5  (6 - 8,5  Enkel vin)");
 
         Wine wine = parser.parse(row);
 
@@ -187,7 +208,7 @@ class WineRowParserTest {
     @Test
     void skaLäsaEgetBetygSomFriTextUtanValidering() {
         Row row = minimalRow();
-        writeCell(row, 13, "999 (påhittat betyg, inte alls i skalan)");
+        writeCell(row, 14, "999 (påhittat betyg, inte alls i skalan)");
 
         Wine wine = parser.parse(row);
 
@@ -207,8 +228,8 @@ class WineRowParserTest {
     @Test
     void skaLämnaSystembolagetsBeskrivningNullOmDenSaknasMenAnvändaProduktnummerkolumnen() {
         Row row = minimalRow();
-        writeCell(row, 14, "5020201");
-        // Kolumn 15 (beskrivningen) lämnas tom.
+        writeCell(row, 15, "5020201");
+        // Kolumn 16 (beskrivningen) lämnas tom.
 
         Wine wine = parser.parse(row);
 
@@ -219,7 +240,7 @@ class WineRowParserTest {
     @Test
     void skaKastaTydligtFelOmMunskänkarnasBetygInteMatcharNågotAvDe29Kända() {
         Row row = minimalRow();
-        writeCell(row, 17, "999 (påhittat betyg)");
+        writeCell(row, 18, "999 (påhittat betyg)");
 
         assertThatThrownBy(() -> parser.parse(row))
                 .isInstanceOf(IllegalArgumentException.class)

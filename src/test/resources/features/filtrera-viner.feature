@@ -92,3 +92,54 @@ Egenskap: Filtrera vinlistan
     När jag filtrerar vinlistan på:
       | minAntalFlaskor | 0 |
     Så ska vinlistan innehålla "Barolo, Chablis"
+
+  # WINE-51: taggar är fri text (samma "normalisera inte i onödan"-princip
+  # som land/druvor) - ett vin kan ha flera, och en tagg-facett filtrerar
+  # precis som vintyp/land/region: ELLER inom facetten, OCH mot övriga.
+  Scenario: Filtrera på en tagg
+    Givet att källaren innehåller följande viner:
+      | namn    | taggar           |
+      | Barolo  | Favorit, Festvin |
+      | Chablis | Vardag           |
+    När jag filtrerar vinlistan på:
+      | tagg | Favorit |
+    Så ska vinlistan innehålla "Barolo"
+    Och vinlistan ska inte innehålla "Chablis"
+
+  Scenario: Flera valda taggar är en "eller"-filtrering inom samma facett
+    Givet att källaren innehåller följande viner:
+      | namn      | taggar  |
+      | Barolo    | Favorit |
+      | Chablis   | Vardag  |
+      | Champagne | Present |
+    När jag filtrerar vinlistan på:
+      | tagg | Favorit, Vardag |
+    Så ska vinlistan innehålla "Barolo, Chablis"
+    Och vinlistan ska inte innehålla "Champagne"
+
+  Scenario: Taggfilter kombineras med andra facetter via "och"-logik
+    Givet att källaren innehåller följande viner:
+      | namn    | vintyp | taggar  |
+      | Barolo  | Rött   | Favorit |
+      | Chianti | Rött   | Vardag  |
+      | Chablis | Vitt   | Favorit |
+    När jag filtrerar vinlistan på:
+      | vintyp | Rött    |
+      | tagg   | Favorit |
+    Så ska vinlistan innehålla "Barolo"
+    Och vinlistan ska inte innehålla "Chianti, Chablis"
+
+  # WINE-51 (granskningsrunda 2): taggfiltret ska vara skiftlägesokänsligt,
+  # precis som Wine.tags() (Wine.Builder.tags() lagrar alltid i en
+  # CASE_INSENSITIVE_ORDER-TreeSet) och distinctTags()/filterpanelens
+  # kryssrutor redan är - ett vin taggat med gemener ska matchas av ett
+  # filter angivet med versaler, eller tvärtom.
+  Scenario: Taggfiltret är skiftlägesokänsligt
+    Givet att källaren innehåller följande viner:
+      | namn    | taggar  |
+      | Barolo  | favorit |
+      | Chablis | vardag  |
+    När jag filtrerar vinlistan på:
+      | tagg | Favorit |
+    Så ska vinlistan innehålla "Barolo"
+    Och vinlistan ska inte innehålla "Chablis"

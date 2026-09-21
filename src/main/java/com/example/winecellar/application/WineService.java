@@ -57,6 +57,7 @@ public class WineService {
                 .filter(wine -> criteria.countries().isEmpty() || criteria.countries().contains(wine.country()))
                 .filter(wine -> criteria.regions().isEmpty() || criteria.regions().contains(wine.region()))
                 .filter(wine -> criteria.subregions().isEmpty() || criteria.subregions().contains(wine.subregion()))
+                .filter(wine -> criteria.tags().isEmpty() || wine.tags().stream().anyMatch(criteria.tags()::contains))
                 .filter(wine -> wine.quantity() >= criteria.minQuantity())
                 .collect(Collectors.toCollection(ArrayList::new));
         result.sort(criteria.sortField().comparator(criteria.sortDirection()));
@@ -104,6 +105,25 @@ public class WineService {
             tree.add(new OriginNode(countryEntry.getKey(), regionNodes));
         }
         return tree;
+    }
+
+    /**
+     * Distinkta taggar bland samtliga av ägarens viner (WINE-51) -
+     * härlett fräscht vid varje anrop, precis som originTree() ovan (ingen
+     * uppslagstabell, taggar är fri text, se CLAUDE.md). Används både av
+     * filterpanelens kryssrutor (vinkallare.html) och av
+     * vinformulärets `<datalist>`-autocomplete (vin-formular.html). Redan
+     * alfabetiskt, skiftlägesokänsligt sorterad - Wine.tags() är alltid
+     * en skiftlägesokänslig TreeSet (se Wine.Builder), och samma
+     * ordning används här för att slå ihop och deduplicera utan ett
+     * extra sorteringssteg.
+     */
+    public List<String> distinctTags(UserId owner) {
+        Set<String> allTags = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (Wine wine : wineRepository.findAllByOwner(owner)) {
+            allTags.addAll(wine.tags());
+        }
+        return List.copyOf(allTags);
     }
 
     public Optional<Wine> findById(WineId id, UserId owner) {

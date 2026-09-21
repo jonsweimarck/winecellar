@@ -17,6 +17,7 @@ import io.cucumber.java.sv.Så;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,7 +72,10 @@ public class SearchAndFilterSteps {
                     // värde sparas rakt av, ingen Rating-tolkning längre
                     // (till skillnad från "munskänkarnas betyg" nedan, som
                     // är oförändrat en sluten betygsskala).
-                    .ownRating(blankToNull(row.get("eget betyg")));
+                    .ownRating(blankToNull(row.get("eget betyg")))
+                    // WINE-51: taggar är fri text, kommaseparerade i tabellen -
+                    // samma "eller inom facetten"-princip som vintyp ovan.
+                    .tags(tagsFromRow(row));
             String munskänkarnasBetygLabel = row.get("munskänkarnas betyg");
             if (munskänkarnasBetygLabel != null && !munskänkarnasBetygLabel.isBlank()) {
                 wine.munskankarnaRating(Rating.fromLabel(munskänkarnasBetygLabel));
@@ -122,6 +126,9 @@ public class SearchAndFilterSteps {
         }
         if (criteriaRow.containsKey("minAntalFlaskor")) {
             builder.minQuantity(Integer.parseInt(criteriaRow.get("minAntalFlaskor")));
+        }
+        if (criteriaRow.containsKey("tagg")) {
+            builder.tags(new HashSet<>(commaList(criteriaRow.get("tagg"))));
         }
         result = wineService.search(builder.build(), null);
     }
@@ -192,5 +199,10 @@ public class SearchAndFilterSteps {
     private static int integerOrDefault(Map<String, String> row, String column, int defaultValue) {
         String value = row.get(column);
         return value == null || value.isBlank() ? defaultValue : Integer.parseInt(value);
+    }
+
+    private static Set<String> tagsFromRow(Map<String, String> row) {
+        String raw = row.get("taggar");
+        return raw == null || raw.isBlank() ? Set.of() : new HashSet<>(commaList(raw));
     }
 }
