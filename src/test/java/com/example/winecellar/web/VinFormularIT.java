@@ -299,6 +299,17 @@ class VinFormularIT extends SharedPostgres {
      * isMobile(true)/hasTouch(true) krävs för att över huvud taget
      * spegla en riktig mobil webbläsarkontext, inte bara en smal
      * setViewportSize - se CLAUDE.md.
+     * <p>
+     * UPPFÖLJNING (granskningsfynd EFTER merge, rapporterat av en riktig
+     * användare - mvn verify OCH den ursprungliga varianten av just det
+     * här testet var gröna trots att listan i praktiken inte gick att
+     * se på mobil). Grundorsaken var att "Taggar" är sista fältet i sin
+     * .kort, och .kort har overflow: hidden (tema.css, för att klippa
+     * runda hörn) - vilket klippte bort förslagslistan. Testet
+     * använder nu {@link #geometriskSynlig}, inte bara
+     * {@code Locator.isVisible()}, som INTE upptäcker den klassen av
+     * fel (ett klippt-av-förälder-element har fortfarande en normal,
+     * icke-noll bounding box).
      */
     @Test
     void skaVisaAutocompleteFörslagIEnMobilWebbläsarkontext() {
@@ -322,6 +333,9 @@ class VinFormularIT extends SharedPostgres {
 
             assertThat(förslagslista.isVisible()).isTrue();
             assertThat(förslagslista.locator("li").first().textContent()).isEqualTo("Favorit");
+            assertThat(geometriskSynlig(sida, "#tagg-forslagslista li:nth-child(1)"))
+                    .as("förslaget ska vara faktiskt synligt, inte bara ha en icke-noll bounding box")
+                    .isTrue();
 
             // Att klicka en förslagspost lägger till den direkt som en
             // tagg (samma semantik som Enter på en tangentbordsmarkerad
@@ -332,6 +346,49 @@ class VinFormularIT extends SharedPostgres {
             assertThat(sida.locator("#tagg-input").inputValue()).isEmpty();
             assertThat(förslagslista.isVisible()).isFalse();
             assertThat(sida.locator("#tagg-chips .chip-tagg").last().textContent().trim()).isEqualTo("Favorit ×");
+        }
+    }
+
+    /**
+     * WINE-52 (granskningsfynd EFTER merge, rapporterat av en riktig
+     * användare - "på dator får bara första träffen plats i
+     * träfflistan"). Både mvn verify och de ursprungliga Playwright-
+     * testerna var gröna trots detta, eftersom inget test hittills
+     * hade mer än EN matchande tagg samtidigt - med bara en post i
+     * listan syns aldrig skillnaden mellan "en post genuint synlig" och
+     * "en post som RÅKAR vara den enda som inte hunnit klippas bort".
+     * Grundorsaken: "Taggar" är sista fältet i sin .kort, och .kort har
+     * overflow: hidden (tema.css, för att klippa runda hörn) - vilket
+     * klippte bort förslagslistan (helt eller delvis, beroende på hur
+     * nära kortets nederkant fältet råkade vara). Verifierat manuellt
+     * mot en riktig körande app innan fixen (samma testscenario gav då
+     * `geometriskSynlig() == false` för BÅDA posterna).
+     */
+    @Test
+    void skaVisaFleraGenuintSynligaFörslagUtanAttKlippasAvKortetsOverflow() {
+        try (BrowserContext context = nyInloggadKontext()) {
+            Page förstaVinet = öppnaFormuläret(context);
+            förstaVinet.locator("input[name=name]").fill("Barolo (flera förslag)");
+            förstaVinet.locator("input[name=quantity]").fill("1");
+            förstaVinet.locator("#tagg-input").fill("Favorit");
+            förstaVinet.locator("#tagg-lagg-till").click();
+            förstaVinet.locator("#tagg-input").fill("Favoritvin");
+            förstaVinet.locator("#tagg-lagg-till").click();
+            förstaVinet.locator("button[type=submit]").last().click();
+            förstaVinet.waitForURL(url("/"));
+
+            Page sida = öppnaFormuläret(context);
+            sida.locator("#tagg-input").fill("fav");
+
+            Locator poster = sida.locator("#tagg-forslagslista li");
+            assertThat(poster.count()).isEqualTo(2);
+            assertThat(poster.allTextContents()).containsExactlyInAnyOrder("Favorit", "Favoritvin");
+
+            for (int i = 1; i <= poster.count(); i++) {
+                assertThat(geometriskSynlig(sida, "#tagg-forslagslista li:nth-child(" + i + ")"))
+                        .as("post %d ska vara faktiskt synlig, inte klippt av kortets overflow: hidden", i)
+                        .isTrue();
+            }
         }
     }
 
@@ -421,6 +478,31 @@ class VinFormularIT extends SharedPostgres {
             assertThat(computedStyle(sida, ".chips > .chip", "padding")).isEqualTo(padding);
             assertThat(computedStyle(sida, ".chips > .chip", "font-size")).isEqualTo(typsnittsstorlek);
         }
+    }
+
+    /**
+     * Kollar att elementet FAKTISKT är målat och synligt på den plats
+     * det själv rapporterar (getBoundingClientRect) - till skillnad
+     * från {@code Locator.isVisible()}, som bara kollar CSS display/
+     * visibility och en icke-noll yta. Ett element kan ha en fullt
+     * normal, icke-noll bounding box men ändå vara helt osynligt för en
+     * riktig användare om en förälder klipper bort det
+     * (overflow: hidden) - exakt den klassen av bugg som WINE-52:s
+     * taggförslag hade (granskningsfynd EFTER merge, hittat av en
+     * riktig användare - varken mvn verify eller de ursprungliga
+     * Playwright-testerna fångade det). document.elementFromPoint(...)
+     * frågar webbläsaren vad som FAKTISKT ritas på en given
+     * skärmpunkt - precis det isVisible() inte gör.
+     */
+    private boolean geometriskSynlig(Page sida, String väljare) {
+        return (Boolean) sida.evaluate(
+                "väljare => { const el = document.querySelector(väljare); if (!el) return false;"
+                        + " const r = el.getBoundingClientRect();"
+                        + " if (r.width === 0 || r.height === 0) return false;"
+                        + " const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;"
+                        + " const träff = document.elementFromPoint(cx, cy);"
+                        + " return !!träff && (träff === el || el.contains(träff) || träff.contains(el)); }",
+                väljare);
     }
 
     /** Ett enskilt CSS-egenskapsvärde, så som webbläsaren faktiskt beräknat det. */
