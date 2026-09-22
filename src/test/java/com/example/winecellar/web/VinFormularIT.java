@@ -9,6 +9,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.FilePayload;
 import com.microsoft.playwright.Playwright;
+import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -389,6 +390,77 @@ class VinFormularIT extends SharedPostgres {
                         .as("post %d ska vara faktiskt synlig, inte klippt av kortets overflow: hidden", i)
                         .isTrue();
             }
+
+            // Granskningsfynd (PR #35): JS sätter listans bredd till
+            // exakt inputens rect.width - utan box-sizing: border-box
+            // (se .tagg-forslagslista i <style>) hade den 1px-borderen
+            // lagts UTANPÅ den bredden, och listan stuckit ut ~2px till
+            // höger om inputens kant.
+            double inputBredd = sida.locator("#tagg-input").boundingBox().width;
+            double listBredd = sida.locator("#tagg-forslagslista").boundingBox().width;
+            assertThat(listBredd).isCloseTo(inputBredd, Offset.offset(0.5));
+        }
+    }
+
+    /**
+     * WINE-52 (granskningsfynd, PR #35): window.innerHeight krymper INTE
+     * när ett riktigt mobilt tangentbord öppnas i iOS Safari - bara
+     * window.visualViewport.height gör det där, vilket är precis den
+     * höjd flip-logiken i vin-formular.html (synligViewporthöjd()) läser
+     * sedan den här fixen. Chromiums mobilemulering (isMobile(true), se
+     * övriga WINE-52-tester) simulerar INTE ett riktigt mjukt
+     * tangentbord - det finns inget sätt att trigga en äkta
+     * visualViewport-krympning i ett automatiserat test. I stället
+     * stubbas window.visualViewport direkt i sidan med ett konstgjort,
+     * litet height-värde: testet bevisar därmed att koden FAKTISKT
+     * läser window.visualViewport.height (inte bara window.innerHeight)
+     * när den finns - ett regressionsskydd mot att koden tyst faller
+     * tillbaka till det gamla, trasiga beteendet.
+     * <p>
+     * En hög viewport (1280×2000, se {@link #nyInloggadKontext(int, int)})
+     * garanterar gott om utrymme nedanför enligt den RIKTIGA
+     * window.innerHeight - om testet ändå ser en flip efter stubben
+     * beror det bevisligen på stubben, inte på att "Taggar" redan ligger
+     * nära kortets nederkant (som i de andra WINE-52-testerna).
+     */
+    @Test
+    void skaAnvändaVisualViewportFörAttUpptäckaEttSimuleratTangentbord() {
+        try (BrowserContext context = nyInloggadKontext(1280, 2000)) {
+            Page förstaVinet = öppnaFormuläret(context);
+            förstaVinet.locator("input[name=name]").fill("Barolo (visualViewport)");
+            förstaVinet.locator("input[name=quantity]").fill("1");
+            förstaVinet.locator("#tagg-input").fill("Favorit");
+            förstaVinet.locator("#tagg-lagg-till").click();
+            förstaVinet.locator("button[type=submit]").last().click();
+            förstaVinet.waitForURL(url("/"));
+
+            Page sida = öppnaFormuläret(context);
+            Locator input = sida.locator("#tagg-input");
+            Locator lista = sida.locator("#tagg-forslagslista");
+
+            // Före stubben: gott om utrymme nedanför i den höga
+            // viewporten - listan ska visas NEDANFÖR inputen som vanligt.
+            input.fill("fav");
+            assertThat(lista.boundingBox().y).isGreaterThanOrEqualTo(
+                    input.boundingBox().y + input.boundingBox().height);
+
+            // Stubbar window.visualViewport med en konstgjord, mycket
+            // lägre höjd - simulerar att ett mjukt tangentbord täcker
+            // nedre delen av skärmen, utan att faktiskt öppna ett.
+            sida.evaluate("() => { window.visualViewport = "
+                    + "{ height: 100, addEventListener: () => {}, removeEventListener: () => {} }; }");
+            // Blur + refokusera för att trigga en ny positionering (samma
+            // kodväg som en riktig visualViewport-resize-händelse hade
+            // gjort) - inputens VÄRDE är oförändrat, så en ren fill()
+            // riskerar att vara ett no-op i webbläsarens ögon.
+            input.evaluate("el => el.blur()");
+            input.click();
+
+            // Efter stubben: listan ska nu vara flippad OVANFÖR inputen,
+            // trots att den riktiga window.innerHeight fortfarande har
+            // gott om utrymme kvar.
+            assertThat(lista.boundingBox().y + lista.boundingBox().height)
+                    .isLessThanOrEqualTo(input.boundingBox().y);
         }
     }
 
@@ -556,10 +628,26 @@ class VinFormularIT extends SharedPostgres {
      * -medveten CSS-brytpunkt annars aldrig triggas i testet.
      */
     private BrowserContext nyInloggadKontext(boolean mobil) {
-        BrowserContext context = browser.newContext(new Browser.NewContextOptions()
+        return nyInloggadKontext(new Browser.NewContextOptions()
                 .setViewportSize(mobil ? 375 : 1280, mobil ? 667 : 800)
                 .setIsMobile(mobil)
                 .setHasTouch(mobil));
+    }
+
+    /**
+     * Explicit viewport-storlek, utan mobilemulering - används av
+     * {@link #skaAnvändaVisualViewportFörAttUpptäckaEttSimuleratTangentbord}
+     * för att garantera GOTT OM utrymme nedanför inputen INNAN
+     * window.visualViewport stubbas, så att flippen i testet bevisligen
+     * beror på stubben - inte råkar bero på att "Taggar" redan ligger
+     * nära kortets nederkant (som i de andra WINE-52-testerna).
+     */
+    private BrowserContext nyInloggadKontext(int bredd, int höjd) {
+        return nyInloggadKontext(new Browser.NewContextOptions().setViewportSize(bredd, höjd));
+    }
+
+    private BrowserContext nyInloggadKontext(Browser.NewContextOptions options) {
+        BrowserContext context = browser.newContext(options);
         Page inloggningssida = context.newPage();
         inloggningssida.navigate(url("/login"));
         inloggningssida.locator("#username").fill(TESTKONTO_ANVÄNDARNAMN);

@@ -90,6 +90,15 @@
            varje visning samt vid scroll/resize medan listan är öppen
            (annars "driver" den bort från inputen). */
         .tagg-forslagslista {
+            /* Granskningsfynd (PR #35): JS:en sätter width till exakt
+               inputens rect.width (se positioneraFörslag() nedan) - utan
+               border-box hade den 1px-borderen (nedan) lagts UTANPÅ den
+               bredden i stället för att räknas in i den, och listan hade
+               stuckit ut ~2px till höger om inputens kant. Det globala
+               "input, select, textarea { width: 100% }"-resetet högst
+               upp i den här filen sätter inte box-sizing, och <ul> täcks
+               inte av det urvalet ändå. */
+            box-sizing: border-box;
             position: fixed;
             z-index: 20;
             margin: 0;
@@ -545,10 +554,26 @@
             // av anroparen innan detta anrop) och läsa dess FAKTISKA,
             // eventuellt max-height-begränsade rand - ingen uppskattning
             // behövs.
+            //
+            // Granskningsfynd (PR #35): window.innerHeight krymper INTE
+            // när ett riktigt mobilt tangentbord öppnas i iOS Safari -
+            // bara window.visualViewport.height gör det där. Utan detta
+            // hade flip-beslutet trott att det fanns gott om utrymme
+            // nedanför (mätt mot HELA layout-viewporten) trots att
+            // tangentbordet i praktiken täckte just det utrymmet - exakt
+            // scenariot i den ursprungliga felrapporten. Alla webbläsare
+            // som stödjer Visual Viewport API (i praktiken alla moderna,
+            // inklusive Android Chrome) får alltså den korrekta,
+            // synliga höjden; webbläsare helt utan stödet faller tillbaka
+            // till innerHeight (oförändrat beteende där).
+            function synligViewporthöjd() {
+                return (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+            }
+
             function positioneraFörslag() {
                 var rect = input.getBoundingClientRect();
                 var listHöjd = lista.getBoundingClientRect().height;
-                var utrymmeNedanför = window.innerHeight - rect.bottom;
+                var utrymmeNedanför = synligViewporthöjd() - rect.bottom;
                 var visaOvanför = utrymmeNedanför < listHöjd + 4 && rect.top > listHöjd + 4;
                 lista.style.left = rect.left + 'px';
                 lista.style.width = rect.width + 'px';
@@ -691,16 +716,25 @@
             // förälder). true (capture) fångar även scroll inuti ett
             // eventuellt nästlat scrollbart element, inte bara
             // fönstret som helhet.
-            window.addEventListener('scroll', function () {
+            function ompositioneraOmSynlig() {
                 if (!lista.hidden) {
                     positioneraFörslag();
                 }
-            }, true);
-            window.addEventListener('resize', function () {
-                if (!lista.hidden) {
-                    positioneraFörslag();
-                }
-            });
+            }
+            window.addEventListener('scroll', ompositioneraOmSynlig, true);
+            window.addEventListener('resize', ompositioneraOmSynlig);
+            // Granskningsfynd (PR #35): window - varken 'scroll' eller
+            // 'resize' - triggas pålitligt när ett riktigt mobilt
+            // tangentbord visas/döljs i iOS Safari. Visual Viewport-
+            // API:ets EGNA händelser gör det, i webbläsare som stödjer
+            // det - utan den här extra lyssnaren hade listan (positionerad
+            // vid tangentbordets ÖPPNING) blivit kvar på fel plats om
+            // tangentbordet sedan stängdes/öppnades igen medan listan var
+            // synlig.
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', ompositioneraOmSynlig);
+                window.visualViewport.addEventListener('scroll', ompositioneraOmSynlig);
+            }
             // Granskningsfynd (PR #34): ArrowDown/ArrowUp flyttar
             // markeringen i förslagslistan, och Enter väljer/lägger till
             // den markerade posten i stället för att blint lägga till
