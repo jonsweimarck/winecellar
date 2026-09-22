@@ -234,6 +234,24 @@ dem:
   men bara som en enkel, serverrenderad DATAKÄLLA som skriptet läser
   `<option>`-värdena ur; inputen har inte längre ett `list`-attribut, så
   webbläsaren renderar aldrig sin egen, opålitliga variant.
+  **Den EGNA dropdownen hade i sin tur ett eget klippningsfel, hittat av
+  en riktig användare EFTER att WINE-52 redan var mergad** (mvn verify
+  och samtliga Playwright-test var gröna ändå - se Kända fällor för den
+  generella lärdomen om `Locator.isVisible()`). `<ul id=
+  "tagg-forslagslista">` byggdes ursprungligen inne i "Taggar"-fältet,
+  positionerad `position: absolute` relativt fältet - men fältet är
+  sista raden i sin `.kort`, och `.kort` har `overflow: hidden` (för att
+  klippa runda hörn), vilket klippte bort större delen av listan oavsett
+  antal träffar. Löst genom att flytta `<ul>`:en till `<body>` i JS
+  (en gång vid sidladdning) och positionera den `position: fixed`,
+  beräknat från inputens `getBoundingClientRect()` vid varje visning
+  samt vid scroll/resize medan den är öppen - `position: fixed` klipps
+  inte av någon förälders `overflow`. Listan "flippar" dessutom till att
+  visas OVANFÖR inputen i stället för nedanför om utrymmet nedanför inte
+  räcker (vanligt eftersom "Taggar" ofta hamnar nära nederkanten av den
+  synliga ytan, särskilt på mobil) - höjden mäts genom att tillfälligt
+  visa listan och läsa dess faktiska (eventuellt max-height-begränsade)
+  höjd, ingen uppskattning.
   **Samma story (WINE-52) gav taggchipsen (span/kryssruta-paret för en
   redan tillagd tagg) samma stil som filterchipsen ovan** - den faktiska
   skillnaden var INTE `.chips`/`.chip`-grundstilen (som redan delades,
@@ -279,6 +297,26 @@ dem:
   en 1x1-pixel-input räknas som synlig. Mät den renderade ytan i stället.
   `evaluate` returnerar dessutom `Integer` för hela tal och `Double`
   annars; casta via `Number`.
+- **`Locator.isVisible()` är LIKA fel verktyg för ett element som klipps
+  bort av en FÖRÄLDERS `overflow: hidden`** - en annan variant av samma
+  grundproblem som föregående punkt, hittad av en riktig användare EFTER
+  att WINE-52 redan var mergad (mvn verify och alla Playwright-test hade
+  varit gröna). Ett `position: absolute`-barn som visuellt klipps bort av
+  en förälders `overflow: hidden` (t.ex. `.kort`, som använder det för
+  att klippa runda hörn) behåller sin egen, fullt normala,
+  icke-noll `getBoundingClientRect()` - `isVisible()` ser alltså
+  fortfarande "synlig" ut trots att ingen pixel av elementet faktiskt
+  målas för en riktig användare. Upptäck den klassen av fel genom att
+  fråga webbläsaren vad som FAKTISKT ritas på elementets egen
+  mittpunkt: `document.elementFromPoint(cx, cy)` ska vara elementet
+  själv (eller en anfader/ättling till det) - inte bara att elementets
+  bounding box har en area. Se `VinFormularIT.geometriskSynlig` för en
+  återanvändbar implementation. Den robusta FIXEN för själva klippningen
+  (inte bara testet som upptäcker den) är att flytta det klippta
+  elementet ur den klippande förälderns DOM-delträd (t.ex. till
+  `<body>` via JS) och positionera det `position: fixed`, beräknat från
+  källelementets `getBoundingClientRect()` - `position: fixed` klipps
+  inte av NÅGON förälders `overflow`, till skillnad från `absolute`.
 - **UI-testfälla att komma ihåg:** `WineListResponsiveIT`/
   `ImportExportFlowIT` klickar länkar där de faktiskt sitter i UI:t.
   Flyttas en länk till en annan sida (som export gjorde i WINE-37) går

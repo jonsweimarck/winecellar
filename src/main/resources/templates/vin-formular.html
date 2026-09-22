@@ -48,14 +48,12 @@
            tillsammans med width: auto låter inputen dela raden med knappen
            i stället för att själv fylla hela bredden.
            .tagg-input-yta (WINE-52) är en egen flex-item-wrapper runt bara
-           inputen (inte knappen) - dels för att kunna positionera
-           förslagslistan under EXAKT inputen (position: relative), dels
-           för att undvika en känd fälla (se CLAUDE.md): min-width: 0
-           måste sättas på själva flex-itemet, inte bara på kontrollen
-           inuti, annars vägrar inputen krympa under sin "naturliga"
-           bredd i en trång rad. */
+           inputen (inte knappen) - för att undvika en känd fälla (se
+           CLAUDE.md): min-width: 0 måste sättas på själva flex-itemet,
+           inte bara på kontrollen inuti, annars vägrar inputen krympa
+           under sin "naturliga" bredd i en trång rad. */
         .tagg-inmatning { display: flex; gap: 0.5rem; }
-        .tagg-input-yta { position: relative; flex: 1; min-width: 0; }
+        .tagg-input-yta { flex: 1; min-width: 0; }
         .tagg-input-yta input { width: 100%; }
         /* Egen, JS-driven autocomplete (WINE-52) - ersätter den tidigare
            rena datalist-lösningen (WINE-51), som visade sig inte visa
@@ -70,14 +68,40 @@
            identiskt på alla plattformar. Ingen tung combobox-komponent
            byggd - bara en enkel, filtrerad <ul> som visas/döljs vid
            fokus/inmatning, i linje med projektets övriga "minimal egen
-           JS"-mönster (t.ex. taggfältets egen tillägg-logik nedan). */
+           JS"-mönster (t.ex. taggfältets egen tillägg-logik nedan).
+
+           UPPFÖLJNING (granskningsfynd efter merge, mot en RIKTIG
+           webbläsare - varken mvn verify eller Playwright-testerna
+           fångade detta): listan låg ursprungligen kvar inuti
+           "Taggar"-fältet, positionerad `position: absolute` relativt
+           .tagg-input-yta. Fältet är sista raden i sin .kort, och .kort
+           har `overflow: hidden` (tema.css, för att klippa hörnen rätt
+           mot border-radius) - vilket klippte bort STÖRRE DELEN av den
+           nedåtväxande listan, oavsett hur många träffar som fanns
+           (upplevdes som "bara första träffen får plats" på desktop och
+           "syns inte alls" på mobil, beroende på exakt hur mycket
+           marginal som fanns kvar innan kortets nederkant). Lösningen är
+           att flytta hela <ul>:en till <body> i JS (se skriptet nedan)
+           och positionera den med `position: fixed` beräknat från
+           inputens `getBoundingClientRect()` - `position: fixed` klipps
+           INTE av någon förälders `overflow: hidden` (till skillnad från
+           `absolute`), eftersom den etablerar sin egen containing block
+           direkt mot viewporten. Kräver att positionen räknas om vid
+           varje visning samt vid scroll/resize medan listan är öppen
+           (annars "driver" den bort från inputen). */
         .tagg-forslagslista {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            z-index: 5;
-            margin: 0.25rem 0 0;
+            /* Granskningsfynd (PR #35): JS:en sätter width till exakt
+               inputens rect.width (se positioneraFörslag() nedan) - utan
+               border-box hade den 1px-borderen (nedan) lagts UTANPÅ den
+               bredden i stället för att räknas in i den, och listan hade
+               stuckit ut ~2px till höger om inputens kant. Det globala
+               "input, select, textarea { width: 100% }"-resetet högst
+               upp i den här filen sätter inte box-sizing, och <ul> täcks
+               inte av det urvalet ändå. */
+            box-sizing: border-box;
+            position: fixed;
+            z-index: 20;
+            margin: 0;
             padding: 0.25rem 0;
             list-style: none;
             background: var(--yta-2);
@@ -235,6 +259,13 @@
                 <div class="tagg-inmatning">
                     <div class="tagg-input-yta">
                         <input type="text" id="tagg-input" autocomplete="off" placeholder="Skriv en tagg och lägg till">
+                        <!-- Flyttas till <body> av skriptet nedan så fort
+                             sidan laddat - se den utförliga motiveringen
+                             vid .tagg-forslagslista i <style> ovan (ett
+                             klipp-mot-kortets-kant-fynd, upptäckt efter
+                             merge mot en riktig webbläsare). Ligger kvar
+                             här i källan bara för att hänga ihop med
+                             fältet den hör till läsmässigt. -->
                         <ul id="tagg-forslagslista" class="tagg-forslagslista" role="listbox" hidden></ul>
                     </div>
                     <!-- "Ny tagg", INTE en text som innehåller "Lägg till" -
@@ -486,10 +517,74 @@
                 return;
             }
 
+            // Granskningsfynd efter merge (mot en riktig webbläsare - se
+            // den fulla motiveringen vid .tagg-forslagslista i <style>
+            // ovan): listans .kort-förälder har overflow: hidden, vilket
+            // klippte bort större delen av listan oavsett hur många
+            // träffar som fanns. Flyttas därför till <body> här, en gång
+            // vid sidladdning - CSS:en är position: fixed (positionerad
+            // av positioneraFörslag() nedan), som inte klipps av NÅGON
+            // förälders overflow.
+            document.body.appendChild(lista);
+
             var allaFörslag = Array.from(källa.querySelectorAll('option')).map(function (alternativ) {
                 return alternativ.value;
             });
             var aktivIndex = -1;
+
+            // Positionerar den nu fristående <ul>:en direkt under (eller,
+            // se nedan, ovanför) inputen, oavsett var på sidan/i vilken
+            // scroll-position fältet råkar befinna sig - position: fixed
+            // är alltid relativt VIEWPORTEN, vilket
+            // getBoundingClientRect() också returnerar rakt av (ingen
+            // scrollX/scrollY-justering behövs, till skillnad från
+            // position: absolute mot hela dokumentet).
+            //
+            // "Flip"-logik (upptäckt vid manuell verifiering av
+            // klipp-fixen ovan): "Taggar" är sista fältet i sin .kort,
+            // vilket ofta lämnar fältet nära nederkanten av den synliga
+            // ytan - särskilt på mobil, där en kort viewport OCH en
+            // eventuell skärmtangentbordsyta krymper det tillgängliga
+            // utrymmet nedanför ytterligare. Utan flip hade listan då
+            // renderats delvis eller helt UTANFÖR den synliga ytan (inte
+            // klippt av någon förälder längre, men ändå praktiskt osynlig
+            // för användaren) - så listan visas OVANFÖR inputen i stället
+            // om utrymmet nedanför inte räcker OCH utrymmet ovanför är
+            // större. Höjden mäts genom att tillfälligt visa listan (satt
+            // av anroparen innan detta anrop) och läsa dess FAKTISKA,
+            // eventuellt max-height-begränsade rand - ingen uppskattning
+            // behövs.
+            //
+            // Granskningsfynd (PR #35): window.innerHeight krymper INTE
+            // när ett riktigt mobilt tangentbord öppnas i iOS Safari -
+            // bara window.visualViewport.height gör det där. Utan detta
+            // hade flip-beslutet trott att det fanns gott om utrymme
+            // nedanför (mätt mot HELA layout-viewporten) trots att
+            // tangentbordet i praktiken täckte just det utrymmet - exakt
+            // scenariot i den ursprungliga felrapporten. Alla webbläsare
+            // som stödjer Visual Viewport API (i praktiken alla moderna,
+            // inklusive Android Chrome) får alltså den korrekta,
+            // synliga höjden; webbläsare helt utan stödet faller tillbaka
+            // till innerHeight (oförändrat beteende där).
+            function synligViewporthöjd() {
+                return (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+            }
+
+            function positioneraFörslag() {
+                var rect = input.getBoundingClientRect();
+                var listHöjd = lista.getBoundingClientRect().height;
+                var utrymmeNedanför = synligViewporthöjd() - rect.bottom;
+                var visaOvanför = utrymmeNedanför < listHöjd + 4 && rect.top > listHöjd + 4;
+                lista.style.left = rect.left + 'px';
+                lista.style.width = rect.width + 'px';
+                if (visaOvanför) {
+                    lista.style.top = 'auto';
+                    lista.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+                } else {
+                    lista.style.bottom = 'auto';
+                    lista.style.top = (rect.bottom + 4) + 'px';
+                }
+            }
 
             function redanTillagdaTaggar() {
                 return Array.from(chipContainer.querySelectorAll('.chip-tagg input[type="checkbox"]'))
@@ -597,7 +692,14 @@
                     });
                     lista.appendChild(post);
                 });
+                // hidden = false FÖRE positioneraFörslag(): positionerings-
+                // funktionen mäter listans faktiska renderade höjd för
+                // flip-beslutet (se kommentaren där), vilket kräver att
+                // den redan är synlig/layoutad. Ingen flimrande
+                // mellanposition hinner synas - allt sker i samma
+                // synkrona JS-uppgift, innan webbläsaren målar om.
                 lista.hidden = false;
+                positioneraFörslag();
             }
 
             läggTillKnapp.addEventListener('click', function () {
@@ -606,6 +708,33 @@
             input.addEventListener('input', visaFörslag);
             input.addEventListener('focus', visaFörslag);
             input.addEventListener('blur', döljFörslag);
+            // Listan "driver" annars iväg från inputen om sidan
+            // scrollas eller fönstret/skärmen ändrar storlek medan den
+            // är öppen - position: fixed följer inte automatiskt med
+            // inputen (till skillnad från den ursprungliga position:
+            // absolute-varianten, som var relativt inputens egen
+            // förälder). true (capture) fångar även scroll inuti ett
+            // eventuellt nästlat scrollbart element, inte bara
+            // fönstret som helhet.
+            function ompositioneraOmSynlig() {
+                if (!lista.hidden) {
+                    positioneraFörslag();
+                }
+            }
+            window.addEventListener('scroll', ompositioneraOmSynlig, true);
+            window.addEventListener('resize', ompositioneraOmSynlig);
+            // Granskningsfynd (PR #35): window - varken 'scroll' eller
+            // 'resize' - triggas pålitligt när ett riktigt mobilt
+            // tangentbord visas/döljs i iOS Safari. Visual Viewport-
+            // API:ets EGNA händelser gör det, i webbläsare som stödjer
+            // det - utan den här extra lyssnaren hade listan (positionerad
+            // vid tangentbordets ÖPPNING) blivit kvar på fel plats om
+            // tangentbordet sedan stängdes/öppnades igen medan listan var
+            // synlig.
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', ompositioneraOmSynlig);
+                window.visualViewport.addEventListener('scroll', ompositioneraOmSynlig);
+            }
             // Granskningsfynd (PR #34): ArrowDown/ArrowUp flyttar
             // markeringen i förslagslistan, och Enter väljer/lägger till
             // den markerade posten i stället för att blint lägga till
