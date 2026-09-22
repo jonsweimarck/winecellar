@@ -46,13 +46,70 @@
         /* Taggfältet (WINE-51): input + knapp på samma rad. .falt/input
            sätter width: 100% globalt (se toppen av den här filen) - flex: 1
            tillsammans med width: auto låter inputen dela raden med knappen
-           i stället för att själv fylla hela bredden. */
+           i stället för att själv fylla hela bredden.
+           .tagg-input-yta (WINE-52) är en egen flex-item-wrapper runt bara
+           inputen (inte knappen) - dels för att kunna positionera
+           förslagslistan under EXAKT inputen (position: relative), dels
+           för att undvika en känd fälla (se CLAUDE.md): min-width: 0
+           måste sättas på själva flex-itemet, inte bara på kontrollen
+           inuti, annars vägrar inputen krympa under sin "naturliga"
+           bredd i en trång rad. */
         .tagg-inmatning { display: flex; gap: 0.5rem; }
-        .tagg-inmatning input { flex: 1; width: auto; }
-        /* Kryssrutan i en taggchip är "ta bort"-kontrollen, inte ett vanligt
-           formulärval - liten och indragen från textens baslinje, inte
-           full bredd (som input/select är som standard på den här sidan). */
-        .chip-tagg input[type="checkbox"] { width: auto; margin: 0; }
+        .tagg-input-yta { position: relative; flex: 1; min-width: 0; }
+        .tagg-input-yta input { width: 100%; }
+        /* Egen, JS-driven autocomplete (WINE-52) - ersätter den tidigare
+           rena datalist-lösningen (WINE-51), som visade sig inte visa
+           något förslag alls i mobila webbläsare: iOS Safari saknar helt
+           stöd för datalist-baserad autocomplete på textinputs (ett
+           långvarigt, aldrig åtgärdat WebKit-beteende), och Android
+           Chrome har historiskt haft inkonsekvent/opålitligt stöd.
+           Datalist-elementet finns kvar i DOM:en, men bara som en enkel,
+           redan serverrenderad DATAKÄLLA för skriptet nedan (inputen är
+           inte längre kopplad till den) - webbläsaren renderar aldrig
+           sin egen, inkonsekventa variant, samma lista fungerar
+           identiskt på alla plattformar. Ingen tung combobox-komponent
+           byggd - bara en enkel, filtrerad <ul> som visas/döljs vid
+           fokus/inmatning, i linje med projektets övriga "minimal egen
+           JS"-mönster (t.ex. taggfältets egen tillägg-logik nedan). */
+        .tagg-forslagslista {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 5;
+            margin: 0.25rem 0 0;
+            padding: 0.25rem 0;
+            list-style: none;
+            background: var(--yta-2);
+            border: 1px solid var(--ram);
+            border-radius: var(--radie);
+            max-height: 12rem;
+            overflow-y: auto;
+            box-shadow: 0 2px 8px var(--skugga);
+        }
+        .tagg-forslagslista li { padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.9rem; }
+        .tagg-forslagslista li:hover, .tagg-forslagslista li:active { background: var(--yta-hover); }
+        /* Taggchipsen (WINE-52) ska se ut exakt som filterchipsen i
+           vinlistans verktygsrad - samma .chips/.chip-grundstil (tema.css,
+           ADR 0008/0019), "tagg ×" som ren text, ingen synlig kryssruta.
+           Kryssrutan är fortfarande den FAKTISKA "ta bort"-kontrollen (se
+           skriptet längst ner, som lyssnar på dess change-händelse) - den
+           döljs bara visuellt, med SAMMA clip-teknik som .filval-inputen
+           (tema.css) använder för filväljarens dolda <input type="file">,
+           INTE display: none, så den finns kvar i tabbordningen och postas
+           normalt med formuläret. Chippen är en <label>, inte en <span> -
+           så att HELA pillen (inte bara den dolda kryssrutan) är
+           klickbar/tryckbar, med mus, touch och tangentbord. */
+        .chip-tagg { cursor: pointer; }
+        .chip-tagg input[type="checkbox"] {
+            position: absolute;
+            width: 1px; height: 1px;
+            padding: 0; margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+        .chip-tagg:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
     </style>
 </head>
 <body>
@@ -161,12 +218,22 @@
                  "Etikett" ovan är det en <div>, inte en <label>: fältet
                  rymmer flera kontroller (textinput, knapp, en kryssruta
                  per redan tillagd tagg), och en <label> får bara peka på
-                 EN kontroll. Autocomplete (list="tagg-forslag") är
-                 webbläsarens egen <datalist>-mekanism, ingen egen
-                 JS-dropdown behövs. -->
+                 EN kontroll.
+                 Autocomplete byggdes ursprungligen (WINE-51) som ren
+                 webbläsar-datalist-koppling utan egen JS-dropdown -
+                 visade sig senare (WINE-52) inte fungera alls i mobila
+                 webbläsare (se .tagg-forslagslista ovan för den fulla
+                 motiveringen). Datalist-elementet finns fortfarande kvar
+                 här, men bara som en enkel, serverrenderad DATAKÄLLA för
+                 skriptet nedan - inputen är inte längre kopplad till
+                 den, så webbläsaren visar aldrig sin egen, opålitliga
+                 variant. -->
             <div class="falt"><span>Taggar</span>
                 <div class="tagg-inmatning">
-                    <input type="text" id="tagg-input" list="tagg-forslag" placeholder="Skriv en tagg och lägg till">
+                    <div class="tagg-input-yta">
+                        <input type="text" id="tagg-input" autocomplete="off" placeholder="Skriv en tagg och lägg till">
+                        <ul id="tagg-forslagslista" class="tagg-forslagslista" hidden></ul>
+                    </div>
                     <!-- "Ny tagg", INTE en text som innehåller "Lägg till" -
                          kolliderar annars (Playwrights strict mode, en
                          delsträngsmatchning, inte bara en exakt matchning)
@@ -188,11 +255,11 @@
                      ett omarkerat fält postas aldrig av webbläsaren, så
                      borttagning kräver ingen extra hantering server-sidan. -->
                 <div class="chips" id="tagg-chips">
-                    <span class="chip chip-tagg" th:each="t : ${wine.tags}">
+                    <label class="chip chip-tagg" th:each="t : ${wine.tags}">
                         <input type="checkbox" name="tags" th:value="${t}" checked
                                th:attr="aria-label=|Ta bort taggen ${t}|">
-                        <span th:text="${t}"></span>
-                    </span>
+                        <span th:text="|${t} ×|"></span>
+                    </label>
                 </div>
             </div>
         </div>
@@ -431,7 +498,7 @@
                     input.value = '';
                     return;
                 }
-                var chip = document.createElement('span');
+                var chip = document.createElement('label');
                 chip.className = 'chip chip-tagg';
                 var kryssruta = document.createElement('input');
                 kryssruta.type = 'checkbox';
@@ -440,7 +507,7 @@
                 kryssruta.checked = true;
                 kryssruta.setAttribute('aria-label', 'Ta bort taggen ' + värde);
                 var text = document.createElement('span');
-                text.textContent = värde;
+                text.textContent = värde + ' ×';
                 chip.appendChild(kryssruta);
                 chip.appendChild(text);
                 bindTaBort(kryssruta);
@@ -454,6 +521,68 @@
                 if (händelse.key === 'Enter') {
                     händelse.preventDefault();
                     läggTillTagg();
+                }
+            });
+        })();
+
+        // Taggfältets autocomplete-förslag (WINE-52) - en egen, enkel
+        // <ul>-dropdown i stället för webbläsarens <datalist>/list-attribut
+        // (WINE-51), som visade sig inte fungera i mobila webbläsare (se
+        // kommentaren vid .tagg-forslagslista ovan). Datan hämtas från
+        // <datalist id="tagg-forslag">, som fortfarande finns kvar i
+        // DOM:en - bara som en enkel, serverrenderad datakälla, inte
+        // längre kopplad till inputen via list=.
+        (function () {
+            var input = document.getElementById('tagg-input');
+            var lista = document.getElementById('tagg-forslagslista');
+            var källa = document.getElementById('tagg-forslag');
+            if (!input || !lista || !källa) {
+                return;
+            }
+
+            var allaFörslag = Array.from(källa.querySelectorAll('option')).map(function (alternativ) {
+                return alternativ.value;
+            });
+
+            function döljFörslag() {
+                lista.hidden = true;
+                lista.innerHTML = '';
+            }
+
+            function visaFörslag() {
+                var text = input.value.trim().toLowerCase();
+                var träffar = text
+                    ? allaFörslag.filter(function (t) { return t.toLowerCase().indexOf(text) !== -1; })
+                    : allaFörslag;
+                if (träffar.length === 0) {
+                    döljFörslag();
+                    return;
+                }
+                lista.innerHTML = '';
+                träffar.forEach(function (t) {
+                    var post = document.createElement('li');
+                    post.textContent = t;
+                    // mousedown, inte click - körs FÖRE inputens blur (som
+                    // annars hade hunnit dölja/tömma listan innan klicket
+                    // registrerades). Fungerar likadant för touch: en
+                    // pekskärmstryckning ger samma mousedown/click-sekvens.
+                    post.addEventListener('mousedown', function (händelse) {
+                        händelse.preventDefault();
+                        input.value = t;
+                        döljFörslag();
+                        input.focus();
+                    });
+                    lista.appendChild(post);
+                });
+                lista.hidden = false;
+            }
+
+            input.addEventListener('input', visaFörslag);
+            input.addEventListener('focus', visaFörslag);
+            input.addEventListener('blur', döljFörslag);
+            input.addEventListener('keydown', function (händelse) {
+                if (händelse.key === 'Escape') {
+                    döljFörslag();
                 }
             });
         })();
