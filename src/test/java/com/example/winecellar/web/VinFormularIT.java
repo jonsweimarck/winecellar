@@ -465,6 +465,137 @@ class VinFormularIT extends SharedPostgres {
     }
 
     /**
+     * WINE-52 (buggrapport EFTER att PR #35 mergats - "på både dator och
+     * mobil visar autocomplete-listan bara 1 tagg"). Listans höjd
+     * begränsades bara av en FAST max-height (12rem), aldrig av det
+     * faktiskt tillgängliga utrymmet: när varken ytan ovanför eller
+     * nedanför rymde hela listan renderades den ändå i full höjd
+     * nedanför och spillde ut under skärmkanten (eller under ett mobilt
+     * tangentbord). `overflow-y: auto` räddade inte det - den scrollar
+     * inuti listans egen 12rem-box, inte inom den synliga resten av
+     * skärmen, så de avklippta posterna var helt oåtkomliga.
+     * <p>
+     * Tidigare Playwright-tester missade detta eftersom de alla kör i
+     * RYMLIGA viewports där listan alltid fick plats. Det här testet kör
+     * därför i en medvetet LÅG viewport (375×300) med fler matchande
+     * taggar än vad som ryms, och verifierar både att hela listboxen
+     * ligger innanför den synliga ytan OCH att de poster som inte får
+     * plats faktiskt går att nå genom att scrolla inuti listan (inte
+     * bara att de finns i DOM:en).
+     */
+    @Test
+    void skaHållaHelaFörslagslistanInomEnLågViewport() {
+        // Taggarna läggs upp i en rymlig viewport - att fylla i hela
+        // vinformuläret i en 300px hög vy är onödigt skört, och det är
+        // bara VISNINGEN av förslagen som ska testas i den låga vyn.
+        // Egen tagg-prefix ("Sommar"), inte "Favorit"-taggarna som andra
+        // tester i klassen räknar exakt antal träffar på - kontot delas
+        // mellan alla testmetoder utan städning emellan.
+        try (BrowserContext förberedelse = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(förberedelse);
+            sida.locator("input[name=name]").fill("Barolo (låg viewport)");
+            sida.locator("input[name=quantity]").fill("1");
+            for (String tagg : new String[]{"Sommar", "Sommarvin", "Sommarfest",
+                    "Sommarrött", "Sommarvitt", "Sommarbubbel"}) {
+                sida.locator("#tagg-input").fill(tagg);
+                sida.locator("#tagg-lagg-till").click();
+            }
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+        }
+
+        try (BrowserContext context = nyInloggadKontext(375, 300)) {
+            Page sida = öppnaFormuläret(context);
+            Locator lista = sida.locator("#tagg-forslagslista");
+            sida.locator("#tagg-input").fill("sommar");
+
+            assertThat(lista.isVisible()).isTrue();
+            assertThat(lista.locator("li").count()).isEqualTo(6);
+
+            // Scrolla så att fältet hamnar MITT i den låga vyn: då finns
+            // det för lite plats både ovanför och nedanför (~150px var,
+            // mot listans önskade 12rem = 192px), vilket är precis det
+            // läge där enbart den fasta max-heighten inte räcker. Utan
+            // scrollen hamnar fältet (tack vare Playwrights egen
+            // scroll-into-view) i stället vid vyns kant, där ena sidan
+            // råkar ha gott om plats och buggen inte syns. Sidans
+            // scroll-lyssnare positionerar om listan automatiskt.
+            sida.evaluate("() => { const f = document.getElementById('tagg-input');"
+                    + " const r = f.getBoundingClientRect();"
+                    + " window.scrollBy(0, r.top + r.height / 2 - window.innerHeight / 2); }");
+            sida.waitForTimeout(100);
+
+            // Hela listboxen ska ligga innanför den synliga ytan - det
+            // var precis det den inte gjorde före fixen (sista posten
+            // hamnade utanför skärmkanten i en 300px hög vy).
+            double viewporthöjd = ((Number) sida.evaluate("() => window.innerHeight")).doubleValue();
+            assertThat(lista.boundingBox().y)
+                    .as("listans överkant ska ligga innanför viewporten")
+                    .isGreaterThanOrEqualTo(0.0);
+            assertThat(lista.boundingBox().y + lista.boundingBox().height)
+                    .as("listans nederkant ska ligga innanför viewporten")
+                    .isLessThanOrEqualTo(viewporthöjd);
+
+            // Första posten ska synas direkt...
+            assertThat(geometriskSynlig(sida, "#tagg-forslagslista li:first-child")).isTrue();
+
+            // ...och de poster som inte får plats ska gå att nå genom att
+            // scrolla INUTI listan (i stället för att ligga bortklippta
+            // under skärmkanten, som före fixen).
+            sida.evaluate("() => { const l = document.getElementById('tagg-forslagslista');"
+                    + " l.scrollTop = l.scrollHeight; }");
+            assertThat(geometriskSynlig(sida, "#tagg-forslagslista li:last-child"))
+                    .as("sista posten ska bli synlig när listan scrollas till slutet")
+                    .isTrue();
+        }
+    }
+
+    /**
+     * WINE-52 (användarens uttryckliga önskemål efter att PR #35
+     * mergats): "listan visas så fort fältet får fokus, medan min tanke
+     * var 'autocomplete', dvs att alternativ inte visades förrän
+     * användaren börjat skriva något som liknar en befintlig tagg".
+     * Förslagen ska alltså bara dyka upp när fältet faktiskt innehåller
+     * något - inte som en komplett tagglista direkt vid fokus (vilket
+     * dessutom gjorde höjdproblemet ovan värst möjligt: alla taggar på
+     * en gång, på den minsta möjliga ytan).
+     */
+    @Test
+    void skaIntePresenteraFörslagFörränAnvändarenBörjatSkriva() {
+        try (BrowserContext context = nyInloggadKontext()) {
+            Page förstaVinet = öppnaFormuläret(context);
+            förstaVinet.locator("input[name=name]").fill("Barolo (skriv först)");
+            förstaVinet.locator("input[name=quantity]").fill("1");
+            förstaVinet.locator("#tagg-input").fill("Vardag");
+            förstaVinet.locator("#tagg-lagg-till").click();
+            förstaVinet.locator("button[type=submit]").last().click();
+            förstaVinet.waitForURL(url("/"));
+
+            Page sida = öppnaFormuläret(context);
+            Locator input = sida.locator("#tagg-input");
+            Locator lista = sida.locator("#tagg-forslagslista");
+
+            // Fokus på ett TOMT fält ska inte ge några förslag alls.
+            input.click();
+            assertThat(input.inputValue()).isEmpty();
+            assertThat(lista.isVisible())
+                    .as("inga förslag förrän användaren skrivit något")
+                    .isFalse();
+
+            // Så fort något skrivs som liknar en befintlig tagg visas de.
+            input.fill("vard");
+            assertThat(lista.isVisible()).isTrue();
+            assertThat(lista.locator("li").allTextContents()).contains("Vardag");
+
+            // ...och töms fältet igen försvinner de.
+            input.fill("");
+            assertThat(lista.isVisible())
+                    .as("ett tomt fält ska dölja listan igen, inte visa alla taggar")
+                    .isFalse();
+        }
+    }
+
+    /**
      * WINE-52 (granskningsfynd, PR #34): den ursprungliga JS-dropdownen
      * hanterade bara musklick på en förslagspost - ArrowDown/ArrowUp/
      * Enter gjorde ingenting alls i listan, så Enter gick i stället

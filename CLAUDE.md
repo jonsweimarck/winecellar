@@ -252,6 +252,25 @@ dem:
   synliga ytan, särskilt på mobil) - höjden mäts genom att tillfälligt
   visa listan och läsa dess faktiska (eventuellt max-height-begränsade)
   höjd, ingen uppskattning.
+  **Tredje rundan på samma ställe (användarrapport efter att även den
+  fixen mergats: "visar bara 1 tagg"): listans höjd begränsades bara av
+  en FAST `max-height` (12rem), aldrig av det faktiskt lediga
+  utrymmet.** Rymdes listan varken ovanför eller nedanför renderades den
+  ändå i full höjd nedanför och spillde ut under skärmkanten/
+  tangentbordet - och `overflow-y: auto` hjälpte inte, eftersom den
+  scrollar inuti listans egen 12rem-box, inte inom resten av den synliga
+  ytan. `positioneraFörslag()` sätter därför numera också en DYNAMISK
+  `maxHeight` utifrån utrymmet på den valda sidan (med 12rem kvar bara
+  som tak), och väljer den sida som har MEST plats när ingen av dem
+  rymmer hela listan. Listans egen scrollposition sparas över
+  ompositioneringen (annars rycks användaren tillbaka mot listans början
+  varje gång sidan scrollas), och listans EGNA inre scroll-händelser
+  triggar inte en ompositionering alls.
+  **Förslag visas dessutom bara när användaren skrivit något** som
+  matchar en befintlig tagg - tidigare öppnades hela tagglistan redan på
+  fokus, vilket både var något annat än vad "autocomplete" utlovar
+  (användarens egna ord) och gjorde höjdproblemet värst möjligt: alla
+  taggar på en gång, på den minsta möjliga ytan.
   **Samma story (WINE-52) gav taggchipsen (span/kryssruta-paret för en
   redan tillagd tagg) samma stil som filterchipsen ovan** - den faktiska
   skillnaden var INTE `.chips`/`.chip`-grundstilen (som redan delades,
@@ -317,6 +336,27 @@ dem:
   `<body>` via JS) och positionera det `position: fixed`, beräknat från
   källelementets `getBoundingClientRect()` - `position: fixed` klipps
   inte av NÅGON förälders `overflow`, till skillnad från `absolute`.
+- **Ett flytande element (dropdown/popover) behöver en maxhöjd som
+  följer det LEDIGA utrymmet, inte bara en fast `max-height` i CSS - och
+  ett UI-test i en rymlig viewport kan aldrig avslöja att den saknas.**
+  Taggförslagens lista hade `max-height: 12rem` + `overflow-y: auto` och
+  såg därför korrekt ut i alla tester (som alla körde i rymliga
+  viewports): först när varken ytan ovanför eller nedanför rymde hela
+  listan renderades den i full höjd och spillde ut under skärmkanten,
+  med de överskjutande posterna helt oåtkomliga (listans overflow
+  scrollar inuti dess EGEN box, inte inom resten av skärmen). Testa den
+  här klassen av fel i en medvetet LÅG viewport, och scrolla dessutom
+  fram fältet till vyns MITT först: Playwrights egen
+  scroll-into-view lägger annars elementet vid vyns kant, där ena sidan
+  råkar ha gott om plats och buggen inte syns (verifierat: testet var
+  grönt mot den trasiga koden tills centreringen lades till). Två
+  följdfällor värda att komma ihåg när samma mönster byggs igen: en
+  ompositionering som nollställer `maxHeight` för att mäta om måste
+  spara och återställa elementets `scrollTop` (webbläsaren klämmer ihop
+  det när boxen tillfälligt växer), och en `scroll`-lyssnare i
+  capture-läge på `window` fångar även elementets EGNA inre scroll -
+  filtrera bort den, annars positioneras listan om mitt under att
+  användaren scrollar i den.
 - **UI-testfälla att komma ihåg:** `WineListResponsiveIT`/
   `ImportExportFlowIT` klickar länkar där de faktiskt sitter i UI:t.
   Flyttas en länk till en annan sida (som export gjorde i WINE-37) går
