@@ -323,9 +323,49 @@ class VinFormularIT extends SharedPostgres {
             assertThat(förslagslista.isVisible()).isTrue();
             assertThat(förslagslista.locator("li").first().textContent()).isEqualTo("Favorit");
 
+            // Att klicka en förslagspost lägger till den direkt som en
+            // tagg (samma semantik som Enter på en tangentbordsmarkerad
+            // post, se skaVäljaEttMarkeratFörslagMedTangentbordetOchEnter
+            // nedan) - inte bara en ifylld textruta som väntar på ett
+            // separat klick på "Ny tagg".
             förslagslista.locator("li").first().click();
-            assertThat(sida.locator("#tagg-input").inputValue()).isEqualTo("Favorit");
+            assertThat(sida.locator("#tagg-input").inputValue()).isEmpty();
             assertThat(förslagslista.isVisible()).isFalse();
+            assertThat(sida.locator("#tagg-chips .chip-tagg").last().textContent().trim()).isEqualTo("Favorit ×");
+        }
+    }
+
+    /**
+     * WINE-52 (granskningsfynd, PR #34): den ursprungliga JS-dropdownen
+     * hanterade bara musklick på en förslagspost - ArrowDown/ArrowUp/
+     * Enter gjorde ingenting alls i listan, så Enter gick i stället
+     * direkt till den vanliga "lägg till det skrivna som fritext"-
+     * logiken. Konkret regression mot den gamla datalist-lösningen
+     * (som i skrivbordswebbläsare redan stödde piltangenter+Enter):
+     * användaren skriver "fav", ser förslaget "Favorit", men kunde inte
+     * välja det med bara tangentbordet - Enter hade lagt till en
+     * FELAKTIG tagg ("fav" ordagrant) i stället.
+     */
+    @Test
+    void skaVäljaEttMarkeratFörslagMedTangentbordetOchEnter() {
+        try (BrowserContext context = nyInloggadKontext()) {
+            Page förstaVinet = öppnaFormuläret(context);
+            förstaVinet.locator("input[name=name]").fill("Barolo (tangentbordsval)");
+            förstaVinet.locator("input[name=quantity]").fill("1");
+            förstaVinet.locator("#tagg-input").fill("Favorit");
+            förstaVinet.locator("#tagg-lagg-till").click();
+            förstaVinet.locator("button[type=submit]").last().click();
+            förstaVinet.waitForURL(url("/"));
+
+            Page sida = öppnaFormuläret(context);
+            Locator input = sida.locator("#tagg-input");
+            input.fill("fav");
+            input.press("ArrowDown");
+            input.press("Enter");
+
+            assertThat(input.inputValue()).isEmpty();
+            assertThat(sida.locator("#tagg-forslagslista").isVisible()).isFalse();
+            assertThat(sida.locator("#tagg-chips .chip-tagg").last().textContent().trim()).isEqualTo("Favorit ×");
         }
     }
 

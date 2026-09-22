@@ -88,7 +88,10 @@
             box-shadow: 0 2px 8px var(--skugga);
         }
         .tagg-forslagslista li { padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.9rem; }
-        .tagg-forslagslista li:hover, .tagg-forslagslista li:active { background: var(--yta-hover); }
+        /* .aktiv (granskningsfynd, PR #34) är tangentbordsmarkeringen
+           (ArrowDown/ArrowUp) - samma visuella behandling som :hover/
+           :active, så mus och tangentbord ger samma synliga feedback. */
+        .tagg-forslagslista li:hover, .tagg-forslagslista li:active, .tagg-forslagslista li.aktiv { background: var(--yta-hover); }
         /* Taggchipsen (WINE-52) ska se ut exakt som filterchipsen i
            vinlistans verktygsrad - samma .chips/.chip-grundstil (tema.css,
            ADR 0008/0019), "tagg ×" som ren text, ingen synlig kryssruta.
@@ -232,7 +235,7 @@
                 <div class="tagg-inmatning">
                     <div class="tagg-input-yta">
                         <input type="text" id="tagg-input" autocomplete="off" placeholder="Skriv en tagg och lägg till">
-                        <ul id="tagg-forslagslista" class="tagg-forslagslista" hidden></ul>
+                        <ul id="tagg-forslagslista" class="tagg-forslagslista" role="listbox" hidden></ul>
                     </div>
                     <!-- "Ny tagg", INTE en text som innehåller "Lägg till" -
                          kolliderar annars (Playwrights strict mode, en
@@ -461,17 +464,32 @@
             fält.addEventListener('change', släckMarkering);
         });
 
-        // Taggfältet (WINE-51): lägger till en ny chip i DOM:en utan
-        // sidladdning/htmx - hela tagglistan skickas i stället in som en
-        // vanlig del av formulärets POST (en kryssruta per tagg, se
-        // .chip-tagg ovan). Ingen egen backend-rutt per tagg.
+        // Taggfältet (WINE-51) och dess autocomplete-förslag (WINE-52)
+        // delar EN IIFE, inte två separata - granskningsfynd (PR #34):
+        // Enter måste kunna prioritera en tangentbordsmarkerad
+        // förslagspost FÖRE den vanliga "lägg till det skrivna som
+        // fritext"-logiken, vilket kräver delat tillstånd (aktivIndex)
+        // mellan de två. Fokus stannar kvar i inputen under hela
+        // interaktionen (ingen faktisk DOM-fokus på <li>-posterna) -
+        // markeringen kommuniceras i stället via role="listbox"/"option",
+        // aria-selected och aria-activedescendant, standardmönstret för
+        // en tillgänglig combobox. Ingen tung combobox-komponent byggd
+        // trots det - bara en enkel, filtrerad <ul> som visas/döljs vid
+        // fokus/inmatning.
         (function () {
             var input = document.getElementById('tagg-input');
             var läggTillKnapp = document.getElementById('tagg-lagg-till');
             var chipContainer = document.getElementById('tagg-chips');
-            if (!input || !läggTillKnapp || !chipContainer) {
+            var lista = document.getElementById('tagg-forslagslista');
+            var källa = document.getElementById('tagg-forslag');
+            if (!input || !läggTillKnapp || !chipContainer || !lista || !källa) {
                 return;
             }
+
+            var allaFörslag = Array.from(källa.querySelectorAll('option')).map(function (alternativ) {
+                return alternativ.value;
+            });
+            var aktivIndex = -1;
 
             function redanTillagdaTaggar() {
                 return Array.from(chipContainer.querySelectorAll('.chip-tagg input[type="checkbox"]'))
@@ -492,10 +510,22 @@
             }
             chipContainer.querySelectorAll('.chip-tagg input[type="checkbox"]').forEach(bindTaBort);
 
-            function läggTillTagg() {
-                var värde = input.value.trim();
+            function döljFörslag() {
+                lista.hidden = true;
+                lista.innerHTML = '';
+                aktivIndex = -1;
+                input.removeAttribute('aria-activedescendant');
+            }
+
+            // värdeOverride används av Enter-hanteringen nedan när en
+            // förslagspost är tangentbordsmarkerad (eller klickad) - då
+            // läggs POSTENS värde till, inte nödvändigtvis det som råkar
+            // stå skrivet i fältet.
+            function läggTillTagg(värdeOverride) {
+                var värde = (värdeOverride !== undefined ? värdeOverride : input.value).trim();
                 if (!värde || redanTillagdaTaggar().indexOf(värde.toLowerCase()) !== -1) {
                     input.value = '';
+                    döljFörslag();
                     return;
                 }
                 var chip = document.createElement('label');
@@ -513,40 +543,30 @@
                 bindTaBort(kryssruta);
                 chipContainer.appendChild(chip);
                 input.value = '';
+                döljFörslag();
                 input.focus();
             }
 
-            läggTillKnapp.addEventListener('click', läggTillTagg);
-            input.addEventListener('keydown', function (händelse) {
-                if (händelse.key === 'Enter') {
-                    händelse.preventDefault();
-                    läggTillTagg();
+            // Flyttar tangentbordsmarkeringen ett steg (delta = 1/-1) -
+            // "wrap:ar" runt till andra änden av listan, precis som de
+            // flesta dropdown-menyer. Specialfallet för aktivIndex === -1
+            // (ingen markering ännu) ser till att den FÖRSTA ArrowDown
+            // hamnar på första posten och den FÖRSTA ArrowUp på den
+            // SISTA - ett rakt "aktivIndex + delta" hade annars, från
+            // -1, gett fel post vid ArrowUp (ett steg fel jämfört med det
+            // avsedda "hoppa till slutet").
+            function markera(delta, poster) {
+                if (poster.length === 0) {
+                    return;
                 }
-            });
-        })();
-
-        // Taggfältets autocomplete-förslag (WINE-52) - en egen, enkel
-        // <ul>-dropdown i stället för webbläsarens <datalist>/list-attribut
-        // (WINE-51), som visade sig inte fungera i mobila webbläsare (se
-        // kommentaren vid .tagg-forslagslista ovan). Datan hämtas från
-        // <datalist id="tagg-forslag">, som fortfarande finns kvar i
-        // DOM:en - bara som en enkel, serverrenderad datakälla, inte
-        // längre kopplad till inputen via list=.
-        (function () {
-            var input = document.getElementById('tagg-input');
-            var lista = document.getElementById('tagg-forslagslista');
-            var källa = document.getElementById('tagg-forslag');
-            if (!input || !lista || !källa) {
-                return;
-            }
-
-            var allaFörslag = Array.from(källa.querySelectorAll('option')).map(function (alternativ) {
-                return alternativ.value;
-            });
-
-            function döljFörslag() {
-                lista.hidden = true;
-                lista.innerHTML = '';
+                var bas = aktivIndex === -1 ? (delta > 0 ? -1 : 0) : aktivIndex;
+                aktivIndex = (bas + delta + poster.length) % poster.length;
+                poster.forEach(function (post, index) {
+                    var ärAktiv = index === aktivIndex;
+                    post.classList.toggle('aktiv', ärAktiv);
+                    post.setAttribute('aria-selected', String(ärAktiv));
+                });
+                input.setAttribute('aria-activedescendant', poster[aktivIndex].id);
             }
 
             function visaFörslag() {
@@ -559,8 +579,13 @@
                     return;
                 }
                 lista.innerHTML = '';
-                träffar.forEach(function (t) {
+                aktivIndex = -1;
+                input.removeAttribute('aria-activedescendant');
+                träffar.forEach(function (t, index) {
                     var post = document.createElement('li');
+                    post.id = 'tagg-forslag-post-' + index;
+                    post.setAttribute('role', 'option');
+                    post.setAttribute('aria-selected', 'false');
                     post.textContent = t;
                     // mousedown, inte click - körs FÖRE inputens blur (som
                     // annars hade hunnit dölja/tömma listan innan klicket
@@ -568,21 +593,48 @@
                     // pekskärmstryckning ger samma mousedown/click-sekvens.
                     post.addEventListener('mousedown', function (händelse) {
                         händelse.preventDefault();
-                        input.value = t;
-                        döljFörslag();
-                        input.focus();
+                        läggTillTagg(t);
                     });
                     lista.appendChild(post);
                 });
                 lista.hidden = false;
             }
 
+            läggTillKnapp.addEventListener('click', function () {
+                läggTillTagg();
+            });
             input.addEventListener('input', visaFörslag);
             input.addEventListener('focus', visaFörslag);
             input.addEventListener('blur', döljFörslag);
+            // Granskningsfynd (PR #34): ArrowDown/ArrowUp flyttar
+            // markeringen i förslagslistan, och Enter väljer/lägger till
+            // den markerade posten i stället för att blint lägga till
+            // det skrivna som fritext - utan det gick det inte att
+            // navigera till/välja ett förslag med bara tangentbordet
+            // (fungerade i den gamla datalist-baserade lösningen).
             input.addEventListener('keydown', function (händelse) {
+                var poster = Array.from(lista.querySelectorAll('li'));
+                if (händelse.key === 'ArrowDown' && !lista.hidden && poster.length > 0) {
+                    händelse.preventDefault();
+                    markera(1, poster);
+                    return;
+                }
+                if (händelse.key === 'ArrowUp' && !lista.hidden && poster.length > 0) {
+                    händelse.preventDefault();
+                    markera(-1, poster);
+                    return;
+                }
                 if (händelse.key === 'Escape') {
                     döljFörslag();
+                    return;
+                }
+                if (händelse.key === 'Enter') {
+                    händelse.preventDefault();
+                    if (!lista.hidden && aktivIndex >= 0 && poster[aktivIndex]) {
+                        läggTillTagg(poster[aktivIndex].textContent);
+                        return;
+                    }
+                    läggTillTagg();
                 }
             });
         })();
