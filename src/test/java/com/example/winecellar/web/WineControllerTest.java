@@ -1255,11 +1255,18 @@ class WineControllerTest {
         }
 
         /**
-         * WINE-51: autocompleten (ett vanligt HTML <datalist>, ingen egen
-         * JS-dropdown) fylls med den inloggade användarens redan använda,
-         * distinkta taggar - även vid TILLÄGG, inte bara redigering, så
-         * att en användare kan återanvända en tidigare tagg direkt när
-         * hen loggar in andra gången.
+         * WINE-51/WINE-52: förslagen (den inloggade användarens redan
+         * använda, distinkta taggar - även vid TILLÄGG, inte bara
+         * redigering) renderas serversidan som ett vanligt HTML
+         * &lt;datalist&gt;, precis som från början (WINE-51). Sedan
+         * WINE-52 är &lt;datalist&gt; bara en datakälla för sidans EGNA
+         * JS-dropdown (se vin-formular.html) - <datalist>/list="..."-
+         * kopplingen visade sig inte fungera i mobila webbläsare (iOS
+         * Safari saknar helt stöd, Android Chrome har historiskt
+         * inkonsekvent stöd), så inputen har därför inte längre ett
+         * list-attribut. Testet verifierar bara att datakällan finns med
+         * rätt värden - själva JS-dropdownens beteende kräver en riktig
+         * webbläsare, se VinFormularIT.
          */
         @Test
         @DisplayName("ska rendera taggfältet med autocomplete-förslag från tidigare använda taggar")
@@ -1270,7 +1277,7 @@ class WineControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(content().string(allOf(
                             containsString("id=\"tagg-input\""),
-                            containsString("list=\"tagg-forslag\""),
+                            not(containsString("list=\"tagg-forslag\"")),
                             containsString("id=\"tagg-forslag\""),
                             containsString("value=\"Favorit\""),
                             containsString("value=\"Vardag\"")

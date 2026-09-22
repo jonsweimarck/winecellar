@@ -138,11 +138,13 @@ media query, verifierat av `WineListResponsiveIT` (Playwright) - se
 Ett vin kan ha valfritt antal fria taggar (t.ex. "Favorit", "Vardag"),
 lagda till/borttagna på vinets sida för tillägg/redigering -
 ett textfält med en "Ny tagg"-knapp, tillagda taggar visas som
-borttagningsbara chips under fältet. Fältet har autocomplete
-(`<datalist>`) mot den inloggade användarens egna, redan använda
-taggar. Taggarna visas som chips direkt på vinlistans kort (både bred
-och smal vy) och kan användas som ett eget filter i verktygsraden (se
-nedan) - ingen separat uppslagstabell, taggar är fri text precis som
+borttagningsbara chips under fältet, i samma stil som filterchipsen i
+verktygsraden (se nedan). Fältet har autocomplete mot den inloggade
+användarens egna, redan använda taggar - en egen, enkel JS-dropdown
+(inte webbläsarens `<datalist>`, som visade sig inte fungera i mobila
+webbläsare). Taggarna visas som chips direkt på vinlistans kort (både
+bred och smal vy) och kan användas som ett eget filter i verktygsraden
+(se nedan) - ingen separat uppslagstabell, taggar är fri text precis som
 `location`/`grapes`.
 
 ### Filtrering, sökning och sortering

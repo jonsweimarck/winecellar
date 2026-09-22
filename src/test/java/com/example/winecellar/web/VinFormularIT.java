@@ -5,6 +5,7 @@ import com.example.winecellar.support.SharedPostgres;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.FileChooser;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.FilePayload;
 import com.microsoft.playwright.Playwright;
@@ -288,6 +289,149 @@ class VinFormularIT extends SharedPostgres {
     }
 
     /**
+     * WINE-52: den tidigare rena &lt;datalist&gt;-autocompleten (WINE-51)
+     * visade sig inte fungera alls i mobila webbläsare - iOS Safari
+     * saknar helt stöd för &lt;datalist&gt; på textinputs (ett
+     * långvarigt, aldrig åtgärdat WebKit-beteende), och Android Chrome
+     * har historiskt haft inkonsekvent/opålitligt stöd. Fixen ersätter
+     * datalist-kopplingen med en egen, enkel JS-dropdown (se
+     * vin-formular.html) som beter sig identiskt oavsett plattform.
+     * isMobile(true)/hasTouch(true) krävs för att över huvud taget
+     * spegla en riktig mobil webbläsarkontext, inte bara en smal
+     * setViewportSize - se CLAUDE.md.
+     */
+    @Test
+    void skaVisaAutocompleteFörslagIEnMobilWebbläsarkontext() {
+        try (BrowserContext context = nyInloggadKontext(true)) {
+            // Lägg till ett första vin med en tagg, så att taggen finns
+            // med som ett tidigare använt förslag när nästa vin läggs
+            // till.
+            Page förstaVinet = öppnaFormuläret(context);
+            förstaVinet.locator("input[name=name]").fill("Barolo (mobilförslag)");
+            förstaVinet.locator("input[name=quantity]").fill("1");
+            förstaVinet.locator("#tagg-input").fill("Favorit");
+            förstaVinet.locator("#tagg-lagg-till").click();
+            förstaVinet.locator("button[type=submit]").last().click();
+            förstaVinet.waitForURL(url("/"));
+
+            Page sida = öppnaFormuläret(context);
+            Locator förslagslista = sida.locator("#tagg-forslagslista");
+            assertThat(förslagslista.isVisible()).isFalse();
+
+            sida.locator("#tagg-input").fill("fav");
+
+            assertThat(förslagslista.isVisible()).isTrue();
+            assertThat(förslagslista.locator("li").first().textContent()).isEqualTo("Favorit");
+
+            // Att klicka en förslagspost lägger till den direkt som en
+            // tagg (samma semantik som Enter på en tangentbordsmarkerad
+            // post, se skaVäljaEttMarkeratFörslagMedTangentbordetOchEnter
+            // nedan) - inte bara en ifylld textruta som väntar på ett
+            // separat klick på "Ny tagg".
+            förslagslista.locator("li").first().click();
+            assertThat(sida.locator("#tagg-input").inputValue()).isEmpty();
+            assertThat(förslagslista.isVisible()).isFalse();
+            assertThat(sida.locator("#tagg-chips .chip-tagg").last().textContent().trim()).isEqualTo("Favorit ×");
+        }
+    }
+
+    /**
+     * WINE-52 (granskningsfynd, PR #34): den ursprungliga JS-dropdownen
+     * hanterade bara musklick på en förslagspost - ArrowDown/ArrowUp/
+     * Enter gjorde ingenting alls i listan, så Enter gick i stället
+     * direkt till den vanliga "lägg till det skrivna som fritext"-
+     * logiken. Konkret regression mot den gamla datalist-lösningen
+     * (som i skrivbordswebbläsare redan stödde piltangenter+Enter):
+     * användaren skriver "fav", ser förslaget "Favorit", men kunde inte
+     * välja det med bara tangentbordet - Enter hade lagt till en
+     * FELAKTIG tagg ("fav" ordagrant) i stället.
+     */
+    @Test
+    void skaVäljaEttMarkeratFörslagMedTangentbordetOchEnter() {
+        try (BrowserContext context = nyInloggadKontext()) {
+            Page förstaVinet = öppnaFormuläret(context);
+            förstaVinet.locator("input[name=name]").fill("Barolo (tangentbordsval)");
+            förstaVinet.locator("input[name=quantity]").fill("1");
+            förstaVinet.locator("#tagg-input").fill("Favorit");
+            förstaVinet.locator("#tagg-lagg-till").click();
+            förstaVinet.locator("button[type=submit]").last().click();
+            förstaVinet.waitForURL(url("/"));
+
+            Page sida = öppnaFormuläret(context);
+            Locator input = sida.locator("#tagg-input");
+            input.fill("fav");
+            input.press("ArrowDown");
+            input.press("Enter");
+
+            assertThat(input.inputValue()).isEmpty();
+            assertThat(sida.locator("#tagg-forslagslista").isVisible()).isFalse();
+            assertThat(sida.locator("#tagg-chips .chip-tagg").last().textContent().trim()).isEqualTo("Favorit ×");
+        }
+    }
+
+    /**
+     * WINE-52: taggchipsen i vin-formular.html ska se ut precis som
+     * filterchipsen i vinlistans verktygsrad - samma .chips/.chip-
+     * grundstil (tema.css, ADR 0008/0019) och samma "text ×"-format.
+     * Innan denna fix var den faktiska SKILLNADEN inte grundstilen (som
+     * redan delades) utan att taggchippen renderade en webbläsarens
+     * vanliga, synliga kryssruta - jämför datainnehåll/element-typ OCH
+     * en riktig computed-style-jämförelse mellan de två sidorna, inte
+     * bara att båda råkar ha klassen "chip".
+     */
+    @Test
+    void skaGeTaggchippenSammaStilSomFilterchipsen() {
+        try (BrowserContext context = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(context);
+            sida.locator("input[name=name]").fill("Barolo (chipjämförelse)");
+            sida.locator("input[name=quantity]").fill("1");
+            sida.locator("#tagg-input").fill("Favorit");
+            sida.locator("#tagg-lagg-till").click();
+
+            Locator taggChip = sida.locator("#tagg-chips .chip-tagg").first();
+            assertThat((String) taggChip.evaluate("el => el.tagName")).isEqualTo("LABEL");
+            assertThat(taggChip.textContent().trim()).isEqualTo("Favorit ×");
+
+            // Kryssrutan är fortfarande den faktiska "ta bort"-kontrollen,
+            // men ska vara visuellt dold - samma clip-teknik/förväntad yta
+            // som filväljarens dolda <input type="file"> (jämför
+            // skaDöljaFilinputenMenBehållaDenAnvändbar ovan).
+            assertThat(ytaIPixlar(sida, "#tagg-chips .chip-tagg input[type=checkbox]")).isLessThanOrEqualTo(1);
+
+            String bakgrund = computedStyle(sida, "#tagg-chips .chip-tagg", "background-color");
+            String kantfärg = computedStyle(sida, "#tagg-chips .chip-tagg", "border-color");
+            String radie = computedStyle(sida, "#tagg-chips .chip-tagg", "border-radius");
+            String padding = computedStyle(sida, "#tagg-chips .chip-tagg", "padding");
+            String typsnittsstorlek = computedStyle(sida, "#tagg-chips .chip-tagg", "font-size");
+
+            sida.locator("input[name=name]").fill("Barolo (chipjämförelse) 2");
+            sida.locator("input[name=quantity]").fill("2");
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+
+            // En riktig filterchip (samma .chips/.chip-grundstil) kräver
+            // ett aktivt filter för att synas alls - ?tag=Favorit ger en.
+            sida.navigate(url("/?tag=Favorit"));
+            Locator filterChip = sida.locator(".chips > .chip").first();
+            assertThat(filterChip.textContent().trim()).isEqualTo("Favorit ×");
+
+            assertThat(computedStyle(sida, ".chips > .chip", "background-color")).isEqualTo(bakgrund);
+            assertThat(computedStyle(sida, ".chips > .chip", "border-color")).isEqualTo(kantfärg);
+            assertThat(computedStyle(sida, ".chips > .chip", "border-radius")).isEqualTo(radie);
+            assertThat(computedStyle(sida, ".chips > .chip", "padding")).isEqualTo(padding);
+            assertThat(computedStyle(sida, ".chips > .chip", "font-size")).isEqualTo(typsnittsstorlek);
+        }
+    }
+
+    /** Ett enskilt CSS-egenskapsvärde, så som webbläsaren faktiskt beräknat det. */
+    private String computedStyle(Page sida, String väljare, String egenskap) {
+        return (String) sida.evaluate(
+                "([väljare, egenskap]) => getComputedStyle(document.querySelector(väljare))"
+                        + ".getPropertyValue(egenskap)",
+                new Object[]{väljare, egenskap});
+    }
+
+    /**
      * Elementets renderade yta i kvadratpixlar. Casten går via Number,
      * inte Double: Playwright lämnar tillbaka ett Integer när JS-talet
      * råkar vara helt, och ett Double annars.
@@ -320,7 +464,20 @@ class VinFormularIT extends SharedPostgres {
     }
 
     private BrowserContext nyInloggadKontext() {
-        BrowserContext context = browser.newContext();
+        return nyInloggadKontext(false);
+    }
+
+    /**
+     * isMobile(true)/hasTouch(true) krävs för att över huvud taget spegla
+     * en riktig mobil webbläsarkontext (inte bara en smal
+     * setViewportSize) - se CLAUDE.md om varför en <meta name="viewport">
+     * -medveten CSS-brytpunkt annars aldrig triggas i testet.
+     */
+    private BrowserContext nyInloggadKontext(boolean mobil) {
+        BrowserContext context = browser.newContext(new Browser.NewContextOptions()
+                .setViewportSize(mobil ? 375 : 1280, mobil ? 667 : 800)
+                .setIsMobile(mobil)
+                .setHasTouch(mobil));
         Page inloggningssida = context.newPage();
         inloggningssida.navigate(url("/login"));
         inloggningssida.locator("#username").fill(TESTKONTO_ANVÄNDARNAMN);

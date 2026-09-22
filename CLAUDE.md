@@ -221,9 +221,30 @@ dem:
   inte bara `InMemoryWineRepository` - taggar lever i en helt annan
   tabell än resten av vinet, så en tyst trasig mappning hade annars
   bara synts i produktion. `WineService.distinctTags(owner)` härleder
-  filterpanelens kryssrutor OCH vinformulärets `<datalist>`-
-  autocomplete från samma källa (samtliga av ägarens vinets distinkta
-  taggar) - ingen cachning, precis som `originTree()`.
+  filterpanelens kryssrutor OCH vinformulärets autocomplete-förslag från
+  samma källa (samtliga av ägarens vinets distinkta taggar) - ingen
+  cachning, precis som `originTree()`. **Autocompleten byggdes
+  ursprungligen (WINE-51) som en ren HTML `<datalist>` kopplad via
+  `list="..."` - visade sig i produktion (WINE-52) inte fungera alls i
+  mobila webbläsare** (iOS Safari saknar helt stöd för `<datalist>` på
+  textinputs, ett långvarigt, aldrig åtgärdat WebKit-beteende; Android
+  Chrome har historiskt haft inkonsekvent/opålitligt stöd). Ersatt av en
+  egen, enkel JS-dropdown (`vin-formular.html`) som beter sig identiskt
+  oavsett plattform - `<datalist id="tagg-forslag">` finns kvar i DOM:en,
+  men bara som en enkel, serverrenderad DATAKÄLLA som skriptet läser
+  `<option>`-värdena ur; inputen har inte längre ett `list`-attribut, så
+  webbläsaren renderar aldrig sin egen, opålitliga variant.
+  **Samma story (WINE-52) gav taggchipsen (span/kryssruta-paret för en
+  redan tillagd tagg) samma stil som filterchipsen ovan** - den faktiska
+  skillnaden var INTE `.chips`/`.chip`-grundstilen (som redan delades,
+  se ADR 0019) utan att chippen renderade webbläsarens vanliga, synliga
+  kryssruta i stället för "tagg ×" som ren text. Chippen är numera en
+  `<label>` (inte en `<span>`) med kryssrutan visuellt dold via SAMMA
+  clip-teknik som `.filval`-inputen (tema.css) använder för sin dolda
+  `<input type="file">` - kryssrutan är fortfarande den faktiska "ta
+  bort"-kontrollen (kvar i tabbordningen, postas normalt), bara inte
+  synlig som en kryssruta; hela pillen är klickbar eftersom `<label>`
+  toggle:ar sin ihopkopplade kryssruta när den klickas var som helst.
   Vinformulärets "Lägg till"-knapp för en ny tagg heter medvetet
   **"Ny tagg", INTE någon text som innehåller "Lägg till"** - en
   Playwright-strict-mode-krock mot huvudformulärets egen submit-knapp
