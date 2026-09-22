@@ -107,6 +107,12 @@
             background: var(--yta-2);
             border: 1px solid var(--ram);
             border-radius: var(--radie);
+            /* Bara ett TAK: den faktiska maxhöjden sätts dessutom inline
+               av positioneraFörslag(), utifrån hur mycket plats som
+               verkligen finns kvar ovanför/nedanför inputen i den synliga
+               ytan. Enbart det här fasta taket räckte inte - listan
+               renderades då i full höjd och spillde ut utanför
+               skärmkanten/tangentbordet. */
             max-height: 12rem;
             overflow-y: auto;
             box-shadow: 0 2px 8px var(--skugga);
@@ -570,20 +576,82 @@
                 return (window.visualViewport && window.visualViewport.height) || window.innerHeight;
             }
 
+            // Luft mellan inputen och listan, och samtidigt den marginal
+            // som hålls mot den synliga ytans kanter.
+            var MARGINAL = 4;
+
+            // Den synliga ytans ÖVERKANT i samma koordinatsystem som
+            // getBoundingClientRect()/position: fixed använder (layout-
+            // viewporten). Noll i normalfallet - skilt från noll bara när
+            // den visuella viewporten är förskjuten inuti layout-
+            // viewporten (nyp-zoom, och i vissa lägen med öppet
+            // tangentbord). `|| 0` gör dessutom att en webbläsare utan
+            // offsetTop (eller ett test som stubbar visualViewport utan
+            // fältet) beter sig som förut i stället för att räkna med
+            // undefined.
+            function synligViewportTopp() {
+                return (window.visualViewport && window.visualViewport.offsetTop) || 0;
+            }
+
+            // Listans höjd begränsas INTE bara av CSS:ens fasta
+            // max-height (12rem) utan också av hur mycket plats som
+            // FAKTISKT finns kvar på den sida som väljs - annars
+            // renderas den i full höjd och spiller ut utanför den
+            // synliga ytan så fort varken utrymmet ovanför eller nedanför
+            // rymmer hela listan (buggrapport efter att PR #35 mergats:
+            // "visar bara 1 tagg" - resten låg under skärmkanten/
+            // tangentbordet, oåtkomliga, eftersom listans egen
+            // overflow-scroll bara scrollar inuti dess 12rem-box).
+            // Med en dynamisk maxHeight ligger hela boxen alltid innanför
+            // den synliga ytan, och de poster som inte får plats nås
+            // genom att scrolla INUTI listan.
             function positioneraFörslag() {
                 var rect = input.getBoundingClientRect();
-                var listHöjd = lista.getBoundingClientRect().height;
-                var utrymmeNedanför = synligViewporthöjd() - rect.bottom;
-                var visaOvanför = utrymmeNedanför < listHöjd + 4 && rect.top > listHöjd + 4;
+                var synligTopp = synligViewportTopp();
+                var synligBotten = synligTopp + synligViewporthöjd();
+                var utrymmeNedanför = synligBotten - rect.bottom - MARGINAL;
+                var utrymmeOvanför = rect.top - synligTopp - MARGINAL;
+
+                // Nollställ förra visningens inline-maxHeight först, så
+                // att mätningen ger listans ÖNSKADE höjd (innehållets
+                // höjd, redan begränsad av CSS-takets 12rem) och inte
+                // den begränsning som sattes senast. Listans egen
+                // scrollposition sparas över mätningen: när boxen
+                // tillfälligt växer klämmer webbläsaren ihop scrollTop
+                // till det som då är max, och användaren hade annars
+                // ryckts tillbaka mot listans början varje gång listan
+                // positionerades om (t.ex. vid sidscroll).
+                var sparadScroll = lista.scrollTop;
+                lista.style.maxHeight = '';
+                var önskadHöjd = lista.getBoundingClientRect().height;
+
+                // Nedanför är förstahandsvalet (det användaren förväntar
+                // sig av en dropdown); ovanför väljs när listan inte får
+                // plats nedanför men väl ovanför. Får den inte plats på
+                // någondera sidan väljs den sida som har MEST plats - att
+                // alltid falla tillbaka till "nedanför" hade annars gett
+                // den sämre av två dåliga placeringar.
+                var visaOvanför;
+                if (önskadHöjd <= utrymmeNedanför) {
+                    visaOvanför = false;
+                } else if (önskadHöjd <= utrymmeOvanför) {
+                    visaOvanför = true;
+                } else {
+                    visaOvanför = utrymmeOvanför > utrymmeNedanför;
+                }
+
+                var tillgängligt = visaOvanför ? utrymmeOvanför : utrymmeNedanför;
+                lista.style.maxHeight = Math.max(0, Math.min(önskadHöjd, tillgängligt)) + 'px';
                 lista.style.left = rect.left + 'px';
                 lista.style.width = rect.width + 'px';
                 if (visaOvanför) {
                     lista.style.top = 'auto';
-                    lista.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+                    lista.style.bottom = (window.innerHeight - rect.top + MARGINAL) + 'px';
                 } else {
                     lista.style.bottom = 'auto';
-                    lista.style.top = (rect.bottom + 4) + 'px';
+                    lista.style.top = (rect.bottom + MARGINAL) + 'px';
                 }
+                lista.scrollTop = sparadScroll;
             }
 
             function redanTillagdaTaggar() {
@@ -664,11 +732,22 @@
                 input.setAttribute('aria-activedescendant', poster[aktivIndex].id);
             }
 
+            // Förslag visas BARA när användaren har börjat skriva något
+            // som liknar en befintlig tagg - ett tomt fält (t.ex. direkt
+            // när fältet får fokus) ger inga förslag alls. Tidigare
+            // visades hela tagglistan på fokus, vilket både var något
+            // annat än vad "autocomplete" utlovar och gjorde
+            // höjdproblemet ovan maximalt dåligt (alla taggar på en gång
+            // = längsta möjliga lista på den minsta möjliga ytan).
             function visaFörslag() {
                 var text = input.value.trim().toLowerCase();
-                var träffar = text
-                    ? allaFörslag.filter(function (t) { return t.toLowerCase().indexOf(text) !== -1; })
-                    : allaFörslag;
+                if (!text) {
+                    döljFörslag();
+                    return;
+                }
+                var träffar = allaFörslag.filter(function (t) {
+                    return t.toLowerCase().indexOf(text) !== -1;
+                });
                 if (träffar.length === 0) {
                     döljFörslag();
                     return;
@@ -706,6 +785,11 @@
                 läggTillTagg();
             });
             input.addEventListener('input', visaFörslag);
+            // Fokus öppnar INTE längre listan av sig självt - visaFörslag
+            // döljer den så länge fältet är tomt (se kommentaren där).
+            // Lyssnaren är ändå kvar för det enda fall där fokus ska ge
+            // förslag: när fältet fortfarande innehåller en påbörjad
+            // text och användaren klickar tillbaka in i det.
             input.addEventListener('focus', visaFörslag);
             input.addEventListener('blur', döljFörslag);
             // Listan "driver" annars iväg från inputen om sidan
@@ -721,7 +805,16 @@
                     positioneraFörslag();
                 }
             }
-            window.addEventListener('scroll', ompositioneraOmSynlig, true);
+            // Listans EGEN inre scroll (den som gör de poster som inte
+            // fick plats åtkomliga) ska inte räknas som "sidan har rört
+            // sig" - listan står stilla relativt inputen då, och en
+            // ompositionering i det läget är i bästa fall onödig.
+            window.addEventListener('scroll', function (händelse) {
+                if (händelse.target === lista) {
+                    return;
+                }
+                ompositioneraOmSynlig();
+            }, true);
             window.addEventListener('resize', ompositioneraOmSynlig);
             // Granskningsfynd (PR #35): window - varken 'scroll' eller
             // 'resize' - triggas pålitligt när ett riktigt mobilt

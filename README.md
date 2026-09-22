@@ -142,7 +142,12 @@ borttagningsbara chips under fältet, i samma stil som filterchipsen i
 verktygsraden (se nedan). Fältet har autocomplete mot den inloggade
 användarens egna, redan använda taggar - en egen, enkel JS-dropdown
 (inte webbläsarens `<datalist>`, som visade sig inte fungera i mobila
-webbläsare). Taggarna visas som chips direkt på vinlistans kort (både
+webbläsare). Förslagen dyker upp först när man börjat skriva något som
+matchar en befintlig tagg (ett tomt fält visar alltså ingen lista), och
+listan begränsas till det utrymme som faktiskt finns kvar ovanför/nedanför
+fältet - den scrollar internt i stället för att sticka ut utanför
+skärmkanten eller hamna under ett mobilt tangentbord.
+Taggarna visas som chips direkt på vinlistans kort (både
 bred och smal vy) och kan användas som ett eget filter i verktygsraden
 (se nedan) - ingen separat uppslagstabell, taggar är fri text precis som
 `location`/`grapes`.
