@@ -107,13 +107,20 @@
             background: var(--yta-2);
             border: 1px solid var(--ram);
             border-radius: var(--radie);
-            /* Bara ett TAK: den faktiska maxhöjden sätts dessutom inline
-               av positioneraFörslag(), utifrån hur mycket plats som
-               verkligen finns kvar ovanför/nedanför inputen i den synliga
-               ytan. Enbart det här fasta taket räckte inte - listan
-               renderades då i full höjd och spillde ut utanför
-               skärmkanten/tangentbordet. */
-            max-height: 12rem;
+            /* Två tak, båda i samma deklaration: designtaket 12rem, och
+               hur mycket plats som verkligen finns kvar ovanför/nedanför
+               inputen i den synliga ytan (--forslag-tillgangligt, satt av
+               positioneraFörslag() vid varje visning). Enbart det fasta
+               taket räckte inte - listan renderades då i full höjd och
+               spillde ut utanför skärmkanten/tangentbordet. Skrivet som
+               en CSS-min() med variabeln som andra led, i stället för att
+               JS:en räknar ut hela värdet: då finns 12rem-talet bara på
+               ETT ställe, och JS:en behöver aldrig mäta listans egen höjd
+               för att sätta en begränsning (se kommentaren i
+               positioneraFörslag() om varför den mätningen är känslig).
+               Utan variabeln satt (t.ex. innan första visningen) gäller
+               fallbacken, dvs. bara designtaket. */
+            max-height: min(12rem, var(--forslag-tillgangligt, 12rem));
             overflow-y: auto;
             box-shadow: 0 2px 8px var(--skugga);
         }
@@ -612,17 +619,30 @@
                 var utrymmeNedanför = synligBotten - rect.bottom - MARGINAL;
                 var utrymmeOvanför = rect.top - synligTopp - MARGINAL;
 
-                // Nollställ förra visningens inline-maxHeight först, så
-                // att mätningen ger listans ÖNSKADE höjd (innehållets
-                // höjd, redan begränsad av CSS-takets 12rem) och inte
-                // den begränsning som sattes senast. Listans egen
+                // Bredden sätts FÖRE höjdmätningen nedan (granskningsfynd
+                // på PR #36): <ul>:en ligger i <body> med position: fixed
+                // och en bredd som bara sätts här, så vid den allra
+                // första visningen är den fortfarande shrink-to-fit mot
+                // viewporten - bredare än inputen. En lång tagg som ryms
+                // på EN rad vid den bredden, men radbryts till två vid
+                // inputens smalare bredd, mättes då en rad för kort, och
+                // listan placerades/begränsades efter en höjd som aldrig
+                // blev den faktiska. Samma eftersläpning gällde vid
+                // resize (mätning mot den gamla bredden).
+                lista.style.left = rect.left + 'px';
+                lista.style.width = rect.width + 'px';
+
+                // Mät listans ÖNSKADE höjd utan förra visningens
+                // begränsning, så att mätningen ger innehållets höjd
+                // (redan begränsad av CSS-takets 12rem) och inte den
+                // begränsning som sattes senast. Listans egen
                 // scrollposition sparas över mätningen: när boxen
                 // tillfälligt växer klämmer webbläsaren ihop scrollTop
                 // till det som då är max, och användaren hade annars
                 // ryckts tillbaka mot listans början varje gång listan
                 // positionerades om (t.ex. vid sidscroll).
                 var sparadScroll = lista.scrollTop;
-                lista.style.maxHeight = '';
+                lista.style.removeProperty('--forslag-tillgangligt');
                 var önskadHöjd = lista.getBoundingClientRect().height;
 
                 // Nedanför är förstahandsvalet (det användaren förväntar
@@ -640,10 +660,19 @@
                     visaOvanför = utrymmeOvanför > utrymmeNedanför;
                 }
 
+                // Begränsningen är BARA det lediga utrymmet, inte
+                // min(önskadHöjd, utrymmet) som tidigare: max-height
+                // tvingar aldrig fram höjd, så resultatet blir exakt
+                // detsamma när mätningen stämmer - men en mätning som
+                // INTE stämmer (se bredd-fällan ovan) kan då inte längre
+                // klämma ihop boxen och klippa bort poster. Den uppmätta
+                // höjden styr härefter bara VILKEN SIDA listan öppnas åt,
+                // aldrig hur mycket av den som syns. Designtaket på 12rem
+                // ligger kvar i CSS:en, där det hör hemma - se
+                // max-height: min(12rem, var(--forslag-tillgangligt))
+                // i <style> ovan.
                 var tillgängligt = visaOvanför ? utrymmeOvanför : utrymmeNedanför;
-                lista.style.maxHeight = Math.max(0, Math.min(önskadHöjd, tillgängligt)) + 'px';
-                lista.style.left = rect.left + 'px';
-                lista.style.width = rect.width + 'px';
+                lista.style.setProperty('--forslag-tillgangligt', Math.max(0, tillgängligt) + 'px');
                 if (visaOvanför) {
                     lista.style.top = 'auto';
                     lista.style.bottom = (window.innerHeight - rect.top + MARGINAL) + 'px';
@@ -730,6 +759,17 @@
                     post.setAttribute('aria-selected', String(ärAktiv));
                 });
                 input.setAttribute('aria-activedescendant', poster[aktivIndex].id);
+                // Listan är numera ofta lägre än sitt innehåll (den
+                // begränsas till det lediga utrymmet), så markeringen kan
+                // hamna utanför den synliga randen - användaren hade då
+                // sett ingenting hända vid ArrowDown och riskerat att
+                // lägga till en tagg hen aldrig sett. "Scrolla inuti
+                // listan" är bara en väg för den som kan peka; markeringen
+                // måste följa med av sig själv för den som navigerar med
+                // tangentbordet. block: 'nearest' scrollar minsta möjliga
+                // - och rör inte sidan i övrigt så länge listan redan
+                // syns, vilket positioneraFörslag() ser till att den gör.
+                poster[aktivIndex].scrollIntoView({block: 'nearest'});
             }
 
             // Förslag visas BARA när användaren har börjat skriva något

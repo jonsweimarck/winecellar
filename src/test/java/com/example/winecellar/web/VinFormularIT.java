@@ -551,6 +551,145 @@ class VinFormularIT extends SharedPostgres {
     }
 
     /**
+     * WINE-52 (granskningsfynd på PR #36): listan ligger i &lt;body&gt;
+     * med position: fixed, och dess bredd sätts av
+     * positioneraFörslag(). Vid den ALLRA FÖRSTA visningen mättes
+     * höjden innan bredden hunnit sättas - listan var då fortfarande
+     * shrink-to-fit mot viewporten, alltså bredare än inputen. En tagg
+     * som ryms på EN rad vid den bredden men radbryts till två vid
+     * inputens smalare bredd mättes därför en rad för kort, och listan
+     * klipptes trots att det fanns gott om plats (det självläkte vid
+     * nästa scroll/resize - men användaren som bara skriver och tittar
+     * ser det klippta läget).
+     * <p>
+     * Testet mäter därför FÖRSTA öppningen, utan någon ompositionering
+     * emellan, i en smal vy där skillnaden mellan listans auto-bredd och
+     * inputens bredd är stor nog att flytta radbrytningen (uppmätt:
+     * 296px auto mot 211px vid inputens bredd, dvs. en rad mot två).
+     * <p>
+     * Listan öppnas med EN ENDA tangenttryckning på ett tecken som bara
+     * den långa taggen innehåller. Det är avgörande: {@code fill(...)}
+     * öppnar listan TVÅ gånger (en gång för fokus, en gång för
+     * inmatningen), och den andra gången mäts mot den bredd den första
+     * hann sätta - vilket döljer felet helt. En riktig användare som
+     * skriver det första matchande tecknet och tittar får däremot exakt
+     * den enda öppning testet återskapar här.
+     */
+    @Test
+    void skaIntePressaIhopListanVidFörstaVisningenAvEnLångTagg() {
+        // "q" finns bara i den här taggen av alla som klassens tester
+        // lägger upp - kontot delas mellan testmetoderna utan städning
+        // emellan, så en tryckning på "q" ger garanterat exakt en träff.
+        String långTagg = "Langtagg q for radbrytning i smal vy hos oss";
+        try (BrowserContext förberedelse = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(förberedelse);
+            sida.locator("input[name=name]").fill("Barolo (lång tagg)");
+            sida.locator("input[name=quantity]").fill("1");
+            sida.locator("#tagg-input").fill(långTagg);
+            sida.locator("#tagg-lagg-till").click();
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+        }
+
+        try (BrowserContext context = nyInloggadKontext(375, 667)) {
+            Page sida = öppnaFormuläret(context);
+            Locator lista = sida.locator("#tagg-forslagslista");
+            Locator input = sida.locator("#tagg-input");
+            input.click();
+            assertThat(lista.isVisible()).as("tomt fält ska inte visa någon lista").isFalse();
+            input.press("q");
+            assertThat(lista.locator("li").allTextContents()).containsExactly(långTagg);
+
+            // Ingen scroll/resize här emellan - just det är poängen.
+            // scrollHeight > clientHeight betyder att listan har fått en
+            // inre scroll, dvs. att den begränsats till mindre än sitt
+            // innehåll trots att det finns gott om plats i vyn.
+            assertThat(innerScrollIPixlar(sida))
+                    .as("listan ska inte vara ihopklämd/inre-scrollande vid första visningen")
+                    .isZero();
+
+            // Bredden ska dessutom följa inputen redan från första
+            // visningen (det är bredden som avgör radbrytningen).
+            assertThat(lista.boundingBox().width)
+                    .isCloseTo(sida.locator("#tagg-input").boundingBox().width, Offset.offset(0.5));
+        }
+    }
+
+    /**
+     * WINE-52 (granskningsfynd på PR #36): sedan listan begränsas till
+     * det lediga utrymmet är den ofta lägre än sitt innehåll - men
+     * tangentbordsmarkeringen (ArrowDown/ArrowUp) scrollades aldrig in i
+     * den synliga randen. Användaren tryckte ArrowDown, såg ingenting
+     * hända, tryckte Enter - och lade till en tagg hen aldrig sett.
+     * "Scrolla inuti listan" (PR #36:s egen mekanism för de poster som
+     * inte får plats) är ingen väg för den som navigerar med
+     * tangentbordet.
+     */
+    @Test
+    void skaScrollaFramDenTangentbordsmarkeradePostenILista() {
+        String[] taggar = {"Zebra ett", "Zebra fem", "Zebra fyra",
+                "Zebra sex", "Zebra tre", "Zebra tva"};
+        try (BrowserContext förberedelse = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(förberedelse);
+            sida.locator("input[name=name]").fill("Barolo (tangentbordsscroll)");
+            sida.locator("input[name=quantity]").fill("1");
+            for (String tagg : taggar) {
+                sida.locator("#tagg-input").fill(tagg);
+                sida.locator("#tagg-lagg-till").click();
+            }
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+        }
+
+        try (BrowserContext context = nyInloggadKontext(375, 320)) {
+            Page sida = öppnaFormuläret(context);
+            Locator input = sida.locator("#tagg-input");
+            Locator lista = sida.locator("#tagg-forslagslista");
+            input.fill("zebra");
+            assertThat(lista.locator("li").count()).isEqualTo(taggar.length);
+
+            // Den låga vyn klämmer listan till mindre än sitt innehåll -
+            // annars finns ingen markering som kan hamna utanför.
+            assertThat(innerScrollIPixlar(sida))
+                    .as("listan ska vara begränsad till mindre än sitt innehåll i den här vyn")
+                    .isGreaterThan(0.0);
+
+            // Stega hela vägen ner till sista posten.
+            for (int i = 0; i < taggar.length; i++) {
+                input.press("ArrowDown");
+            }
+
+            assertThat(sida.locator("#tagg-forslagslista li.aktiv").textContent())
+                    .isEqualTo(taggar[taggar.length - 1]);
+            assertThat(markeringenÄrInomListansSynligaRand(sida))
+                    .as("den markerade posten ska scrollas fram, inte hamna utanför listans synliga rand")
+                    .isTrue();
+            assertThat(geometriskSynlig(sida, "#tagg-forslagslista li.aktiv"))
+                    .as("den markerade posten ska dessutom vara faktiskt synlig på skärmen")
+                    .isTrue();
+        }
+    }
+
+    /**
+     * Hur många pixlar av listans innehåll som ligger utanför dess
+     * synliga box (0 = inget klipps, hela listan syns utan inre scroll).
+     */
+    private double innerScrollIPixlar(Page sida) {
+        return ((Number) sida.evaluate("() => { const l = document.getElementById('tagg-forslagslista');"
+                + " return Math.max(0, l.scrollHeight - l.clientHeight); }")).doubleValue();
+    }
+
+    /** Ligger den tangentbordsmarkerade posten innanför listans synliga rand? */
+    private boolean markeringenÄrInomListansSynligaRand(Page sida) {
+        return (Boolean) sida.evaluate("() => { const l = document.getElementById('tagg-forslagslista');"
+                + " const aktiv = l.querySelector('li.aktiv');"
+                + " if (!aktiv) return false;"
+                + " const lr = l.getBoundingClientRect(); const ar = aktiv.getBoundingClientRect();"
+                // 1px marginal för delpixelavrundning.
+                + " return ar.top >= lr.top - 1 && ar.bottom <= lr.bottom + 1; }");
+    }
+
+    /**
      * WINE-52 (användarens uttryckliga önskemål efter att PR #35
      * mergats): "listan visas så fort fältet får fokus, medan min tanke
      * var 'autocomplete', dvs att alternativ inte visades förrän
@@ -766,12 +905,12 @@ class VinFormularIT extends SharedPostgres {
     }
 
     /**
-     * Explicit viewport-storlek, utan mobilemulering - används av
-     * {@link #skaAnvändaVisualViewportFörAttUpptäckaEttSimuleratTangentbord}
-     * för att garantera GOTT OM utrymme nedanför inputen INNAN
-     * window.visualViewport stubbas, så att flippen i testet bevisligen
-     * beror på stubben - inte råkar bero på att "Taggar" redan ligger
-     * nära kortets nederkant (som i de andra WINE-52-testerna).
+     * Explicit viewport-storlek, utan mobilemulering - för de tester som
+     * behöver styra utrymmet runt taggfältet exakt i stället för att ta
+     * klassens vanliga mått. Används åt båda hållen: medvetet RYMLIGT
+     * (så att en flip bevisligen beror på det testet framkallar, inte på
+     * att "Taggar" råkar ligga nära kortets nederkant) och medvetet
+     * TRÅNGT (så att listan måste begränsas till det lediga utrymmet).
      */
     private BrowserContext nyInloggadKontext(int bredd, int höjd) {
         return nyInloggadKontext(new Browser.NewContextOptions().setViewportSize(bredd, höjd));
