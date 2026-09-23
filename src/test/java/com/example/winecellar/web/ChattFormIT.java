@@ -97,9 +97,15 @@ class ChattFormIT extends SharedPostgres {
             // evaluate-avläsning, inte två separata Locator-anrop - annars
             // hinner navigeringen (redirecten efter dröjsmålet) i sällsynta
             // fall gå igenom mellan de två avläsningarna och ge ett falskt
-            // negativt resultat på den andra.
-            assertThat(läsVäntestatus(page, "ny-konversation-status", ".ny-konversation button[type=submit]"))
-                    .isEqualTo(Map.of("text", "Skickar meddelande, väntar på svar...", "disabled", true));
+            // negativt resultat på den andra. Punkterna cyklar 1-2-3 i
+            // evighet (WINE-54, vantestatus.js) - texten matchas därför med
+            // ett mönster (1-3 avslutande punkter) i stället för en exakt
+            // sträng, eftersom exakt VILKET steg i loopen assertionen råkar
+            // träffa inte är deterministiskt.
+            Map<String, Object> väntestatus =
+                    läsVäntestatus(page, "ny-konversation-status", ".ny-konversation button[type=submit]");
+            assertThat((String) väntestatus.get("text")).matches("Skickar meddelande, väntar på svar\\.{1,3}");
+            assertThat(väntestatus.get("disabled")).isEqualTo(true);
 
             page.waitForURL(Pattern.compile(".*/chatt/\\d+"));
         }
@@ -120,8 +126,12 @@ class ChattFormIT extends SharedPostgres {
             page.locator(".nytt-meddelande textarea[name=message]").fill("Några fler förslag?");
             klickaUtanAttVäntaPåNavigering(page.locator(".nytt-meddelande button[type=submit]"));
 
-            assertThat(läsVäntestatus(page, "nytt-meddelande-status", ".nytt-meddelande button[type=submit]"))
-                    .isEqualTo(Map.of("text", "Skickar meddelande, väntar på svar...", "disabled", true));
+            // Se kommentaren i föregående test för varför texten matchas
+            // med ett mönster i stället för en exakt sträng.
+            Map<String, Object> väntestatus =
+                    läsVäntestatus(page, "nytt-meddelande-status", ".nytt-meddelande button[type=submit]");
+            assertThat((String) väntestatus.get("text")).matches("Skickar meddelande, väntar på svar\\.{1,3}");
+            assertThat(väntestatus.get("disabled")).isEqualTo(true);
         }
     }
 

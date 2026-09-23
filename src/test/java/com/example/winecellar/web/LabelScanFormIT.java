@@ -106,11 +106,15 @@ class LabelScanFormIT extends SharedPostgres {
         // Konstgjord fördröjning (WINE-8) - annars kan mock-svaret komma
         // tillbaka och sidan navigera bort SÅ snabbt (en 1x1-testbild, ingen
         // riktig nätverksfördröjning) att statusraden hinner försvinna innan
-        // assertionen nedan hinner läsa den. "Analyserar etikett..." sätts
+        // assertionen nedan hinner läsa den. "Analyserar etikett" sätts
         // synkront direkt när filen väljs (se vin-formular.html), innan
         // Canvas-nedskalningen eller nätverksanropet ens börjar - fördröjningen
         // simulerar bara den riktiga LLM-anropstiden så testet får ett
-        // pålitligt fönster att observera statusraden i.
+        // pålitligt fönster att observera statusraden i. Punkterna cyklar
+        // 1-2-3 i evighet (WINE-54, vantestatus.js) - matchas därför med ett
+        // mönster (1-3 avslutande punkter) i stället för en exakt sträng,
+        // eftersom exakt VILKET steg i loopen assertionen råkar träffa inte
+        // är deterministiskt.
         when(labelInterpreter.interpret(any(), any())).thenAnswer(invocation -> {
             Thread.sleep(800);
             return Optional.of(new InterpretedLabel("Barolo", "Pio Cesare", 2018, "Italien", "Piemonte"));
@@ -122,7 +126,7 @@ class LabelScanFormIT extends SharedPostgres {
             page.locator("#etikett-input").setInputFiles(
                     new FilePayload("etikett.png", "image/png", EN_PIXEL_PNG));
 
-            assertThat(page.locator("#etikett-status").textContent()).isEqualTo("Analyserar etikett...");
+            assertThat(page.locator("#etikett-status").textContent()).matches("Analyserar etikett\\.{1,3}");
 
             page.waitForURL("**/wines/tolka-etikett");
         }
