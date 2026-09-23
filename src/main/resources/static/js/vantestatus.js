@@ -29,9 +29,19 @@
     // cyklas av loopen. Sätter texten synkront innan loopen ens startar,
     // så elementet aldrig är tomt/utan punkter mellan att den här
     // funktionen anropas och första intervall-tick:et.
+    //
+    // Granskningsfynd (PR #39): städar bort en ev. redan pågående loop på
+    // SAMMA element innan en ny startas (id sparat direkt på elementet,
+    // via ett dataset-attribut) - annars kunde t.ex. ett andra filval i
+    // vin-formular.html (innan det första hunnit klart) starta en andra,
+    // oberoende setInterval-loop på samma statusrad. Ofarligt i sig, men
+    // obegränsad tillväxt av parallella loopar utan städning annars.
     function starta(element, grundtext) {
         if (!element) {
             return;
+        }
+        if (element.dataset.väntestatusIntervall) {
+            clearInterval(Number(element.dataset.väntestatusIntervall));
         }
         var antalPunkter = 1;
         var uppdatera = function () {
@@ -39,7 +49,7 @@
             antalPunkter = antalPunkter === MAX_PUNKTER ? 1 : antalPunkter + 1;
         };
         uppdatera();
-        setInterval(uppdatera, INTERVALL_MS);
+        element.dataset.väntestatusIntervall = String(setInterval(uppdatera, INTERVALL_MS));
     }
 
     window.winecellarVäntestatus = {starta: starta};

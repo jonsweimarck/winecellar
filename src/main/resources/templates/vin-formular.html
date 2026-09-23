@@ -458,8 +458,22 @@
                 // kan ta några sekunder) kommer tillbaka som en ny sida.
                 // Punkterna cyklar 1-2-3 i evighet (WINE-54, vantestatus.js)
                 // så statusraden inte ser frusen ut under väntetiden.
+                // Granskningsfynd (PR #39): denna funktion fortsätter
+                // synkront till Canvas-nedskalningen och det JS-drivna
+                // form.submit() längre ner - skulle /js/vantestatus.js av
+                // någon anledning inte ha laddats (nätverksblip, stale
+                // cache) hade ett oskyddat anrop kastat ett TypeError här
+                // och tyst avbrutit HELA flödet (bilden hade aldrig
+                // skalats ner, formuläret aldrig skickats in), utan att
+                // användaren ser någon felindikation. Faller därför
+                // tillbaka till samma statiska text som innan WINE-54 om
+                // den delade hjälparen mot förmodan saknas.
                 if (statusRad) {
-                    window.winecellarVäntestatus.starta(statusRad, 'Analyserar etikett');
+                    if (window.winecellarVäntestatus) {
+                        window.winecellarVäntestatus.starta(statusRad, 'Analyserar etikett');
+                    } else {
+                        statusRad.textContent = 'Analyserar etikett...';
+                    }
                 }
                 var bild = new Image();
                 var läsare = new FileReader();
