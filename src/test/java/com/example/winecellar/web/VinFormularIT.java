@@ -551,21 +551,28 @@ class VinFormularIT extends SharedPostgres {
     }
 
     /**
-     * WINE-52 (granskningsfynd på PR #36): listan ligger i &lt;body&gt;
-     * med position: fixed, och dess bredd sätts av
-     * positioneraFörslag(). Vid den ALLRA FÖRSTA visningen mättes
-     * höjden innan bredden hunnit sättas - listan var då fortfarande
-     * shrink-to-fit mot viewporten, alltså bredare än inputen. En tagg
-     * som ryms på EN rad vid den bredden men radbryts till två vid
-     * inputens smalare bredd mättes därför en rad för kort, och listan
-     * klipptes trots att det fanns gott om plats (det självläkte vid
-     * nästa scroll/resize - men användaren som bara skriver och tittar
-     * ser det klippta läget).
+     * WINE-52 (granskningsfynd på PR #36, fynd 4). Skyddar mot en
+     * regression av just det granskningsfynd 4 löste - INTE fynd 1, se
+     * {@link #skaVäljaDenSidaSomFaktisktRymmerListanVidEttGränsläge}
+     * för det. En efterföljande granskning (PR #37) avslöjade att det
+     * ursprungliga namnet/dokumentationen på det här testet pekade på
+     * fel orsak: sedan fynd 4 gjorde begränsningen strukturellt beroende
+     * av ENBART det lediga utrymmet (aldrig av listans uppmätta höjd,
+     * se {@code positioneraFörslag()}), kan en felmätt höjd inte längre
+     * klämma ihop boxen - riktad negativ kontroll (bara ordnings-
+     * hunken från fynd 1 återinförd, fynd 4:s fix kvar) bekräftade att
+     * testet förblir GRÖNT då. Det den FAKTISKT bevisar är alltså fynd
+     * 4:s garanti: begränsningen kan aldrig bli snävare än det lediga
+     * utrymmet, oavsett vad en (eventuellt felmätt) höjd säger.
      * <p>
-     * Testet mäter därför FÖRSTA öppningen, utan någon ompositionering
-     * emellan, i en smal vy där skillnaden mellan listans auto-bredd och
-     * inputens bredd är stor nog att flytta radbrytningen (uppmätt:
-     * 296px auto mot 211px vid inputens bredd, dvs. en rad mot två).
+     * Scenariot som utlöser testet är ändå detsamma som fynd 1:s -
+     * listan ligger i &lt;body&gt; med position: fixed och en bredd som
+     * bara sätts av {@code positioneraFörslag()}; vid den ALLRA FÖRSTA
+     * visningen är den fortfarande shrink-to-fit mot viewporten (bredare
+     * än inputen) fram till dess. En tagg som ryms på EN rad vid den
+     * bredden men radbryts till två vid inputens smalare bredd ger
+     * alltså en höjdmätning som (utan fynd 4) hade blivit en rad för
+     * kort (uppmätt: 296px auto mot 211px vid inputens bredd).
      * <p>
      * Listan öppnas med EN ENDA tangenttryckning på ett tecken som bara
      * den långa taggen innehåller. Det är avgörande: {@code fill(...)}
@@ -576,7 +583,7 @@ class VinFormularIT extends SharedPostgres {
      * den enda öppning testet återskapar här.
      */
     @Test
-    void skaIntePressaIhopListanVidFörstaVisningenAvEnLångTagg() {
+    void skaInteKlämmaIhopListanNärHöjdenMätsFelVidFörstaVisningen() {
         // "q" finns bara i den här taggen av alla som klassens tester
         // lägger upp - kontot delas mellan testmetoderna utan städning
         // emellan, så en tryckning på "q" ger garanterat exakt en träff.
@@ -612,6 +619,81 @@ class VinFormularIT extends SharedPostgres {
             // visningen (det är bredden som avgör radbrytningen).
             assertThat(lista.boundingBox().width)
                     .isCloseTo(sida.locator("#tagg-input").boundingBox().width, Offset.offset(0.5));
+        }
+    }
+
+    /**
+     * WINE-52 (granskningsfynd, PR #37 - uppföljning). Det egentliga
+     * regressionsskyddet för fynd 1 (bredd-före-höjd-ordningen i
+     * {@code positioneraFörslag()}) - se javadocen på
+     * {@link #skaInteKlämmaIhopListanNärHöjdenMätsFelVidFörstaVisningen}
+     * för varför det testet, trots namnet, INTE bevisar det här.
+     * <p>
+     * Fynd 4 gör att en felmätt höjd inte längre kan klippa listan, men
+     * den kan fortfarande få fel SIDA (ovanför/nedanför) vald - en
+     * felmätning som säger "höjden är X" när den verkliga (radbrutna)
+     * höjden är större kan få koden att tro att "nedanför" räcker, trots
+     * att bara "ovanför" faktiskt gör det. Resultatet blir inte avklippt
+     * innehåll (fynd 4 förhindrar det), utan en SÄMRE placering: listan
+     * öppnas åt fel håll och tvingas till onödig intern scroll, i stället
+     * för att öppnas åt det håll som rymmer hela innehållet utan scroll.
+     * <p>
+     * Gränsläget är uppmätt med en tillfällig probe (samma långa tagg
+     * som testet ovan, i en 375×700-vy): med den gamla, felaktiga
+     * ordningen (bredd sätts EFTER mätningen) väljer koden "nedanför" så
+     * fort minst ~52px är ledigt där - trots att listans FAKTISKA
+     * (korrekt uppmätta) höjd bara får plats "ovanför" ända upp till
+     * ~72px ledigt nedanför. 60px ledigt (mitt i det ~20px breda
+     * gränsspannet där de två ordningarna svarar olika) håller testet
+     * stabilt mot mindre pixelvariationer mellan webbläsarversioner.
+     * Verifierat med en riktad negativ kontroll (bara ordnings-hunken
+     * återinförd, fynd 4:s fix kvar): testet blev då RÖTT (valde
+     * "nedanför" i stället för "ovanför").
+     */
+    @Test
+    void skaVäljaDenSidaSomFaktisktRymmerListanVidEttGränsläge() {
+        // "k" finns bara i den här taggen av alla som klassens tester
+        // lägger upp - kontot delas mellan testmetoderna utan städning
+        // emellan, så en tryckning på "k" ger garanterat exakt en träff.
+        String långTagg = "Langtagg k for radbrytning i smal vy hos oss";
+        try (BrowserContext förberedelse = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(förberedelse);
+            sida.locator("input[name=name]").fill("Barolo (sidval vid gränsfall)");
+            sida.locator("input[name=quantity]").fill("1");
+            sida.locator("#tagg-input").fill(långTagg);
+            sida.locator("#tagg-lagg-till").click();
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+        }
+
+        try (BrowserContext context = nyInloggadKontext(375, 700)) {
+            Page sida = öppnaFormuläret(context);
+            Locator input = sida.locator("#tagg-input");
+            Locator lista = sida.locator("#tagg-forslagslista");
+
+            // Scrolla FÖRE den första öppningen (listan har då ännu ingen
+            // bredd satt - fortfarande CSS:ens 'auto') så att exakt 60px
+            // är ledigt UNDER inputen.
+            sida.evaluate("""
+                    () => {
+                      const f = document.getElementById('tagg-input');
+                      const r = f.getBoundingClientRect();
+                      const nu = window.innerHeight - r.bottom;
+                      window.scrollBy(0, 60 - nu);
+                    }
+                    """);
+
+            // EN enda tangenttryckning - den första, avgörande öppningen
+            // (se motiveringen i testet ovan för varför fill(...) inte
+            // duger här).
+            input.click();
+            input.press("k");
+            assertThat(lista.locator("li").allTextContents()).containsExactly(långTagg);
+
+            assertThat(sida.evaluate("() => document.getElementById('tagg-forslagslista').style.top"))
+                    .as("listan ska öppnas OVANFÖR inputen (den enda sidan som faktiskt rymmer hela "
+                            + "listans innehåll) - inte NEDANFÖR, som en felmätt höjd hade valt")
+                    .isEqualTo("auto");
         }
     }
 

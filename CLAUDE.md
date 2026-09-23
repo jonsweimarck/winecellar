@@ -283,6 +283,20 @@ dem:
   min(12rem, var(...))` läser - 12rem-talet finns därmed bara i CSS:en,
   och en felmätt höjd kan inte längre klämma ihop boxen: mätningen styr
   numera bara VILKEN SIDA listan öppnas åt, aldrig hur mycket som syns.
+  **Just det - att begränsningen numera är strukturellt oberoende av
+  mätningen - avslöjade i sin tur att `VinFormularIT`s ursprungliga
+  regressionstest för (1) i praktiken bara skyddar (2)**, hittat vid en
+  uppföljande granskning (PR #37) med en riktad negativ kontroll (bara
+  ordnings-fixen (1) återinförd, begränsnings-fixen (2) kvar - testet
+  förblev grönt). Testet döptes om
+  (`skaInteKlämmaIhopListanNärHöjdenMätsFelVidFörstaVisningen`) för att
+  spegla vad det FAKTISKT bevisar, och ett eget test tillkom för (1):
+  `skaVäljaDenSidaSomFaktisktRymmerListanVidEttGränsläge` verifierar
+  SIDVALET (inline `style.top`) vid ett uppmätt gränsläge där en felmätt
+  höjd väljer fel sida utan att det syns som avklippt innehåll (eftersom
+  (2) ändå begränsar till den valda sidans lediga utrymme) - en
+  påminnelse om att en förbättrad felhantering på ETT ställe kan tysta
+  ett annat tests förmåga att bevisa vad det påstår sig bevisa.
   `markera()` (ArrowDown/ArrowUp) scrollar dessutom fram den markerade
   posten med `scrollIntoView({block: 'nearest'})` - "scrolla inuti
   listan" är ingen väg för den som navigerar med tangentbordet, och utan
