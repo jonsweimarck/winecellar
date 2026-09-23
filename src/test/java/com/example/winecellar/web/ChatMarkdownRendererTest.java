@@ -80,4 +80,22 @@ class ChatMarkdownRendererTest {
 
         assertThat(html).doesNotContainIgnoringCase("data:");
     }
+
+    @Test
+    void skaRenderaEnMjukRadbrytningUtanBlankradSomEnRiktigBrTagg() {
+        // Granskningsfynd (samma story): en enskild \n utan blankrad
+        // (CommonMarks "soft break") renderas annars som en bokstavlig \n
+        // rakt i HTML-källkoden, vilket webbläsarens white-space: normal
+        // (.meddelande-innehall, chatt.html) kollapsar till ett mellanslag -
+        // flera på varandra följande textrader (ett mycket troligt
+        // LLM-svarsmönster, t.ex. ett vinförslag per rad utan
+        // markdown-punktlista) hade då visats som EN sammanhängande mening.
+        // Se klasskommentaren i ChatMarkdownRenderer.
+        String html = ChatMarkdownRenderer.toSafeHtml("Rad 1\nRad 2\nRad 3");
+
+        assertThat(html)
+                .contains("Rad 1<br")
+                .contains("Rad 2<br")
+                .contains("Rad 3");
+    }
 }

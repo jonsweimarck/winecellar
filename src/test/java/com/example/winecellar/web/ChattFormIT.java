@@ -17,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -122,6 +123,68 @@ class ChattFormIT extends SharedPostgres {
             assertThat(läsVäntestatus(page, "nytt-meddelande-status", ".nytt-meddelande button[type=submit]"))
                     .isEqualTo(Map.of("text", "Skickar meddelande, väntar på svar...", "disabled", true));
         }
+    }
+
+    @Test
+    void skaVisaFleraTextraderPåSkildaYPositionerEfterMjukRadbrytningUtanBlankrad() {
+        // Granskningsfynd (WINE-53, PR #38): en "soft break" (en enskild \n
+        // som INTE är separerad av en blankrad - ett mycket troligt
+        // LLM-svarsmönster, t.ex. ett vinförslag per rad utan
+        // markdown-punktlista) renderas numera som en riktig <br>-tagg (se
+        // ChatMarkdownRenderer). Det räcker inte att bara verifiera att
+        // <br>-taggen finns i HTML-källan (se ChatMarkdownRendererTest) -
+        // en förälders CSS (t.ex. ett white-space-läge som gör radbrytningar
+        // osynliga) skulle fortfarande kunna klämma ihop raderna visuellt
+        // utan att HTML-källan avslöjar det, samma klass av "grönt test,
+        // trasig rendering"-fälla som Playwrights isVisible() gav flera
+        // gånger i WINE-52 (se CLAUDE.md). Verifierar därför att tre rader
+        // FAKTISKT hamnar på tre skilda Y-positioner i en riktig
+        // webbläsare, inte bara att markupen ser rätt ut.
+        when(wineChatAssistant.reply(any(), any()))
+                .thenReturn(Optional.of("Rad ett\nRad tva\nRad tre"));
+
+        try (BrowserContext context = nyKontext()) {
+            Page page = context.newPage();
+            page.navigate("http://localhost:" + port + "/chatt");
+            page.locator(".ny-konversation textarea[name=message]").fill("Ge tre förslag, ett per rad");
+            page.locator(".ny-konversation button[type=submit]").click();
+            page.waitForURL(Pattern.compile(".*/chatt/\\d+"));
+
+            // Range.getClientRects() ger en rektangel per BOXFRAGMENT (text
+            // och <br> ger var sitt fragment på samma rad), inte en per
+            // visuell rad - flera fragment på samma rad delar därför samma
+            // Y-position (verifierat: [184, 184, 208, 208, 232] för tre
+            // rader). distinct() ger radernas faktiska Y-positioner.
+            List<Double> radernasYPositioner = läsRadernasYPositioner(page).stream().distinct().toList();
+
+            assertThat(radernasYPositioner).hasSize(3);
+            assertThat(radernasYPositioner.get(1)).isGreaterThan(radernasYPositioner.get(0));
+            assertThat(radernasYPositioner.get(2)).isGreaterThan(radernasYPositioner.get(1));
+        }
+    }
+
+    /**
+     * `Element.getClientRects()` ger bara EN rektangel för ett block-element
+     * som `<p>` (dess egen border box, oavsett hur många visuella rader
+     * innehållet bryts över) - fel verktyg här. En `Range` som spänner över
+     * elementets INNEHÅLL (textnoderna/`<br>`-elementen) ger däremot en
+     * rektangel per visuell radbox, samma tekniken webbläsare själva
+     * använder för att räkna ut var en textmarkering bryts av mot
+     * skärmkanten - det avslöjar om en `<br>` faktiskt bröt raden visuellt
+     * eller om webbläsarens white-space-läge klämde ihop den mot
+     * föregående rad.
+     */
+    @SuppressWarnings("unchecked")
+    private List<Double> läsRadernasYPositioner(Page page) {
+        Object rader = page.locator(".meddelande-assistant .meddelande-innehall p").first()
+                .evaluate("el => { " +
+                        "const range = document.createRange(); " +
+                        "range.selectNodeContents(el); " +
+                        "return Array.from(range.getClientRects()).map(r => r.top); " +
+                        "}");
+        return ((List<Object>) rader).stream()
+                .map(värde -> ((Number) värde).doubleValue())
+                .toList();
     }
 
     private void klickaUtanAttVäntaPåNavigering(Locator knapp) {

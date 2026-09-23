@@ -741,6 +741,31 @@ kontra enstaka strukturerad extraktion).
   `.meddelande-text`-klass som bara ligger på användarens meddelande-
   `<span>`, eftersom assistentsvarets riktiga HTML-block redan hanterar
   sina egna radbrytningar.
+  **Ytterligare ett granskningsfynd (samma story, PR #38): en "soft
+  break" (en enskild `\n` UTAN blankrad - ett mycket troligt
+  LLM-svarsmönster, t.ex. flera vinförslag på var sin rad utan
+  markdown-punktlista) renderades av CommonMark som en bokstavlig `\n`
+  rakt i HTML-källkoden, inte som `<br>`.** Utan `.meddelande-innehall`s
+  `white-space: pre-wrap` (borttagen enligt föregående stycke) kollapsade
+  webbläsarens standardläge (`white-space: normal`) då flera på varandra
+  följande textrader till EN sammanhängande mening - en funktionell
+  regression jämfört med läget innan WINE-53, inte bara en kvarstående
+  brist. Fixat med `.softbreak("<br />\n")` i `ChatMarkdownRenderer`s
+  `HtmlRenderer`-builder. **Testfälla värd att komma ihåg om samma
+  mönster (radbrytning måste synas visuellt, inte bara i markupen)
+  byggs igen:** `Element.getClientRects()` ger bara EN rektangel för ett
+  block-element som `<p>` (dess egen border box, oavsett hur många
+  visuella rader innehållet faktiskt bryts över) - fel verktyg för att
+  verifiera att en `<br>` faktiskt syns som en radbrytning. En `Range`
+  som spänner över elementets INNEHÅLL
+  (`document.createRange(); range.selectNodeContents(el)`) ger däremot
+  en rektangel per visuell radbox, samma teknik webbläsare själva
+  använder för textmarkeringar - `ChattFormIT.
+  skaVisaFleraTextraderPåSkildaYPositionerEfterMjukRadbrytningUtanBlankrad`
+  visar mönstret. Ge även akt på att flera boxfragment (text OCH den
+  efterföljande `<br>`) kan dela exakt samma Y-position inom en och
+  samma rad - `distinct()` på den avlästa listan innan den jämförs,
+  annars ger jämförelsen falska antal.
 
 ## Flera användare - nuläge
 

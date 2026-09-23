@@ -39,6 +39,24 @@ import org.commonmark.renderer.html.UrlSanitizer;
  * <p>Används bara för assistentens (ASSISTANT-roll) meddelanden - se
  * {@link ChatController} - inte användarens egna, som förblir ren,
  * escapad text (samma beteende som innan WINE-53).
+ *
+ * <p><b>{@code softbreak("<br />\n")} - granskningsfynd, samma story.</b>
+ * CommonMark renderar annars en "soft break" (en enskild {@code \n} som
+ * INTE är separerad av en blankrad - ett mycket troligt LLM-svarsmönster,
+ * t.ex. flera vinförslag, ett per rad, utan markdown-punktlista; systemprompten
+ * i {@code AnthropicWineChatAssistant} instruerar inte modellen om någon
+ * specifik radbrytningskonvention) som en bokstavlig {@code \n} rakt i
+ * HTML-källkoden, INTE som {@code <br>}. Innan WINE-53 garanterade
+ * {@code white-space: pre-wrap} på hela {@code .meddelande} att varje
+ * radbrytning förblev synlig oavsett formatering - {@code
+ * .meddelande-innehall} (chatt.html) saknar den regeln (se klasskommentaren
+ * i chatt.html för varför), så webbläsarens standard {@code white-space:
+ * normal} annars hade kollapsat flera på varandra följande textrader till
+ * EN sammanhängande mening. Att explicit rendera soft breaks som riktiga
+ * {@code <br>}-taggar återställer garantin utan att sätta {@code pre-wrap}
+ * (som i stället hade gjort whitespace MELLAN riktiga block-element som
+ * {@code <p>}/{@code <ul>} synligt som oavsiktliga extra blankrader, se
+ * samma klasskommentar i chatt.html).
  */
 final class ChatMarkdownRenderer {
 
@@ -47,6 +65,7 @@ final class ChatMarkdownRenderer {
             .escapeHtml(true)
             .sanitizeUrls(true)
             .urlSanitizer(new NoDataUrlSanitizer())
+            .softbreak("<br />\n")
             .build();
 
     private ChatMarkdownRenderer() {
