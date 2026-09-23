@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="${conversation.title} + ' - Vinkällaren'"></title>
     <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <script th:src="@{/js/vantestatus.js}" defer></script>
     <style>
         body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
         dialog p { margin: 0 0 1rem; }
@@ -142,8 +143,10 @@
             var statusRad = document.getElementById('nytt-meddelande-status');
             var knapp = form.querySelector('button[type=submit]');
             form.addEventListener('submit', function () {
+                // Punkterna cyklar 1-2-3 i evighet (WINE-54, vantestatus.js)
+                // så statusraden inte ser frusen ut under väntetiden.
                 if (statusRad) {
-                    statusRad.textContent = 'Skickar meddelande, väntar på svar...';
+                    window.winecellarVäntestatus.starta(statusRad, 'Skickar meddelande, väntar på svar');
                 }
                 if (knapp) {
                     knapp.disabled = true;

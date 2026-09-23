@@ -6,6 +6,7 @@
     <title th:text="${wine.id == null ? 'Lägg till vin' : 'Redigera vin'}"></title>
     <th:block th:replace="~{fragments/tema :: tema}"></th:block>
     <script th:src="@{/js/validering.js}" defer></script>
+    <script th:src="@{/js/vantestatus.js}" defer></script>
     <style>
         body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem 4rem; }
         input, select, textarea { width: 100%; }
@@ -455,8 +456,24 @@
                 // sidladdning, inte htmx/fetch) - texten hinner alltså synas
                 // hela väntetiden tills serverns svar (etikettolkningen, som
                 // kan ta några sekunder) kommer tillbaka som en ny sida.
+                // Punkterna cyklar 1-2-3 i evighet (WINE-54, vantestatus.js)
+                // så statusraden inte ser frusen ut under väntetiden.
+                // Granskningsfynd (PR #39): denna funktion fortsätter
+                // synkront till Canvas-nedskalningen och det JS-drivna
+                // form.submit() längre ner - skulle /js/vantestatus.js av
+                // någon anledning inte ha laddats (nätverksblip, stale
+                // cache) hade ett oskyddat anrop kastat ett TypeError här
+                // och tyst avbrutit HELA flödet (bilden hade aldrig
+                // skalats ner, formuläret aldrig skickats in), utan att
+                // användaren ser någon felindikation. Faller därför
+                // tillbaka till samma statiska text som innan WINE-54 om
+                // den delade hjälparen mot förmodan saknas.
                 if (statusRad) {
-                    statusRad.textContent = 'Analyserar etikett...';
+                    if (window.winecellarVäntestatus) {
+                        window.winecellarVäntestatus.starta(statusRad, 'Analyserar etikett');
+                    } else {
+                        statusRad.textContent = 'Analyserar etikett...';
+                    }
                 }
                 var bild = new Image();
                 var läsare = new FileReader();
