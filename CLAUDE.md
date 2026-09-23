@@ -692,6 +692,43 @@ kontra enstaka strukturerad extraktion).
 - **Navigationsentry: hamburgarmenyn i toppraden** (ersatte den tidigare
   direkta kugghjulslänken till Inställningar, se "Designsystem och
   navigation" nedan), inte en egen knapp på vinlistan.
+- **Assistentens svar tolkas som markdown och renderas som riktig HTML
+  (WINE-53)** - `WineChatAssistant.reply(...)` returnerar fri text som i
+  praktiken kommer kodad som markdown-syntax (rubriker, listor, fetstil,
+  kod) från Anthropics API; utan tolkning visades den rå syntaxen rakt av.
+  Ny `ChatMarkdownRenderer` (paketprivat, `web`-paketet,
+  [commonmark-java](https://github.com/commonmark/commonmark-java)) gör
+  själva omvandlingen; `ChatController.show(...)` bygger en egen,
+  paketprivat `ChatMessageView(role, content, html)` per meddelande
+  (samma "beräkna rendering-klara värden i controllern, inte i
+  mallen"-princip som `WineController`s fältetiketter) - `html` är bara
+  satt (icke-`null`) för ASSISTANT-meddelanden. **Användarens EGNA
+  meddelanden renderas medvetet INTE som markdown** - `chatt.html` visar
+  dem oförändrat som ren, escapad text (`th:text`) - bara assistentens
+  svar går via `th:utext` mot den förtolkade HTML:en.
+  **Säkerhetsaspekt, inte bara "installera ett markdown-bibliotek":**
+  assistentens svar är i grunden opålitlig indata (en extern tjänsts
+  textsvar, i teorin även påverkbar av en användares egna
+  chattmeddelanden via prompt-injektion) - CommonMark-specifikationen
+  tillåter annars rå HTML i källtexten (t.ex. en bokstavlig
+  `<script>`-tagg) att passera rakt igenom till utdatan oförändrad.
+  `ChatMarkdownRenderer` sätter både `escapeHtml(true)` (rå HTML i
+  källan blir escapad text i stället för körbar HTML - påverkar inte
+  den riktiga HTML:en renderaren själv genererar för rubriker/listor/
+  fetstil) och `sanitizeUrls(true)` (spärrar farliga länkscheman, t.ex.
+  `javascript:`, i markdown-länkar/-bilder via CommonMarks egen
+  `DefaultUrlSanitizer`) - verifierat både i ett fristående enhetstest
+  (`ChatMarkdownRendererTest`) och i `ChatControllerTest`. Bara
+  kärnspecifikationen används (ingen GFM-tabellextension) - tillräckligt
+  för det assistenten faktiskt skriver, och håller det nya beroendet
+  minimalt i linje med projektets övriga, medvetet få beroenden.
+  `chatt.html` fick egna, scopeade CSS-regler för det renderade
+  innehållet (`.meddelande-innehall h1-h3/p/ul/ol/li/blockquote/pre/
+  code`) - `white-space: pre-wrap` (som tidigare låg på hela `.meddelande`
+  och bevarade användarens egna radbrytningar) flyttades till en egen
+  `.meddelande-text`-klass som bara ligger på användarens meddelande-
+  `<span>`, eftersom assistentsvarets riktiga HTML-block redan hanterar
+  sina egna radbrytningar.
 
 ## Flera användare - nuläge
 

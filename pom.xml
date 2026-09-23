@@ -30,6 +30,9 @@
              använde (WINE-20, se ADR 0014) - POI blir nu ett riktigt
              runtime-beroende av den deployade appen. -->
         <poi.version>5.2.5</poi.version>
+        <!-- Markdown-tolkning av chattassistentens svar (WINE-53) - se
+             ChatMarkdownRenderer (web-paketet). -->
+        <commonmark.version>0.24.0</commonmark.version>
     </properties>
 
     <dependencyManagement>
@@ -91,6 +94,26 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>${poi.version}</version>
+        </dependency>
+
+        <!-- Markdown-till-HTML för chattassistentens fria textsvar (WINE-53,
+             se ChatMarkdownRenderer i web-paketet) - assistentens svar
+             kommer kodade som markdown-syntax (rubriker, listor, fetstil)
+             från Anthropics API och visades tidigare som rå text. Vald
+             framför en handskriven regex-omvandling eftersom källtexten är
+             opålitlig indata (en extern LLM-tjänsts svar, i teorin även
+             påverkbar av en användares egna chattmeddelanden via
+             prompt-injektion) - escapeHtml/sanitizeUrls (aktiverade i
+             ChatMarkdownRenderer) stänger av CommonMark-specifikationens
+             annars tillåtna genomsläpp av rå HTML respektive farliga
+             länkscheman (t.ex. "javascript:") i källtexten. Bara
+             kärnspecifikationen (ingen GFM-tabellextension) - tillräckligt
+             för rubriker/listor/fetstil/kod, och håller beroendet minimalt
+             i linje med projektets övriga, medvetet få beroenden. -->
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>${commonmark.version}</version>
         </dependency>
 
         <!-- Test: enhets- och integrationsnivå -->

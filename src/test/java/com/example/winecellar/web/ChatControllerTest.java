@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -158,6 +159,56 @@ class ChatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Vilket vin passar till rödkött?")))
                 .andExpect(content().string(containsString("Barolo passar bra")));
+    }
+
+    @Test
+    void skaRenderaMarkdownIAssistentensSvarSomRiktigHtml() throws Exception {
+        // WINE-53: assistentsvar kommer som markdown-syntax (se
+        // WineChatAssistant#reply) och ska visas formaterat, inte som rå
+        // markdown-text. Den faktiska tolkningslogiken testas i detalj av
+        // ChatMarkdownRendererTest - det här verifierar bara att
+        // ChatController faktiskt använder den för assistentens meddelanden.
+        inloggadAnvändareFinns();
+        when(chatService.findConversation(ÄGARE, KONVERSATION_ID)).thenReturn(Optional.of(konversation()));
+        when(chatService.messages(KONVERSATION_ID)).thenReturn(List.of(
+                assistantMessage("Prova en **Barolo** - passar bra till:\n- Rödkött\n- Lagrad ost")));
+
+        mockMvc.perform(get("/chatt/7").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<strong>Barolo</strong>")))
+                .andExpect(content().string(containsString("<li>Rödkött</li>")))
+                .andExpect(content().string(not(containsString("**Barolo**"))));
+    }
+
+    @Test
+    void skaInteRenderaMarkdownIAnvändarensEgnaMeddelanden() throws Exception {
+        // Bara assistentens svar tolkas som markdown - användarens egen
+        // text (fri chatinmatning) förblir ren, escapad text precis som
+        // innan WINE-53.
+        inloggadAnvändareFinns();
+        when(chatService.findConversation(ÄGARE, KONVERSATION_ID)).thenReturn(Optional.of(konversation()));
+        when(chatService.messages(KONVERSATION_ID)).thenReturn(List.of(
+                new ChatMessage(null, KONVERSATION_ID, Role.USER, "Vad sägs om **starka** viner?", Instant.now())));
+
+        mockMvc.perform(get("/chatt/7").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Vad sägs om **starka** viner?")))
+                .andExpect(content().string(not(containsString("<strong>starka</strong>"))));
+    }
+
+    @Test
+    void skaInteRenderaRåHtmlFrånAssistentensSvarSomKörbarHtml() throws Exception {
+        // Assistentens svar är fri text från en extern tjänst och behandlas
+        // som opålitlig indata - en bokstavlig <script>-tagg i svaret ska
+        // aldrig hamna orenderad/körbar i sidan.
+        inloggadAnvändareFinns();
+        when(chatService.findConversation(ÄGARE, KONVERSATION_ID)).thenReturn(Optional.of(konversation()));
+        when(chatService.messages(KONVERSATION_ID)).thenReturn(List.of(
+                assistantMessage("Se detta: <script>alert('xss')</script>")));
+
+        mockMvc.perform(get("/chatt/7").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("<script>alert"))));
     }
 
     @Test
