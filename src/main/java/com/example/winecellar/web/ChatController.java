@@ -3,6 +3,7 @@ package com.example.winecellar.web;
 import com.example.winecellar.application.ChatResult;
 import com.example.winecellar.application.ChatService;
 import com.example.winecellar.application.UserRepository;
+import com.example.winecellar.domain.ChatMessage;
 import com.example.winecellar.domain.Conversation;
 import com.example.winecellar.domain.Conversation.ConversationId;
 import com.example.winecellar.domain.User.UserId;
@@ -71,7 +72,9 @@ public class ChatController {
     public String show(@PathVariable Long id, Model model, Authentication authentication) {
         Conversation conversation = findOwnedConversationOr404(id, authentication);
         model.addAttribute("conversation", conversation);
-        model.addAttribute("messages", chatService.messages(conversation.id()));
+        model.addAttribute("messages", chatService.messages(conversation.id()).stream()
+                .map(ChatController::toView)
+                .toList());
         return "chatt";
     }
 
@@ -108,5 +111,26 @@ public class ChatController {
 
     private UserId owner(Authentication authentication) {
         return CurrentUser.owner(authentication, userRepository);
+    }
+
+    /**
+     * WINE-53: assistentsvar innehåller markdown-syntax från LLM:et och
+     * tolkas till HTML (se {@link ChatMarkdownRenderer}) innan de når
+     * {@code chatt.html} - beräknat här, inte i mallen, samma princip som
+     * övriga rendering-klara modellattribut controllern bygger
+     * (t.ex. {@code WineController}s fältetiketter). Användarens EGNA
+     * meddelanden renderas medvetet INTE som markdown - bara {@code html}
+     * är satt (icke-null) för ett ASSISTANT-meddelande, {@code content}
+     * visas rakt av (escapad text, som innan denna story) för ett
+     * USER-meddelande.
+     */
+    private static ChatMessageView toView(ChatMessage message) {
+        String html = message.role() == ChatMessage.Role.ASSISTANT
+                ? ChatMarkdownRenderer.toSafeHtml(message.content())
+                : null;
+        return new ChatMessageView(message.role(), message.content(), html);
+    }
+
+    record ChatMessageView(ChatMessage.Role role, String content, String html) {
     }
 }

@@ -15,9 +15,45 @@
         .farlig-zon-text { margin: 0 0 0.75rem; color: var(--text-dampad); }
 
         .meddelanden { display: flex; flex-direction: column; gap: 0.75rem; margin: 1.5rem 0; }
-        .meddelande { padding: 0.75rem 1rem; border-radius: var(--radie); max-width: 85%; white-space: pre-wrap; }
+        .meddelande { padding: 0.75rem 1rem; border-radius: var(--radie); max-width: 85%; overflow-wrap: anywhere; }
         .meddelande-user { align-self: flex-end; background: var(--accent); color: var(--pa-accent); }
         .meddelande-assistant { align-self: flex-start; background: var(--yta-2); border: 1px solid var(--ram-stark); }
+
+        /* Användarens EGNA meddelanden är ren text (aldrig markdown-tolkade,
+           se ChatMarkdownRenderer) - white-space: pre-wrap bevarar radbrytningar
+           användaren själv skrev in. Scopeat hit (inte på .meddelande) eftersom
+           assistentsvarets riktiga HTML-element (nedan) redan hanterar sina
+           egna radbrytningar - pre-wrap hade bara gjort whitespace mellan
+           block-element (<p>, <ul>, ...) i den genererade HTML:en synligt som
+           extra, oavsiktliga blankrader. */
+        .meddelande-text { white-space: pre-wrap; }
+
+        /* Assistentsvarets markdown-till-HTML-innehåll (WINE-53) - egna
+           marginaler/typografi för rubriker/listor/kod, smala nog att inte
+           göra bubblan onödigt hög, och skalade för att fungera lika bra i
+           en 85%-bred bubbla på både dator och mobil (se .meddelande ovan). */
+        .meddelande-innehall > :first-child { margin-top: 0; }
+        .meddelande-innehall > :last-child { margin-bottom: 0; }
+        .meddelande-innehall p { margin: 0.5rem 0; }
+        .meddelande-innehall h1, .meddelande-innehall h2, .meddelande-innehall h3 {
+            margin: 0.75rem 0 0.35rem; font-size: 1.05rem;
+        }
+        .meddelande-innehall ul, .meddelande-innehall ol { margin: 0.5rem 0; padding-left: 1.3rem; }
+        .meddelande-innehall li { margin: 0.2rem 0; }
+        .meddelande-innehall blockquote {
+            margin: 0.5rem 0; padding-left: 0.75rem;
+            border-left: 3px solid var(--ram-stark); color: var(--text-dampad);
+        }
+        .meddelande-innehall pre {
+            margin: 0.5rem 0; padding: 0.6rem; overflow-x: auto;
+            background: var(--yta-3); border-radius: var(--radie);
+        }
+        .meddelande-innehall code {
+            padding: 0.1rem 0.3rem; background: var(--yta-3);
+            border-radius: 0.25rem; font-size: 0.85em; overflow-wrap: anywhere;
+        }
+        .meddelande-innehall pre code { padding: 0; background: none; }
+        .meddelande-innehall a { color: inherit; }
 
         .nytt-meddelande textarea {
             width: 100%; box-sizing: border-box; min-height: 3.5rem; resize: vertical; font: inherit;
@@ -31,8 +67,17 @@
 
     <div class="meddelanden">
         <div th:each="meddelande : ${messages}"
-             th:class="${meddelande.role().name() == 'USER'} ? 'meddelande meddelande-user' : 'meddelande meddelande-assistant'"
-             th:text="${meddelande.content}"></div>
+             th:class="${meddelande.role().name() == 'USER'} ? 'meddelande meddelande-user' : 'meddelande meddelande-assistant'">
+            <!-- Användarens egna meddelanden är ren text (th:text, escapad) -
+                 assistentens svar är förtolkad, sanerad markdown-HTML
+                 (ChatController/ChatMarkdownRenderer, WINE-53), th:utext. -->
+            <span th:if="${meddelande.role().name() == 'USER'}"
+                  class="meddelande-text"
+                  th:text="${meddelande.content}"></span>
+            <div th:unless="${meddelande.role().name() == 'USER'}"
+                 class="meddelande-innehall"
+                 th:utext="${meddelande.html}"></div>
+        </div>
     </div>
 
     <form method="post" th:action="@{/chatt/{id}/meddelande(id=${conversation.id.value})}" class="nytt-meddelande">

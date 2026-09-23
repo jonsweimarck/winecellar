@@ -692,6 +692,80 @@ kontra enstaka strukturerad extraktion).
 - **Navigationsentry: hamburgarmenyn i toppraden** (ersatte den tidigare
   direkta kugghjulslänken till Inställningar, se "Designsystem och
   navigation" nedan), inte en egen knapp på vinlistan.
+- **Assistentens svar tolkas som markdown och renderas som riktig HTML
+  (WINE-53)** - `WineChatAssistant.reply(...)` returnerar fri text som i
+  praktiken kommer kodad som markdown-syntax (rubriker, listor, fetstil,
+  kod) från Anthropics API; utan tolkning visades den rå syntaxen rakt av.
+  Ny `ChatMarkdownRenderer` (paketprivat, `web`-paketet,
+  [commonmark-java](https://github.com/commonmark/commonmark-java)) gör
+  själva omvandlingen; `ChatController.show(...)` bygger en egen,
+  paketprivat `ChatMessageView(role, content, html)` per meddelande
+  (samma "beräkna rendering-klara värden i controllern, inte i
+  mallen"-princip som `WineController`s fältetiketter) - `html` är bara
+  satt (icke-`null`) för ASSISTANT-meddelanden. **Användarens EGNA
+  meddelanden renderas medvetet INTE som markdown** - `chatt.html` visar
+  dem oförändrat som ren, escapad text (`th:text`) - bara assistentens
+  svar går via `th:utext` mot den förtolkade HTML:en.
+  **Säkerhetsaspekt, inte bara "installera ett markdown-bibliotek":**
+  assistentens svar är i grunden opålitlig indata (en extern tjänsts
+  textsvar, i teorin även påverkbar av en användares egna
+  chattmeddelanden via prompt-injektion) - CommonMark-specifikationen
+  tillåter annars rå HTML i källtexten (t.ex. en bokstavlig
+  `<script>`-tagg) att passera rakt igenom till utdatan oförändrad.
+  `ChatMarkdownRenderer` sätter både `escapeHtml(true)` (rå HTML i
+  källan blir escapad text i stället för körbar HTML - påverkar inte
+  den riktiga HTML:en renderaren själv genererar för rubriker/listor/
+  fetstil) och `sanitizeUrls(true)` (spärrar farliga länkscheman, t.ex.
+  `javascript:`, i markdown-länkar/-bilder) - verifierat både i ett
+  fristående enhetstest (`ChatMarkdownRendererTest`) och i
+  `ChatControllerTest`. **En egen `UrlSanitizer` ersätter dessutom
+  CommonMarks `DefaultUrlSanitizer` rakt av** (samma story, tillagt
+  efter en oberoende granskning som pekade ut kvarvarande `data:`-
+  länkar EFTER att den ursprungliga XSS-hårdningen redan var
+  verifierad) - `DefaultUrlSanitizer` tillåter annars även
+  `data:`-scheman (rimligt för ett allmänt markdown-bibliotek, t.ex.
+  inbäddade base64-bilder), vilket här bara är en kvarvarande, svag
+  nätfiskevektor (`data:text/html,<falsk inloggningssida>`, öppnad i
+  webbläsarens egen unika opaka origin - ingen session-/XSS-risk i sig,
+  eftersom den inte kan komma åt appens riktiga cookies/session) utan
+  någon motsvarande legitim användning i just den här chatten
+  (assistenten är rent textbaserad, renderar aldrig bilder) att väga
+  mot. `data:` spärras därför helt, för både länkar och bilder. Bara
+  kärnspecifikationen används (ingen GFM-tabellextension) - tillräckligt
+  för det assistenten faktiskt skriver, och håller det nya beroendet
+  minimalt i linje med projektets övriga, medvetet få beroenden.
+  `chatt.html` fick egna, scopeade CSS-regler för det renderade
+  innehållet (`.meddelande-innehall h1-h3/p/ul/ol/li/blockquote/pre/
+  code`) - `white-space: pre-wrap` (som tidigare låg på hela `.meddelande`
+  och bevarade användarens egna radbrytningar) flyttades till en egen
+  `.meddelande-text`-klass som bara ligger på användarens meddelande-
+  `<span>`, eftersom assistentsvarets riktiga HTML-block redan hanterar
+  sina egna radbrytningar.
+  **Ytterligare ett granskningsfynd (samma story, PR #38): en "soft
+  break" (en enskild `\n` UTAN blankrad - ett mycket troligt
+  LLM-svarsmönster, t.ex. flera vinförslag på var sin rad utan
+  markdown-punktlista) renderades av CommonMark som en bokstavlig `\n`
+  rakt i HTML-källkoden, inte som `<br>`.** Utan `.meddelande-innehall`s
+  `white-space: pre-wrap` (borttagen enligt föregående stycke) kollapsade
+  webbläsarens standardläge (`white-space: normal`) då flera på varandra
+  följande textrader till EN sammanhängande mening - en funktionell
+  regression jämfört med läget innan WINE-53, inte bara en kvarstående
+  brist. Fixat med `.softbreak("<br />\n")` i `ChatMarkdownRenderer`s
+  `HtmlRenderer`-builder. **Testfälla värd att komma ihåg om samma
+  mönster (radbrytning måste synas visuellt, inte bara i markupen)
+  byggs igen:** `Element.getClientRects()` ger bara EN rektangel för ett
+  block-element som `<p>` (dess egen border box, oavsett hur många
+  visuella rader innehållet faktiskt bryts över) - fel verktyg för att
+  verifiera att en `<br>` faktiskt syns som en radbrytning. En `Range`
+  som spänner över elementets INNEHÅLL
+  (`document.createRange(); range.selectNodeContents(el)`) ger däremot
+  en rektangel per visuell radbox, samma teknik webbläsare själva
+  använder för textmarkeringar - `ChattFormIT.
+  skaVisaFleraTextraderPåSkildaYPositionerEfterMjukRadbrytningUtanBlankrad`
+  visar mönstret. Ge även akt på att flera boxfragment (text OCH den
+  efterföljande `<br>`) kan dela exakt samma Y-position inom en och
+  samma rad - `distinct()` på den avlästa listan innan den jämförs,
+  annars ger jämförelsen falska antal.
 
 ## Flera användare - nuläge
 
