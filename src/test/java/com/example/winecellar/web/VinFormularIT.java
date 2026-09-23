@@ -551,6 +551,227 @@ class VinFormularIT extends SharedPostgres {
     }
 
     /**
+     * WINE-52 (granskningsfynd på PR #36, fynd 4). Skyddar mot en
+     * regression av just det granskningsfynd 4 löste - INTE fynd 1, se
+     * {@link #skaVäljaDenSidaSomFaktisktRymmerListanVidEttGränsläge}
+     * för det. En efterföljande granskning (PR #37) avslöjade att det
+     * ursprungliga namnet/dokumentationen på det här testet pekade på
+     * fel orsak: sedan fynd 4 gjorde begränsningen strukturellt beroende
+     * av ENBART det lediga utrymmet (aldrig av listans uppmätta höjd,
+     * se {@code positioneraFörslag()}), kan en felmätt höjd inte längre
+     * klämma ihop boxen - riktad negativ kontroll (bara ordnings-
+     * hunken från fynd 1 återinförd, fynd 4:s fix kvar) bekräftade att
+     * testet förblir GRÖNT då. Det den FAKTISKT bevisar är alltså fynd
+     * 4:s garanti: begränsningen kan aldrig bli snävare än det lediga
+     * utrymmet, oavsett vad en (eventuellt felmätt) höjd säger.
+     * <p>
+     * Scenariot som utlöser testet är ändå detsamma som fynd 1:s -
+     * listan ligger i &lt;body&gt; med position: fixed och en bredd som
+     * bara sätts av {@code positioneraFörslag()}; vid den ALLRA FÖRSTA
+     * visningen är den fortfarande shrink-to-fit mot viewporten (bredare
+     * än inputen) fram till dess. En tagg som ryms på EN rad vid den
+     * bredden men radbryts till två vid inputens smalare bredd ger
+     * alltså en höjdmätning som (utan fynd 4) hade blivit en rad för
+     * kort (uppmätt: 296px auto mot 211px vid inputens bredd).
+     * <p>
+     * Listan öppnas med EN ENDA tangenttryckning på ett tecken som bara
+     * den långa taggen innehåller. Det är avgörande: {@code fill(...)}
+     * öppnar listan TVÅ gånger (en gång för fokus, en gång för
+     * inmatningen), och den andra gången mäts mot den bredd den första
+     * hann sätta - vilket döljer felet helt. En riktig användare som
+     * skriver det första matchande tecknet och tittar får däremot exakt
+     * den enda öppning testet återskapar här.
+     */
+    @Test
+    void skaInteKlämmaIhopListanNärHöjdenMätsFelVidFörstaVisningen() {
+        // "q" finns bara i den här taggen av alla som klassens tester
+        // lägger upp - kontot delas mellan testmetoderna utan städning
+        // emellan, så en tryckning på "q" ger garanterat exakt en träff.
+        String långTagg = "Langtagg q for radbrytning i smal vy hos oss";
+        try (BrowserContext förberedelse = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(förberedelse);
+            sida.locator("input[name=name]").fill("Barolo (lång tagg)");
+            sida.locator("input[name=quantity]").fill("1");
+            sida.locator("#tagg-input").fill(långTagg);
+            sida.locator("#tagg-lagg-till").click();
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+        }
+
+        try (BrowserContext context = nyInloggadKontext(375, 667)) {
+            Page sida = öppnaFormuläret(context);
+            Locator lista = sida.locator("#tagg-forslagslista");
+            Locator input = sida.locator("#tagg-input");
+            input.click();
+            assertThat(lista.isVisible()).as("tomt fält ska inte visa någon lista").isFalse();
+            input.press("q");
+            assertThat(lista.locator("li").allTextContents()).containsExactly(långTagg);
+
+            // Ingen scroll/resize här emellan - just det är poängen.
+            // scrollHeight > clientHeight betyder att listan har fått en
+            // inre scroll, dvs. att den begränsats till mindre än sitt
+            // innehåll trots att det finns gott om plats i vyn.
+            assertThat(innerScrollIPixlar(sida))
+                    .as("listan ska inte vara ihopklämd/inre-scrollande vid första visningen")
+                    .isZero();
+
+            // Bredden ska dessutom följa inputen redan från första
+            // visningen (det är bredden som avgör radbrytningen).
+            assertThat(lista.boundingBox().width)
+                    .isCloseTo(sida.locator("#tagg-input").boundingBox().width, Offset.offset(0.5));
+        }
+    }
+
+    /**
+     * WINE-52 (granskningsfynd, PR #37 - uppföljning). Det egentliga
+     * regressionsskyddet för fynd 1 (bredd-före-höjd-ordningen i
+     * {@code positioneraFörslag()}) - se javadocen på
+     * {@link #skaInteKlämmaIhopListanNärHöjdenMätsFelVidFörstaVisningen}
+     * för varför det testet, trots namnet, INTE bevisar det här.
+     * <p>
+     * Fynd 4 gör att en felmätt höjd inte längre kan klippa listan, men
+     * den kan fortfarande få fel SIDA (ovanför/nedanför) vald - en
+     * felmätning som säger "höjden är X" när den verkliga (radbrutna)
+     * höjden är större kan få koden att tro att "nedanför" räcker, trots
+     * att bara "ovanför" faktiskt gör det. Resultatet blir inte avklippt
+     * innehåll (fynd 4 förhindrar det), utan en SÄMRE placering: listan
+     * öppnas åt fel håll och tvingas till onödig intern scroll, i stället
+     * för att öppnas åt det håll som rymmer hela innehållet utan scroll.
+     * <p>
+     * Gränsläget är uppmätt med en tillfällig probe (samma långa tagg
+     * som testet ovan, i en 375×700-vy): med den gamla, felaktiga
+     * ordningen (bredd sätts EFTER mätningen) väljer koden "nedanför" så
+     * fort minst ~52px är ledigt där - trots att listans FAKTISKA
+     * (korrekt uppmätta) höjd bara får plats "ovanför" ända upp till
+     * ~72px ledigt nedanför. 60px ledigt (mitt i det ~20px breda
+     * gränsspannet där de två ordningarna svarar olika) håller testet
+     * stabilt mot mindre pixelvariationer mellan webbläsarversioner.
+     * Verifierat med en riktad negativ kontroll (bara ordnings-hunken
+     * återinförd, fynd 4:s fix kvar): testet blev då RÖTT (valde
+     * "nedanför" i stället för "ovanför").
+     */
+    @Test
+    void skaVäljaDenSidaSomFaktisktRymmerListanVidEttGränsläge() {
+        // "k" finns bara i den här taggen av alla som klassens tester
+        // lägger upp - kontot delas mellan testmetoderna utan städning
+        // emellan, så en tryckning på "k" ger garanterat exakt en träff.
+        String långTagg = "Langtagg k for radbrytning i smal vy hos oss";
+        try (BrowserContext förberedelse = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(förberedelse);
+            sida.locator("input[name=name]").fill("Barolo (sidval vid gränsfall)");
+            sida.locator("input[name=quantity]").fill("1");
+            sida.locator("#tagg-input").fill(långTagg);
+            sida.locator("#tagg-lagg-till").click();
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+        }
+
+        try (BrowserContext context = nyInloggadKontext(375, 700)) {
+            Page sida = öppnaFormuläret(context);
+            Locator input = sida.locator("#tagg-input");
+            Locator lista = sida.locator("#tagg-forslagslista");
+
+            // Scrolla FÖRE den första öppningen (listan har då ännu ingen
+            // bredd satt - fortfarande CSS:ens 'auto') så att exakt 60px
+            // är ledigt UNDER inputen.
+            sida.evaluate("""
+                    () => {
+                      const f = document.getElementById('tagg-input');
+                      const r = f.getBoundingClientRect();
+                      const nu = window.innerHeight - r.bottom;
+                      window.scrollBy(0, 60 - nu);
+                    }
+                    """);
+
+            // EN enda tangenttryckning - den första, avgörande öppningen
+            // (se motiveringen i testet ovan för varför fill(...) inte
+            // duger här).
+            input.click();
+            input.press("k");
+            assertThat(lista.locator("li").allTextContents()).containsExactly(långTagg);
+
+            assertThat(sida.evaluate("() => document.getElementById('tagg-forslagslista').style.top"))
+                    .as("listan ska öppnas OVANFÖR inputen (den enda sidan som faktiskt rymmer hela "
+                            + "listans innehåll) - inte NEDANFÖR, som en felmätt höjd hade valt")
+                    .isEqualTo("auto");
+        }
+    }
+
+    /**
+     * WINE-52 (granskningsfynd på PR #36): sedan listan begränsas till
+     * det lediga utrymmet är den ofta lägre än sitt innehåll - men
+     * tangentbordsmarkeringen (ArrowDown/ArrowUp) scrollades aldrig in i
+     * den synliga randen. Användaren tryckte ArrowDown, såg ingenting
+     * hända, tryckte Enter - och lade till en tagg hen aldrig sett.
+     * "Scrolla inuti listan" (PR #36:s egen mekanism för de poster som
+     * inte får plats) är ingen väg för den som navigerar med
+     * tangentbordet.
+     */
+    @Test
+    void skaScrollaFramDenTangentbordsmarkeradePostenILista() {
+        String[] taggar = {"Zebra ett", "Zebra fem", "Zebra fyra",
+                "Zebra sex", "Zebra tre", "Zebra tva"};
+        try (BrowserContext förberedelse = nyInloggadKontext()) {
+            Page sida = öppnaFormuläret(förberedelse);
+            sida.locator("input[name=name]").fill("Barolo (tangentbordsscroll)");
+            sida.locator("input[name=quantity]").fill("1");
+            for (String tagg : taggar) {
+                sida.locator("#tagg-input").fill(tagg);
+                sida.locator("#tagg-lagg-till").click();
+            }
+            sida.locator("button[type=submit]").last().click();
+            sida.waitForURL(url("/"));
+        }
+
+        try (BrowserContext context = nyInloggadKontext(375, 320)) {
+            Page sida = öppnaFormuläret(context);
+            Locator input = sida.locator("#tagg-input");
+            Locator lista = sida.locator("#tagg-forslagslista");
+            input.fill("zebra");
+            assertThat(lista.locator("li").count()).isEqualTo(taggar.length);
+
+            // Den låga vyn klämmer listan till mindre än sitt innehåll -
+            // annars finns ingen markering som kan hamna utanför.
+            assertThat(innerScrollIPixlar(sida))
+                    .as("listan ska vara begränsad till mindre än sitt innehåll i den här vyn")
+                    .isGreaterThan(0.0);
+
+            // Stega hela vägen ner till sista posten.
+            for (int i = 0; i < taggar.length; i++) {
+                input.press("ArrowDown");
+            }
+
+            assertThat(sida.locator("#tagg-forslagslista li.aktiv").textContent())
+                    .isEqualTo(taggar[taggar.length - 1]);
+            assertThat(markeringenÄrInomListansSynligaRand(sida))
+                    .as("den markerade posten ska scrollas fram, inte hamna utanför listans synliga rand")
+                    .isTrue();
+            assertThat(geometriskSynlig(sida, "#tagg-forslagslista li.aktiv"))
+                    .as("den markerade posten ska dessutom vara faktiskt synlig på skärmen")
+                    .isTrue();
+        }
+    }
+
+    /**
+     * Hur många pixlar av listans innehåll som ligger utanför dess
+     * synliga box (0 = inget klipps, hela listan syns utan inre scroll).
+     */
+    private double innerScrollIPixlar(Page sida) {
+        return ((Number) sida.evaluate("() => { const l = document.getElementById('tagg-forslagslista');"
+                + " return Math.max(0, l.scrollHeight - l.clientHeight); }")).doubleValue();
+    }
+
+    /** Ligger den tangentbordsmarkerade posten innanför listans synliga rand? */
+    private boolean markeringenÄrInomListansSynligaRand(Page sida) {
+        return (Boolean) sida.evaluate("() => { const l = document.getElementById('tagg-forslagslista');"
+                + " const aktiv = l.querySelector('li.aktiv');"
+                + " if (!aktiv) return false;"
+                + " const lr = l.getBoundingClientRect(); const ar = aktiv.getBoundingClientRect();"
+                // 1px marginal för delpixelavrundning.
+                + " return ar.top >= lr.top - 1 && ar.bottom <= lr.bottom + 1; }");
+    }
+
+    /**
      * WINE-52 (användarens uttryckliga önskemål efter att PR #35
      * mergats): "listan visas så fort fältet får fokus, medan min tanke
      * var 'autocomplete', dvs att alternativ inte visades förrän
@@ -766,12 +987,12 @@ class VinFormularIT extends SharedPostgres {
     }
 
     /**
-     * Explicit viewport-storlek, utan mobilemulering - används av
-     * {@link #skaAnvändaVisualViewportFörAttUpptäckaEttSimuleratTangentbord}
-     * för att garantera GOTT OM utrymme nedanför inputen INNAN
-     * window.visualViewport stubbas, så att flippen i testet bevisligen
-     * beror på stubben - inte råkar bero på att "Taggar" redan ligger
-     * nära kortets nederkant (som i de andra WINE-52-testerna).
+     * Explicit viewport-storlek, utan mobilemulering - för de tester som
+     * behöver styra utrymmet runt taggfältet exakt i stället för att ta
+     * klassens vanliga mått. Används åt båda hållen: medvetet RYMLIGT
+     * (så att en flip bevisligen beror på det testet framkallar, inte på
+     * att "Taggar" råkar ligga nära kortets nederkant) och medvetet
+     * TRÅNGT (så att listan måste begränsas till det lediga utrymmet).
      */
     private BrowserContext nyInloggadKontext(int bredd, int höjd) {
         return nyInloggadKontext(new Browser.NewContextOptions().setViewportSize(bredd, höjd));

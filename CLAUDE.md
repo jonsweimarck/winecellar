@@ -271,6 +271,36 @@ dem:
   fokus, vilket både var något annat än vad "autocomplete" utlovar
   (användarens egna ord) och gjorde höjdproblemet värst möjligt: alla
   taggar på en gång, på den minsta möjliga ytan.
+  **Två efterföljande granskningsfynd på samma funktion**, båda
+  åtgärdade: (1) bredden sätts numera FÖRE höjdmätningen i
+  `positioneraFörslag()` - listan ligger i `<body>` och är
+  shrink-to-fit mot viewporten tills bredden sätts, så en lång tagg som
+  ryms på en rad vid den bredden men radbryts vid inputens smalare bredd
+  mättes en rad för kort vid den allra första visningen (uppmätt:
+  296px mot 211px, en rad mot två). (2) Begränsningen sätts numera som
+  BARA det lediga utrymmet i stället för `min(uppmätt höjd, utrymmet)`,
+  via CSS-variabeln `--forslag-tillgangligt` som `max-height:
+  min(12rem, var(...))` läser - 12rem-talet finns därmed bara i CSS:en,
+  och en felmätt höjd kan inte längre klämma ihop boxen: mätningen styr
+  numera bara VILKEN SIDA listan öppnas åt, aldrig hur mycket som syns.
+  **Just det - att begränsningen numera är strukturellt oberoende av
+  mätningen - avslöjade i sin tur att `VinFormularIT`s ursprungliga
+  regressionstest för (1) i praktiken bara skyddar (2)**, hittat vid en
+  uppföljande granskning (PR #37) med en riktad negativ kontroll (bara
+  ordnings-fixen (1) återinförd, begränsnings-fixen (2) kvar - testet
+  förblev grönt). Testet döptes om
+  (`skaInteKlämmaIhopListanNärHöjdenMätsFelVidFörstaVisningen`) för att
+  spegla vad det FAKTISKT bevisar, och ett eget test tillkom för (1):
+  `skaVäljaDenSidaSomFaktisktRymmerListanVidEttGränsläge` verifierar
+  SIDVALET (inline `style.top`) vid ett uppmätt gränsläge där en felmätt
+  höjd väljer fel sida utan att det syns som avklippt innehåll (eftersom
+  (2) ändå begränsar till den valda sidans lediga utrymme) - en
+  påminnelse om att en förbättrad felhantering på ETT ställe kan tysta
+  ett annat tests förmåga att bevisa vad det påstår sig bevisa.
+  `markera()` (ArrowDown/ArrowUp) scrollar dessutom fram den markerade
+  posten med `scrollIntoView({block: 'nearest'})` - "scrolla inuti
+  listan" är ingen väg för den som navigerar med tangentbordet, och utan
+  det kunde användaren trycka Enter på en post hen aldrig sett.
   **Samma story (WINE-52) gav taggchipsen (span/kryssruta-paret för en
   redan tillagd tagg) samma stil som filterchipsen ovan** - den faktiska
   skillnaden var INTE `.chips`/`.chip`-grundstilen (som redan delades,
@@ -357,6 +387,20 @@ dem:
   capture-läge på `window` fångar även elementets EGNA inre scroll -
   filtrera bort den, annars positioneras listan om mitt under att
   användaren scrollar i den.
+- **`Locator.fill(...)` kan dölja ett fel som bara drabbar den FÖRSTA
+  gången något visas.** `fill` fokuserar fältet och skriver sedan
+  värdet, vilket ger TVÅ omgångar av fältets egna `focus`- och
+  `input`-hanterare - den andra omgången kör mot det tillstånd den
+  första hann sätta upp. Ett fel som bara finns vid den allra första
+  visningen (taggförslagens bredd-före-höjd-mätning) självläkte därför
+  innan assertionen ens hann köra, och testet var grönt mot den trasiga
+  koden. Uppmätt med en tillfällig probe som loggade varje
+  positionering: `bredd=296 styleWidth=` följt av `bredd=211
+  styleWidth=210.5px`. Öppna i stället med EN enda tangenttryckning
+  (`press("q")` på ett tecken som bara den avsedda posten innehåller) -
+  det är dessutom vad en riktig användare gör. Generellt: när ett fel
+  bara uppstår i ett elements första livscykel, kontrollera hur många
+  gånger hanterarna faktiskt kördes innan du litar på ett grönt test.
 - **UI-testfälla att komma ihåg:** `WineListResponsiveIT`/
   `ImportExportFlowIT` klickar länkar där de faktiskt sitter i UI:t.
   Flyttas en länk till en annan sida (som export gjorde i WINE-37) går
