@@ -716,9 +716,21 @@ kontra enstaka strukturerad extraktion).
   källan blir escapad text i stället för körbar HTML - påverkar inte
   den riktiga HTML:en renderaren själv genererar för rubriker/listor/
   fetstil) och `sanitizeUrls(true)` (spärrar farliga länkscheman, t.ex.
-  `javascript:`, i markdown-länkar/-bilder via CommonMarks egen
-  `DefaultUrlSanitizer`) - verifierat både i ett fristående enhetstest
-  (`ChatMarkdownRendererTest`) och i `ChatControllerTest`. Bara
+  `javascript:`, i markdown-länkar/-bilder) - verifierat både i ett
+  fristående enhetstest (`ChatMarkdownRendererTest`) och i
+  `ChatControllerTest`. **En egen `UrlSanitizer` ersätter dessutom
+  CommonMarks `DefaultUrlSanitizer` rakt av** (samma story, tillagt
+  efter en oberoende granskning som pekade ut kvarvarande `data:`-
+  länkar EFTER att den ursprungliga XSS-hårdningen redan var
+  verifierad) - `DefaultUrlSanitizer` tillåter annars även
+  `data:`-scheman (rimligt för ett allmänt markdown-bibliotek, t.ex.
+  inbäddade base64-bilder), vilket här bara är en kvarvarande, svag
+  nätfiskevektor (`data:text/html,<falsk inloggningssida>`, öppnad i
+  webbläsarens egen unika opaka origin - ingen session-/XSS-risk i sig,
+  eftersom den inte kan komma åt appens riktiga cookies/session) utan
+  någon motsvarande legitim användning i just den här chatten
+  (assistenten är rent textbaserad, renderar aldrig bilder) att väga
+  mot. `data:` spärras därför helt, för både länkar och bilder. Bara
   kärnspecifikationen används (ingen GFM-tabellextension) - tillräckligt
   för det assistenten faktiskt skriver, och håller det nya beroendet
   minimalt i linje med projektets övriga, medvetet få beroenden.

@@ -62,4 +62,22 @@ class ChatMarkdownRendererTest {
 
         assertThat(html).contains("href=\"https://www.systembolaget.se\"");
     }
+
+    @Test
+    void skaSaneraBortEnDataUriLänk() {
+        // CommonMarks DefaultUrlSanitizer tillåter annars data:-scheman - en
+        // svag nätfiskevektor (t.ex. data:text/html,<falsk inloggningssida>),
+        // se klasskommentaren i ChatMarkdownRenderer.
+        String html = ChatMarkdownRenderer.toSafeHtml(
+                "[Klicka här](data:text/html,<script>alert('xss')</script>)");
+
+        assertThat(html).doesNotContainIgnoringCase("data:");
+    }
+
+    @Test
+    void skaSaneraBortEnDataUriBild() {
+        String html = ChatMarkdownRenderer.toSafeHtml("![Etikett](data:image/png;base64,AAAA)");
+
+        assertThat(html).doesNotContainIgnoringCase("data:");
+    }
 }
