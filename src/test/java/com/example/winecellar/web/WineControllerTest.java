@@ -1571,6 +1571,41 @@ class WineControllerTest {
                     .minQuantity(1)
                     .build(), null);
         }
+
+        /**
+         * Scenario 12 (granskningsfynd, WINE-56): en enskild vinnamnslänk i
+         * AI-chattens svar ({@link ChatWineMentionLinker#searchLinkFor})
+         * kombinerar {@code reset=true} med {@code search} (INGEN
+         * {@code name}-parameter, till skillnad från Scenario 8 ovan som
+         * gäller samlingslänken) - motsvarar ett klick på ett enskilt nämnt
+         * vinnamn i svaret. Ett redan ihågkommet facetfilter (här:
+         * wineType=RED) får INTE ligga kvar och dölja träffen, annars kan
+         * en länk till ett vitt vin ge "Inga träffar" trots att vinet
+         * faktiskt finns.
+         */
+        @Test
+        @DisplayName("reset=true kombinerat med bara search (ingen name) ska rensa ett tidigare ihågkommet facetfilter")
+        void skaKombineraResetMedBaraSearchOchRensaIhågkommetFacetfilter() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("sort", "PRICE").param("direction", "DESCENDING")
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            MockHttpSession session = sessionFrån(förstaRequesten);
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .session(session)
+                            .param("reset", "true")
+                            .param("search", "Chablis"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .searchTerm("Chablis")
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(1)
+                    .build(), null);
+        }
     }
 
     @Nested

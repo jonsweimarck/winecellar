@@ -27,7 +27,7 @@ class ChatWineMentionLinkerTest {
         String html = ChatWineMentionLinker.toHtmlWithWineLinks(
                 "Prova en Barolo till rödkött.", List.of("Barolo"));
 
-        assertThat(html).contains(linkContaining("/?search=Barolo", "Barolo"));
+        assertThat(html).contains(linkContaining("/?reset=true&amp;search=Barolo", "Barolo"));
     }
 
     @Test
@@ -36,7 +36,7 @@ class ChatWineMentionLinkerTest {
                 "Barolo passar bra till rödkött. Barolo passar även till lagrad ost.",
                 List.of("Barolo"));
 
-        String länk = linkContaining("/?search=Barolo", "Barolo");
+        String länk = linkContaining("/?reset=true&amp;search=Barolo", "Barolo");
         assertThat(html)
                 .contains(länk + " passar bra")
                 .contains(länk + " passar även");
@@ -69,8 +69,8 @@ class ChatWineMentionLinkerTest {
                 "Prova en Château Margaux 2015.", List.of("Margaux", "Château Margaux"));
 
         assertThat(html)
-                .contains(linkContaining("/?search=Ch%C3%A2teau%20Margaux", "Château Margaux"))
-                .doesNotContain("/?search=Margaux\"");
+                .contains(linkContaining("/?reset=true&amp;search=Ch%C3%A2teau%20Margaux", "Château Margaux"))
+                .doesNotContain("search=Margaux\"");
     }
 
     @Test
@@ -127,6 +127,21 @@ class ChatWineMentionLinkerTest {
 
         assertThat(html).contains(
                 linkContaining("/?reset=true&amp;name=Barolo&amp;name=Chablis", "Visa dessa viner i vinlistan"));
+    }
+
+    @Test
+    void skaProcentkodaSärskildaTeckenIVinnamnetIStälletFörAttInjiceraEnExtraQueryparameter() {
+        // "&" skulle, om det lämnades okodat i länken, brutit av search-
+        // värdet och startat en ny (falsk) queryparameter - "1 & 2"
+        // används medvetet, inte bara ett bokstavligt "&", för att bevisa
+        // att RESTEN av namnet efter tecknet inte tappas bort.
+        String html = ChatWineMentionLinker.toHtmlWithWineLinks(
+                "Prova gärna Vin 1 & 2 till maten.", List.of("Vin 1 & 2"));
+
+        assertThat(html)
+                .contains(linkContaining("/?reset=true&amp;search=Vin%201%20%26%202", "Vin 1 &amp; 2"))
+                .doesNotContain("search=Vin%201%20\"")
+                .doesNotContain("&amp;2=");
     }
 
     @Test

@@ -252,7 +252,7 @@ class ChatControllerTest {
                 // CommonMark renderar rel="nofollow" FÖRE href (se ChatMarkdownRenderer,
                 // sanitizeUrls(true)) - kollar bara att attributet/länktexten finns,
                 // inte den exakta attributordningen.
-                .andExpect(content().string(containsString("href=\"/?search=Barolo\">Barolo</a>")))
+                .andExpect(content().string(containsString("href=\"/?reset=true&amp;search=Barolo\">Barolo</a>")))
                 .andExpect(content().string(containsString("Visa dessa viner i vinlistan")));
     }
 

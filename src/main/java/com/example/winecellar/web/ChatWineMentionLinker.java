@@ -156,8 +156,17 @@ final class ChatWineMentionLinker {
         return !(beforeIsWordChar && afterIsWordChar);
     }
 
+    /**
+     * `reset=true` TILLSAMMANS med `search` (granskningsfynd, WINE-56) -
+     * annars kan ett redan aktivt, ihågkommet filter (t.ex. vintyp, se
+     * WINE-55/ADR 0023) dölja det enskilda nämnda vinet efter klick, precis
+     * av samma skäl som {@link #showWinesLinkFor} redan använder
+     * {@code reset=true} för samlingslänken (se {@code WineController#
+     * resolveFilter}).
+     */
     private static String searchLinkFor(String wineName) {
         return UriComponentsBuilder.fromPath("/")
+                .queryParam("reset", "true")
                 .queryParam("search", wineName)
                 .build().encode().toUriString();
     }
