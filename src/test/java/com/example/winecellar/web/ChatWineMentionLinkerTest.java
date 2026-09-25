@@ -175,6 +175,27 @@ class ChatWineMentionLinkerTest {
                 .doesNotContain(">Etna Rosso</a>");
     }
 
+    /**
+     * WINE-56, granskningsfynd på apostrofmatchningen ovan: `ʼ` (U+02BC,
+     * "modifier letter apostrophe") klassas av {@link Character#
+     * isLetterOrDigit(int)} som en bokstav (Unicode-kategori "Letter,
+     * modifier"), till skillnad från de fem andra apostrofvarianterna -
+     * utan en apostrofmedveten ordgränskontroll räknas positionen precis
+     * intill en sådan apostrof felaktigt som "mitt i ett ord" så fort den
+     * ligger direkt efter ett föregående ord utan mellanslagsseparator, och
+     * matchningen avvisas tyst. "'a Rina Etna Rosso" är ett riktigt vinnamn
+     * i användarens samling som just börjar med en apostrof.
+     */
+    @Test
+    void skaLänkaEttVinnamnSomBörjarMedApostrofÄvenNärDenSkrivsMedModifierLetterApostrofeUtanMellanslagFöreOrdet() {
+        String html = ChatWineMentionLinker.toHtmlWithWineLinks(
+                "Kvällensʼa Rina Etna Rosso är perfekt.",
+                List.of("'a Rina Etna Rosso"));
+
+        assertThat(html)
+                .contains(linkContaining("/?reset=true&amp;name='a%20Rina%20Etna%20Rosso", "ʼa Rina Etna Rosso"));
+    }
+
     private static String linkContaining(String href, String linkText) {
         return "href=\"" + href + "\">" + linkText + "</a>";
     }

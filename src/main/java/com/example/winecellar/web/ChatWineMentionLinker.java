@@ -148,9 +148,14 @@ final class ChatWineMentionLinker {
      * är identisk med originaltexten; den text som faktiskt visas i länken
      * ({@link #linkMentionsInTextNode}) hämtas alltid ur den ONORMALISERADE
      * `literal`-strängen, så assistentens ordagranna formulering syns
-     * oförändrad i svaret. Ordgränskontrollen körs mot den onormaliserade
-     * `text`-strängen - apostrofvarianter är aldrig bokstäver/siffror, så
-     * normaliseringen kan aldrig ändra utfallet av den kontrollen.
+     * oförändrad i svaret. Ordgränskontrollen ({@link #isMentionBoundary})
+     * körs mot den onormaliserade `text`-strängen, men behandlar själv varje
+     * apostrofvariant som ett icke-ordtecken oavsett dess egen Unicode-
+     * kategori - `ʼ` (U+02BC, "modifier letter apostrophe") klassas annars
+     * av {@link Character#isLetterOrDigit(int)} som en bokstav (kategori
+     * "Letter, modifier"), till skillnad från de övriga fem varianterna, och
+     * hade annars kunnat få en gräns precis intill den att felaktigt räknas
+     * som "mitt i ett ord".
      */
     private static List<Match> findMatches(String text, List<Candidate> candidatesByLengthDescending) {
         String normalizedText = normalizeApostrophes(text);
@@ -206,9 +211,24 @@ final class ChatWineMentionLinker {
     }
 
     private static boolean isMentionBoundary(String text, int index) {
-        boolean beforeIsWordChar = index > 0 && Character.isLetterOrDigit(text.codePointBefore(index));
-        boolean afterIsWordChar = index < text.length() && Character.isLetterOrDigit(text.codePointAt(index));
+        boolean beforeIsWordChar = index > 0 && isWordCodePoint(text.codePointBefore(index));
+        boolean afterIsWordChar = index < text.length() && isWordCodePoint(text.codePointAt(index));
         return !(beforeIsWordChar && afterIsWordChar);
+    }
+
+    /**
+     * Som {@link Character#isLetterOrDigit(int)}, men behandlar en
+     * apostrofvariant (se {@link #isApostropheVariant}) som ett icke-
+     * ordtecken oavsett dess egen Unicode-kategori - `ʼ` (U+02BC) klassas
+     * annars som en bokstav ("Letter, modifier"), till skillnad från de
+     * andra fem apostrofvarianterna, vilket annars gett en inkonsekvent
+     * ordgränsbedömning just för den varianten.
+     */
+    private static boolean isWordCodePoint(int codePoint) {
+        if (codePoint <= Character.MAX_VALUE && isApostropheVariant((char) codePoint)) {
+            return false;
+        }
+        return Character.isLetterOrDigit(codePoint);
     }
 
     /**

@@ -813,13 +813,28 @@ kontra enstaka strukturerad extraktion).
      beteende) - den exakta `regionMatches`-jämförelsen misslyckades då
      redan vid startpositionen för den fullständiga frasen, och en
      kortare, oavsiktlig delfras länkades i stället. Fixat med en egen
-     `normalizeApostrophes`(en snäv, uppräknad grupp apostrofvarianter,
+     `normalizeApostrophes` (en snäv, uppräknad grupp apostrofvarianter,
      INTE ett brett Unicode-normaliseringsschema) som BARA används för
      själva jämförelsen (en normaliserad kopia av både text- och
      kandidatsträngarna, tecken-för-tecken så positionerna förblir
      oförändrade) - den TEXT som faktiskt visas i länken hämtas alltid
      ur den ONORMALISERADE originaltexten, så assistentens ordagranna
      formulering syns oförändrad.
+  3. **Kodgranskningsfynd på fix 2, innan den ens hunnit mergas:** javadoc-
+     kommentaren som motiverade att ordgränskontrollen kunde köras mot den
+     ONORMALISERADE texten påstod att "apostrofvarianter är aldrig
+     bokstäver/siffror" - fel för `ʼ` (U+02BC, "modifier letter
+     apostrophe"), vars Unicode-kategori är "Letter, modifier" och som
+     alltså RÄKNAS som en bokstav av `Character.isLetterOrDigit(...)`,
+     till skillnad från de andra fem apostrofvarianterna. Ett vinnamn som
+     börjar med apostrof (t.ex. `"'a Rina Etna Rosso"`, ett riktigt vinnamn
+     i samlingen) nämnt med just den varianten, direkt intill ett
+     föregående ord utan mellanslag, klassades då felaktigt som "mitt i ett
+     ord" och länkades aldrig, helt tyst. Fixat genom att låta
+     gränskontrollen behandla en apostrofvariant som ett icke-ordtecken
+     oavsett dess egen Unicode-kategori, konsekvent med hur
+     `normalizeApostrophes` redan behandlar de sex varianterna som
+     likvärdiga överallt annars.
 
 ## Flera användare - nuläge
 
