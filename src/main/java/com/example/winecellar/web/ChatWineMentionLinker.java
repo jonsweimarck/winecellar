@@ -133,11 +133,34 @@ final class ChatWineMentionLinker {
 
     /**
      * Hittar samtliga icke-överlappande matchningar i `text` - vid varje
-     * startposition provas kandidaterna längst först (listan är redan
-     * sorterad efter fallande längd), så en längre, mer specifik fras
-     * vinner alltid över en kortare delsträng av samma fras (t.ex.
-     * "Château Margaux" framför "Margaux"). Ordgränsmedveten: en matchning
-     * får inte börja eller sluta mitt i ett ord.
+     * startposition avgörs matchningen av den LÄNGSTA kandidat vars
+     * INNEHÅLL stämmer (listan är redan sorterad efter fallande längd),
+     * så en längre, mer specifik fras vinner alltid över en kortare
+     * delsträng av samma fras (t.ex. "Château Margaux" framför "Margaux").
+     * Ordgränsmedveten: en matchning får inte börja eller sluta mitt i ett
+     * ord.
+     *
+     * <p><strong>Ingen reservlösning till en kortare kandidat vid samma
+     * startposition</strong> om den längsta innehålls-matchande kandidatens
+     * EGEN slutgräns misslyckas - även om en kortare kandidat i listan
+     * råkar ha en giltig gräns där. Utan den regeln kan ett vinnamn som är
+     * ett exakt ORD-FÖR-ORD-PREFIX av ett annat, längre vinnamn (t.ex.
+     * "Etna Bianco" som inleder "Etna Bianco Superiore") ge en felaktig,
+     * avkortad länk: om assistentens text klistrar något direkt på slutet
+     * av det längre namnet utan mellanslag (en böjningsändelse som
+     * "Etna Bianco Superiores", eller en hopklistrad årgång som
+     * "Etna Bianco Superiore2020") misslyckas det längre namnets slutgräns
+     * - men eftersom det kortare namnet råkar sluta exakt på det redan
+     * existerande mellanslaget MELLAN de två orden i det längre namnet,
+     * skulle en reservlösning till nästa (kortare) kandidat ge den kortare
+     * kandidaten en giltig gräns där, trots att hela sekvensen egentligen
+     * är samma sammanhängande omnämnande av det längre vinet. Hittas ingen
+     * giltig gräns för den längsta innehålls-matchande kandidaten skapas
+     * därför ingen länk alls för den positionen - hellre ingen länk än en
+     * felaktig - och skanningen hoppar förbi HELA den kandidatens längd
+     * innan den fortsätter leta efter nästa omnämnande (både korrekt och
+     * effektivare än att skanna vidare tecken för tecken genom en redan
+     * avvisad kandidats span).
      *
      * <p>Jämförelsen sker mot en apostroftolerant, normaliserad kopia av
      * `text` (se {@link #normalizeApostrophes}) - en LLM-genererad svarstext
@@ -162,20 +185,30 @@ final class ChatWineMentionLinker {
         List<Match> matches = new ArrayList<>();
         int length = text.length();
         int i = 0;
-        outer:
         while (i < length) {
+            if (!isMentionBoundary(text, i)) {
+                i++;
+                continue;
+            }
+            Candidate longestContentMatch = null;
+            int longestContentMatchLength = 0;
             for (Candidate candidate : candidatesByLengthDescending) {
                 int candidateLength = candidate.normalizedName().length();
                 if (i + candidateLength <= length
-                        && normalizedText.regionMatches(true, i, candidate.normalizedName(), 0, candidateLength)
-                        && isMentionBoundary(text, i)
-                        && isMentionBoundary(text, i + candidateLength)) {
-                    matches.add(new Match(i, i + candidateLength, candidate.name()));
-                    i += candidateLength;
-                    continue outer;
+                        && normalizedText.regionMatches(true, i, candidate.normalizedName(), 0, candidateLength)) {
+                    longestContentMatch = candidate;
+                    longestContentMatchLength = candidateLength;
+                    break;
                 }
             }
-            i++;
+            if (longestContentMatch == null) {
+                i++;
+                continue;
+            }
+            if (isMentionBoundary(text, i + longestContentMatchLength)) {
+                matches.add(new Match(i, i + longestContentMatchLength, longestContentMatch.name()));
+            }
+            i += longestContentMatchLength;
         }
         return matches;
     }

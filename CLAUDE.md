@@ -835,6 +835,29 @@ kontra enstaka strukturerad extraktion).
      oavsett dess egen Unicode-kategori, konsekvent med hur
      `normalizeApostrophes` redan behandlar de sex varianterna som
      likvärdiga överallt annars.
+  4. **Ett tredje buggfynd, återigen av en riktig användare efter merge:**
+     ett kortare vinnamn som är ett exakt ORD-FÖR-ORD-PREFIX av ett längre
+     (samma inledande ord, t.ex. `"Etna Bianco"` som inleder
+     `"Etna Bianco Superiore"` - båda riktiga vinnamn i samlingen) kunde
+     länkas felaktigt, avkortat, när assistentens text klistrade något
+     direkt på slutet av det längre namnet utan mellanslag (en svensk
+     böjningsändelse eller en hopklistrad årgång är typiska LLM-
+     svarsmönster). `findMatches` provade tidigare kandidaterna längst
+     först VID VARJE STARTPOSITION och föll, om den längsta kandidatens
+     EGEN slutgräns misslyckades, tillbaka på nästa (kortare) kandidat i
+     listan - men just när den kortare kandidaten råkar sluta exakt på det
+     redan existerande mellanslaget mellan de två orden i det längre
+     namnet fick DEN kandidaten en giltig gräns där, trots att hela
+     sekvensen egentligen är samma sammanhängande omnämnande av det längre
+     vinet. Fixat genom att ta bort just den reservlösningen:
+     `findMatches` avgör nu, vid varje startposition, matchningen enbart
+     utifrån den LÄNGSTA kandidat vars innehåll stämmer - om just den
+     kandidatens egen gräns misslyckas skapas ingen länk alls för
+     omnämnandet (samma "hellre ingen länk än en felaktig"-princip som
+     redan gällde för fix 1/2 ovan), och skanningen hoppar förbi HELA den
+     kandidatens längd innan den fortsätter - både korrekt och effektivare
+     än den tidigare tecken-för-tecken-vidareskanningen genom en redan
+     avvisad kandidats span.
 
 ## Flera användare - nuläge
 

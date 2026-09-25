@@ -120,3 +120,19 @@ länken.
   ignorera allt annat i requesten" - en skärpning av
   [0023](0023-session-scoped-filter-memory.md), inte en omprövning av det
   beslutet.
+- Ett tredje granskningsfynd, upptäckt av en riktig användare efter merge:
+  när ett kortare vinnamn råkar vara ett exakt ord-för-ord-prefix av ett
+  längre (samma inledande ord, t.ex. ett vin vars namn bara är den första
+  delen av ett annat vins namn), och assistentens text klistrar något
+  direkt på slutet av det längre namnet utan mellanslag (en böjningsändelse
+  eller en hopklistrad årgång är typiska exempel), kunde det längre
+  namnets egen matchning tidigare misslyckas medan det kortare namnet
+  ändå fick en giltig gräns - eftersom det kortare namnet råkar sluta
+  exakt på det befintliga mellanslaget mellan de två delarna av det
+  längre namnet. Resultatet var en felaktig, avkortad länk till det
+  kortare vinet. Löst genom att aldrig falla tillbaka på en kortare
+  kandidat vid samma startposition: matchningen avgörs numera enbart av
+  den längsta kandidat vars innehåll stämmer på den positionen, och om
+  just DEN kandidatens egen gräns misslyckas skapas ingen länk alls för
+  omnämnandet - samma "hellre ingen länk än en felaktig"-princip som
+  redan gällde för de två tidigare granskningsfynden.
