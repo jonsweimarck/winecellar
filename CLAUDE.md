@@ -812,6 +812,31 @@ AVVIKER från användarens sparade default - annars hade badgen alltid
 visat minst 1 för varje inloggad användare, även utan något aktivt val
 i den aktuella sessionen.
 
+**Vinlistans ÖVRIGA filtrering (sökterm, sortering, vintyp, ursprung,
+taggar - INTE `minQuantity`, se ovan) minns sig kvar för HELA
+webbläsarsessionen sedan WINE-55/[ADR 0023](docs/adr/0023-session-scoped-filter-memory.md),
+i `HttpSession` - inte i databasen.** `WineController.resolveFilter(...)`
+avgör hur en `GET /`-request ska tolkas: en request som bär `sort`
+och/eller `direction` (vilket verktygsradens formulär och chipsens
+borttagningslänkar ALLTID gör, se ADR 0008, oavsett vilket enskilt fält
+som egentligen ändrades) betraktas som en FULLSTÄNDIG, avsiktlig
+beskrivning av hela filtreringen och ERSÄTTER hela det ihågkomna
+tillståndet på en gång - annars hade det varit omöjligt att avmarkera
+den sista kryssrutan i en facett (en tom uppsättning kryssrutor går
+inte att skilja från "facetten nämns inte alls" i en vanlig HTML-
+formulärinskickning). En request UTAN `sort`/`direction` (en bar `/`,
+t.ex. efter `redirect:/` från addWine/saveEdit/deleteWine, eller en
+klickad "Avbryt"-länk) slår i stället ihop varje enskilt fält FÖR SIG:
+ett explicit satt fält åsidosätter bara sitt eget ihågkomna värde
+(exakt samma princip som `minQuantity` redan följer), ett frånvarande
+fält faller tillbaka på sessionens minne. `/?reset=true` (satt av
+"Rensa filter"/"Rensa sökning och filter"-länkarna i vinkallare.html,
+i stället för en bar `/` de tidigare pekade på) tömmer minnet helt -
+utan den signalen hade länkarna bara återställt exakt det filter de
+skulle ta bort, eftersom en bar `/` annars läser minnet i stället för
+att tömma det. En ny session (ny inloggning) startar alltid om från
+kodens vanliga standardvärden, precis som innan WINE-55.
+
 **`User.ownRatingFromScale` (WINE-50, se [ADR 0022](docs/adr/0022-own-rating-freetext.md))**
 styr om `vin-formular.html`
 erbjuder "Eget betyg" som ett fritextfält (default, avmarkerad, för både

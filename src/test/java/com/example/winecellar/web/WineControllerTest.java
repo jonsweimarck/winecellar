@@ -46,6 +46,7 @@ import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
@@ -1231,6 +1232,203 @@ class WineControllerTest {
                             not(containsString("hx-delete=")),
                             not(containsString(">Ta bort<"))
                     )));
+        }
+    }
+
+    /**
+     * WINE-55 ("Kom ihåg filtrering", se ADR 0023): filtreringen är
+     * sessionsbunden, INTE databaspersisterad (till skillnad från
+     * {@code minQuantity}s egen, oförändrade {@code defaultMinQuantityFilter}
+     * - se {@code Startsidan} ovan, opåverkad av den här storyn). Varje
+     * test som ska bevisa att något kommer ihåg kör TVÅ requester i SAMMA
+     * {@link MockHttpSession} (fångad från den första requestens
+     * {@link MvcResult}) - en enda request kan aldrig bevisa att något
+     * faktiskt sparades.
+     */
+    @Nested
+    @DisplayName("sessionsbunden filterminne (WINE-55)")
+    class SessionsbundetFilterminne {
+
+        @BeforeEach
+        void källarenInnehållerViner() {
+            when(wineService.listWines(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+        }
+
+        private MockHttpSession sessionFrån(MvcResult result) {
+            return (MockHttpSession) result.getRequest().getSession(false);
+        }
+
+        /**
+         * Scenario 1: en explicit filtrering (verktygsradens formulär,
+         * hx-trigger="change" - se vinkallare.html) ska fortfarande gälla
+         * vid en EFTERFÖLJANDE, helt parameterlös navigering till
+         * startsidan i samma session - motsvarar att ha besökt en annan
+         * sida (t.ex. Inställningar) och gått tillbaka.
+         */
+        @Test
+        @DisplayName("ska komma ihåg sortering/filtrering/sökning vid en efterföljande bar navigering i samma session")
+        void skaKommaIhågFiltreringVidEfterföljandeBarNavigering() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("search", "barolo")
+                            .param("sort", "PRICE").param("direction", "DESCENDING")
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .session(sessionFrån(förstaRequesten)))
+                    .andExpect(status().isOk());
+
+            // Anropas EN gång per request (första + den bara uppföljaren) -
+            // exakt samma kriterier bägge gångerna är själva poängen med
+            // att minnas, så times(2) är rätt förväntan, inte times(1).
+            verify(wineService, times(2)).search(SearchCriteria.builder()
+                    .searchTerm("barolo")
+                    .sortField(SortField.PRICE).sortDirection(SortDirection.DESCENDING)
+                    .wineTypes(Set.of(WineType.RED))
+                    .minQuantity(1)
+                    .build(), null);
+        }
+
+        /**
+         * Scenario 2: samma sak efter en PLAIN "redirect:/" (exakt det
+         * `deleteWine`/`saveEdit`/`addWine` redan gör) - bevisar att den
+         * ihågkomna filtreringen inte var beroende av NÅGOT annat i den
+         * första requestens URL än att den var parameterlös, vilket en
+         * riktig redirect-respons också är.
+         */
+        @Test
+        @DisplayName("ska komma ihåg filtreringen efter en redirect till en helt parameterlös / (efter tillägg/redigering/borttagning)")
+        void skaKommaIhågFiltreringEfterRedirectTillPlainRot() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("sort", "VINTAGE").param("direction", "DESCENDING")
+                            .param("country", "Italien"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            MockHttpSession session = sessionFrån(förstaRequesten);
+
+            // Exakt den navigering en redirect:/ (efter t.ex. saveEdit) resulterar i.
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()).session(session))
+                    .andExpect(status().isOk());
+
+            verify(wineService, times(2)).search(SearchCriteria.builder()
+                    .sortField(SortField.VINTAGE).sortDirection(SortDirection.DESCENDING)
+                    .countries(Set.of("Italien"))
+                    .minQuantity(1)
+                    .build(), null);
+        }
+
+        /**
+         * Scenario 3: "Rensa filter"/"Rensa sökning och filter" (nu
+         * `/?reset=true`, se vinkallare.html) måste faktiskt TÖMMA
+         * sessionens minne - annars hade länken bara återställt exakt
+         * samma filter den skulle ta bort, eftersom en bar `/` annars
+         * tolkas som "använd det ihågkomna filtret".
+         */
+        @Test
+        @DisplayName("reset=true ska nollställa det ihågkomna filtret, så en efterföljande bar navigering inte återställer det gamla")
+        void skaNollställaIhågkommetFilterVidReset() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("sort", "PRICE").param("direction", "DESCENDING")
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            MockHttpSession session = sessionFrån(förstaRequesten);
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .session(session).param("reset", "true"))
+                    .andExpect(status().isOk());
+
+            // En TREDJE, helt bar request (ingen reset-parameter denna gång)
+            // ska nu visa vanliga defaults, INTE det ursprungliga PRICE/RED-filtret.
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()).session(session))
+                    .andExpect(status().isOk());
+
+            verify(wineService, times(2)).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(1)
+                    .build(), null);
+        }
+
+        /**
+         * Scenario 4: en explicit queryparameter (t.ex. en delad/bokmärkt
+         * länk) åsidosätter alltid det ihågkomna värdet för SITT EGET fält,
+         * och blir självt det nya ihågkomna värdet - övriga, orörda fält
+         * (här: wineType/sort/direction) hämtas fortfarande ur minnet,
+         * samma princip som `minQuantity` redan följer. Den andra requesten
+         * har medvetet VARKEN sort- eller direction-parameter, så den
+         * hamnar i fält-för-fält-grenen av resolveFilter (inte
+         * "hela-verktygsraden"-grenen som de andra testen här utlöser via
+         * sort/direction).
+         */
+        @Test
+        @DisplayName("en explicit queryparameter ska åsidosätta bara sitt eget ihågkomna fält, och bli det nya ihågkomna värdet")
+        void skaLåtaExplicitParameterÅsidosättaBaraSittEgetFält() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("search", "första")
+                            .param("sort", "PRICE").param("direction", "DESCENDING")
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            MockHttpSession session = sessionFrån(förstaRequesten);
+
+            // En bokmärkt/delad länk som bara anger ett nytt sökord.
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .session(session).param("search", "andra"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .searchTerm("andra")
+                    .sortField(SortField.PRICE).sortDirection(SortDirection.DESCENDING)
+                    .wineTypes(Set.of(WineType.RED))
+                    .minQuantity(1)
+                    .build(), null);
+
+            // Det nya sökordet ska i sin tur ha blivit det ihågkomna värdet -
+            // en TREDJE, bar request (utan sökparameter) ska fortfarande visa "andra".
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()).session(session))
+                    .andExpect(status().isOk());
+
+            // times(2): den andra OCH den tredje requesten gav samma kriterier.
+            verify(wineService, times(2)).search(SearchCriteria.builder()
+                    .searchTerm("andra")
+                    .sortField(SortField.PRICE).sortDirection(SortDirection.DESCENDING)
+                    .wineTypes(Set.of(WineType.RED))
+                    .minQuantity(1)
+                    .build(), null);
+        }
+
+        /**
+         * Scenario 5: en NY session (motsvarar en ny inloggning) ska
+         * fortfarande visa vanliga defaults, oavsett vad en TIDIGARE,
+         * separat session hade ihågkommet - filtreringen är alltså
+         * medvetet inte databaspersisterad per användare (se ADR 0023).
+         * De två requesterna delar HÄR ingen session alls (ingen
+         * `.session(...)` anropas) - varje `mockMvc.perform` utan en
+         * explicit session får sin egen, tomma {@link MockHttpSession}.
+         */
+        @Test
+        @DisplayName("en ny session ska starta om från vanliga defaults, oavsett vad en tidigare session hade ihågkommet")
+        void skaStartaOmFrånDefaultsIEnNySession() throws Exception {
+            mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("sort", "PRICE").param("direction", "DESCENDING")
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk());
+
+            // Ingen delad session - en helt fristående request, som en ny inloggning.
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(1)
+                    .build(), null);
         }
     }
 

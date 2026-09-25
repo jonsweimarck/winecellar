@@ -56,3 +56,4 @@ WINE-36).
 | [0020](0020-remember-me-hash-based.md) | "Håll mig inloggad" via hash-baserad remember-me, inte persistenta tokens | Accepted |
 | [0021](0021-wine-chat-conversational-llm-integration.md) | AI-chatt om vinsamlingen - persisterad konversationsdomän och en andra, flerturs-formad LLM-integration | Accepted |
 | [0022](0022-own-rating-freetext.md) | Det egna betyget är fri text, inte längre en sluten skala | Accepted |
+| [0023](0023-session-scoped-filter-memory.md) | Vinlistans filtrering minns sig själv för sessionen, inte per konto | Accepted |

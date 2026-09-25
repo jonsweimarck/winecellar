@@ -192,6 +192,18 @@ bokmärkbart och delbart. Orkestreringen ligger i
 `WineService.search(SearchCriteria)`, inte i controllern - se
 [ADR 0006](docs/adr/0006-search-orchestration-in-application-layer.md).
 
+En vald filtrering/sökning/sortering minns sig dessutom kvar för hela
+webbläsarsessionen (sedan [ADR 0023](docs/adr/0023-session-scoped-filter-memory.md))
+- en navigering till en annan sida (Inställningar, redigera ett vin,
+...) och tillbaka till startsidan visar samma filtrering igen, i
+stället för att nollställas. En explicit queryparameter (bokmärke,
+delad länk, ett ändrat val i verktygsraden) åsidosätter alltid det
+ihågkomna värdet och blir själv det nya ihågkomna värdet. Minnet är
+sessionsbundet, inte kontobundet som `minQuantity`s sparade
+standardvärde - en ny inloggning startar alltid om från vanliga
+standardvärden. Länkarna "Rensa filter"/"Rensa sökning och filter"
+tömmer minnet helt.
+
 ## Chatta om vinsamlingen
 
 En inloggad användare kan chatta fritt med en AI-assistent (samma
