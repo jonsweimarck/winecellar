@@ -252,7 +252,7 @@ class ChatControllerTest {
                 // CommonMark renderar rel="nofollow" FÖRE href (se ChatMarkdownRenderer,
                 // sanitizeUrls(true)) - kollar bara att attributet/länktexten finns,
                 // inte den exakta attributordningen.
-                .andExpect(content().string(containsString("href=\"/?reset=true&amp;search=Barolo\">Barolo</a>")))
+                .andExpect(content().string(containsString("href=\"/?reset=true&amp;name=Barolo\">Barolo</a>")))
                 .andExpect(content().string(containsString("Visa dessa viner i vinlistan")));
     }
 
@@ -266,7 +266,7 @@ class ChatControllerTest {
 
         mockMvc.perform(get("/chatt/7").with(user("testperson")))
                 .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString("/?search="))))
+                .andExpect(content().string(not(containsString("/?name="))))
                 .andExpect(content().string(not(containsString("Visa dessa viner i vinlistan"))));
     }
 

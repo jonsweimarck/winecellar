@@ -1211,6 +1211,33 @@ class WineControllerTest {
         }
 
         /**
+         * WINE-56, buggfynd efter merge: en enskild vinnamnslänk från
+         * AI-chatten (se ChatWineMentionLinker#searchLinkFor) länkar sedan
+         * dess till samma exakta `name`-facett som samlingslänken, inte
+         * längre till en fritextsökning - just för att undvika att en
+         * flerordig fras fick sökchippets "+"-uppdelade etikett
+         * (skaVisaFleraSökordMedPlusIChippet ovan) trots att det egentligen
+         * handlar om ETT redan känt, exakt vinnamn. Det här testet bekräftar
+         * bara `name`-facettens EGEN chip-rendering (buildChips) - inte
+         * själva länken, som redan täcks av ChatWineMentionLinkerTest.
+         */
+        @Test
+        @DisplayName("ska visa ett flerordigt namnfilter som en ren chip utan +-uppdelning, till skillnad från sökchippet")
+        void skaVisaNamnfilterChipUtanPlusUppdelning() throws Exception {
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+
+            String html = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "Contrada Monte Serra Etna Rosso"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(html)
+                    .contains("Contrada Monte Serra Etna Rosso ×")
+                    .doesNotContain("Contrada + Monte + Serra + Etna + Rosso");
+        }
+
+        /**
          * WINE-44: "Redigera" ersattes av en ikonlänk (ingen synlig text
          * längre), och "Ta bort" finns inte kvar i vinlistan alls - se
          * "Farlig zon" i vin-formular.html/NärEttVinTasBort nedan för den

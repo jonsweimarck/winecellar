@@ -17,7 +17,8 @@ import java.util.TreeSet;
 /**
  * WINE-56 (se docs/adr/0024-chat-wine-mention-links.md): länkar varje
  * förekomst av ett av den inloggade ägarens FAKTISKA vinnamn i
- * assistentens svar till en namnsökning i vinlistan, och avslutar svaret
+ * assistentens svar till en exakt namnfacett i vinlistan (samma facett
+ * som samlingslänken, se {@link #searchLinkFor}), och avslutar svaret
  * med en samlingslänk till exakt de nämnda vinerna, om minst ett faktiskt
  * nämndes.
  *
@@ -60,10 +61,11 @@ final class ChatWineMentionLinker {
      */
     private static Set<String> linkMentions(Node document, List<String> wineNames) {
         Set<String> mentionedWineNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        List<String> candidatesByLengthDescending = wineNames.stream()
+        List<Candidate> candidatesByLengthDescending = wineNames.stream()
                 .filter(name -> name != null && !name.isBlank())
                 .distinct()
                 .sorted(Comparator.comparingInt(String::length).reversed())
+                .map(name -> new Candidate(name, normalizeApostrophes(name)))
                 .toList();
         if (candidatesByLengthDescending.isEmpty()) {
             return mentionedWineNames;
@@ -90,7 +92,7 @@ final class ChatWineMentionLinker {
      * minst en matchning - annars orörd.
      */
     private static void linkMentionsInTextNode(
-            Text textNode, List<String> candidatesByLengthDescending, Set<String> mentionedWineNames) {
+            Text textNode, List<Candidate> candidatesByLengthDescending, Set<String> mentionedWineNames) {
         String literal = textNode.getLiteral();
         List<Match> matches = findMatches(literal, candidatesByLengthDescending);
         if (matches.isEmpty()) {
@@ -121,26 +123,54 @@ final class ChatWineMentionLinker {
     }
 
     /**
+     * En kandidat i sin FAKTISKA, databaslagrade form (`name`, används för
+     * matchningens länkmål och den returnerade `mentionedWineNames`) och en
+     * apostroftolerant kopia (`normalizedName`, används BARA för själva
+     * jämförelsen) - se {@link #normalizeApostrophes}.
+     */
+    private record Candidate(String name, String normalizedName) {
+    }
+
+    /**
      * Hittar samtliga icke-överlappande matchningar i `text` - vid varje
      * startposition provas kandidaterna längst först (listan är redan
      * sorterad efter fallande längd), så en längre, mer specifik fras
      * vinner alltid över en kortare delsträng av samma fras (t.ex.
      * "Château Margaux" framför "Margaux"). Ordgränsmedveten: en matchning
      * får inte börja eller sluta mitt i ett ord.
+     *
+     * <p>Jämförelsen sker mot en apostroftolerant, normaliserad kopia av
+     * `text` (se {@link #normalizeApostrophes}) - en LLM-genererad svarstext
+     * skriver ofta en typografisk apostrof (t.ex. U+2019) även där
+     * databasens vinnamn har en rak apostrof (U+0027), eller tvärtom.
+     * Normaliseringen ersätter varje apostrofvariant med EXAKT ett tecken,
+     * så längden - och därmed varje positions {@code start}/{@code end} -
+     * är identisk med originaltexten; den text som faktiskt visas i länken
+     * ({@link #linkMentionsInTextNode}) hämtas alltid ur den ONORMALISERADE
+     * `literal`-strängen, så assistentens ordagranna formulering syns
+     * oförändrad i svaret. Ordgränskontrollen ({@link #isMentionBoundary})
+     * körs mot den onormaliserade `text`-strängen, men behandlar själv varje
+     * apostrofvariant som ett icke-ordtecken oavsett dess egen Unicode-
+     * kategori - `ʼ` (U+02BC, "modifier letter apostrophe") klassas annars
+     * av {@link Character#isLetterOrDigit(int)} som en bokstav (kategori
+     * "Letter, modifier"), till skillnad från de övriga fem varianterna, och
+     * hade annars kunnat få en gräns precis intill den att felaktigt räknas
+     * som "mitt i ett ord".
      */
-    private static List<Match> findMatches(String text, List<String> candidatesByLengthDescending) {
+    private static List<Match> findMatches(String text, List<Candidate> candidatesByLengthDescending) {
+        String normalizedText = normalizeApostrophes(text);
         List<Match> matches = new ArrayList<>();
         int length = text.length();
         int i = 0;
         outer:
         while (i < length) {
-            for (String candidate : candidatesByLengthDescending) {
-                int candidateLength = candidate.length();
+            for (Candidate candidate : candidatesByLengthDescending) {
+                int candidateLength = candidate.normalizedName().length();
                 if (i + candidateLength <= length
-                        && text.regionMatches(true, i, candidate, 0, candidateLength)
+                        && normalizedText.regionMatches(true, i, candidate.normalizedName(), 0, candidateLength)
                         && isMentionBoundary(text, i)
                         && isMentionBoundary(text, i + candidateLength)) {
-                    matches.add(new Match(i, i + candidateLength, candidate));
+                    matches.add(new Match(i, i + candidateLength, candidate.name()));
                     i += candidateLength;
                     continue outer;
                 }
@@ -150,24 +180,78 @@ final class ChatWineMentionLinker {
         return matches;
     }
 
+    /**
+     * Ersätter varje vanlig apostrofvariant (rak `'` U+0027, typografiska
+     * `’` U+2019/`‘` U+2018/`‛` U+201B, "modifier letter apostrophe"
+     * `ʼ` U+02BC, "prime" `′` U+2032) med en gemensam, kanonisk form (den
+     * raka apostrofen) - EN tecken-för-tecken-ersättning, så resultatet
+     * alltid har SAMMA längd som `value`. Medvetet en snäv, uppräknad
+     * grupp - inte ett brett Unicode-normaliseringsschema (NFKD/NFC etc.),
+     * som hade normaliserat betydligt mer än bara apostroftecken.
+     */
+    private static String normalizeApostrophes(String value) {
+        StringBuilder normalized = null;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (isApostropheVariant(c)) {
+                if (normalized == null) {
+                    normalized = new StringBuilder(value);
+                }
+                normalized.setCharAt(i, '\'');
+            }
+        }
+        return normalized == null ? value : normalized.toString();
+    }
+
+    private static boolean isApostropheVariant(char c) {
+        return switch (c) {
+            case '\'', '’', '‘', '‛', 'ʼ', '′' -> true;
+            default -> false;
+        };
+    }
+
     private static boolean isMentionBoundary(String text, int index) {
-        boolean beforeIsWordChar = index > 0 && Character.isLetterOrDigit(text.codePointBefore(index));
-        boolean afterIsWordChar = index < text.length() && Character.isLetterOrDigit(text.codePointAt(index));
+        boolean beforeIsWordChar = index > 0 && isWordCodePoint(text.codePointBefore(index));
+        boolean afterIsWordChar = index < text.length() && isWordCodePoint(text.codePointAt(index));
         return !(beforeIsWordChar && afterIsWordChar);
     }
 
     /**
-     * `reset=true` TILLSAMMANS med `search` (granskningsfynd, WINE-56) -
+     * Som {@link Character#isLetterOrDigit(int)}, men behandlar en
+     * apostrofvariant (se {@link #isApostropheVariant}) som ett icke-
+     * ordtecken oavsett dess egen Unicode-kategori - `ʼ` (U+02BC) klassas
+     * annars som en bokstav ("Letter, modifier"), till skillnad från de
+     * andra fem apostrofvarianterna, vilket annars gett en inkonsekvent
+     * ordgränsbedömning just för den varianten.
+     */
+    private static boolean isWordCodePoint(int codePoint) {
+        if (codePoint <= Character.MAX_VALUE && isApostropheVariant((char) codePoint)) {
+            return false;
+        }
+        return Character.isLetterOrDigit(codePoint);
+    }
+
+    /**
+     * `reset=true` TILLSAMMANS med en `name`-parameter (samma exakta facett
+     * som {@link #showWinesLinkFor} redan använder för samlingslänken) -
      * annars kan ett redan aktivt, ihågkommet filter (t.ex. vintyp, se
-     * WINE-55/ADR 0023) dölja det enskilda nämnda vinet efter klick, precis
-     * av samma skäl som {@link #showWinesLinkFor} redan använder
-     * {@code reset=true} för samlingslänken (se {@code WineController#
-     * resolveFilter}).
+     * WINE-55/ADR 0023) dölja det enskilda nämnda vinet efter klick.
+     *
+     * <p>Byggd om från en fritextsökning (`search`) till samma `name`-facett
+     * som samlingslänken (buggfynd efter merge, WINE-56): vinnamnet är redan
+     * känt EXAKT (hämtat direkt ur den inloggade ägarens egen kandidatlista,
+     * se {@link #linkMentions}), så det finns ingen anledning att gå via en
+     * bredare, ordstammad fritextsökning - som dessutom visade sig ge en
+     * missvisande, "+"-uppdelad filterchip (`WineController#
+     * searchTermLabel`, en etikett avsedd för det allmänna sökfältets
+     * OCH-mellan-orden-semantik, inte för ett redan känt, exakt vinnamn).
+     * `name`-facetten ger samma resultat men en ren, konsekvent chip -
+     * identisk med samlingslänkens.
      */
     private static String searchLinkFor(String wineName) {
         return UriComponentsBuilder.fromPath("/")
                 .queryParam("reset", "true")
-                .queryParam("search", wineName)
+                .queryParam("name", wineName)
                 .build().encode().toUriString();
     }
 

@@ -25,20 +25,31 @@ inloggade ägarens FAKTISKA vinnamn, inte en gissning.
 Två saker läggs till svarets rendering:
 
 1. Varje förekomst av ett av ägarens vinnamn i assistentens svar blir en
-   länk till en fritextsökning på just det namnet i vinlistan. Precis som
-   samlingslänken (se nedan) kombineras länken med samma nollställning av
-   vinlistans sessionsbundna filtrering, av samma skäl - annars hade ett
-   redan aktivt filter kunnat dölja det nämnda vinet. Matchningen
-   är exakt (skiftlägesokänslig, ordgränsmedveten) - ingen böjningsform-
-   medveten eller ungefärlig matchning. Den avgörs mot det redan tolkade
-   syntaxträdet för svarets markdown, inte genom att leta efter
-   textmönster i den råa källtexten före tolkning - en sådan
-   strängersättning hade riskerat att träffa text som redan låg inuti en
-   befintlig länk eller ett kodstycke i svaret och förstöra dem. Genom att
-   matcha mot det tolkade trädet, och medvetet inte gå in i innehållet av
-   en redan befintlig länk, skyddas sådan text automatiskt - ett
-   vinnamn som redan är en del av en länk eller ett kodstycke länkas
-   alltså inte om.
+   länk till en exakt namnsökning i vinlistan - samma facett (se punkt 2
+   nedan) som samlingslänken använder, inte en fritextsökning. Vinnamnet
+   är redan känt EXAKT (det är hämtat direkt ur ägarens egen
+   kandidatlista, inte gissat ur svarstexten), så det finns ingen
+   anledning att gå via en bredare, ordstammad fritextsökning - som
+   dessutom visade sig ge en missvisande, "+"-mellan-orden-uppdelad
+   filterchip (avsedd för det allmänna sökfältets OCH-semantik, inte för
+   ett redan känt namn) när det nämnda vinnamnet har flera ord
+   (granskningsfynd efter merge). Precis som samlingslänken kombineras
+   länken med samma nollställning av vinlistans sessionsbundna
+   filtrering, av samma skäl - annars hade ett redan aktivt filter kunnat
+   dölja det nämnda vinet. Matchningen är exakt (skiftlägesokänslig,
+   ordgränsmedveten, apostroftolerant - en typografisk och en rak apostrof
+   behandlas som samma tecken vid själva JÄMFÖRELSEN, granskningsfynd
+   efter merge, eftersom en LLM-genererad svarstext ofta skriver
+   apostrofer annorlunda än vad databasen råkar lagra; den TEXT som
+   faktiskt visas i länken förblir alltid assistentens ordagranna
+   formulering). Den avgörs mot det redan tolkade syntaxträdet för
+   svarets markdown, inte genom att leta efter textmönster i den råa
+   källtexten före tolkning - en sådan strängersättning hade riskerat att
+   träffa text som redan låg inuti en befintlig länk eller ett kodstycke
+   i svaret och förstöra dem. Genom att matcha mot det tolkade trädet,
+   och medvetet inte gå in i innehållet av en redan befintlig länk,
+   skyddas sådan text automatiskt - ett vinnamn som redan är en del av en
+   länk eller ett kodstycke länkas alltså inte om.
 
    Vid en textuell överlappning (t.ex. ett kortare vinnamn som råkar vara
    en delsträng av ett längre) vinner alltid den längsta, mest specifika
@@ -96,8 +107,14 @@ länken.
   att fånga fler, mer diffusa förekomster.
 - Den nya facetten känner bara igen exakta namn, inte producent eller
   årgång - två viner med samma namn men olika producent/årgång kan inte
-  skiljas åt av den samlade länken. En eventuell utökning till fler fält
-  är ett separat, framtida beslut.
+  skiljas åt av vare sig den enskilda eller den samlade länken (båda
+  använder samma facett, se punkt 1/2 ovan). En eventuell utökning till
+  fler fält är ett separat, framtida beslut.
+- Eftersom både den enskilda och den samlade länken använder samma
+  exakta facett visas de alltid som samma slags chip i verktygsraden
+  (utan "+"-uppdelning) - till skillnad från det allmänna sökfältets
+  chip, som medvetet ser annorlunda ut eftersom det representerar en
+  annan, bredare sökning.
 - Den sessionsbundna filtreringens nollställningssignal betyder numera
   "utgå från standardvärdena för vinlistan" snarare än "nollställ och
   ignorera allt annat i requesten" - en skärpning av

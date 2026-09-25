@@ -786,14 +786,55 @@ kontra enstaka strukturerad extraktion).
   in i en redan existerande länk - text som redan är en del av en länk
   eller ett kodstycke i svaret länkas alltså aldrig om (ett kodstycke
   har ingen egen textnod att träffa över huvud taget). Varje matchning
-  slås in i en riktig länknod till en fritextsökning
-  (`/?search=<vinnamn>`); nämns minst ett vin läggs en avslutande
+  slås in i en riktig länknod; nämns minst ett vin läggs en avslutande
   stycke-nod till sist i syntaxträdet med en samlingslänk
   (`/?reset=true&name=<vinnamn>...`, en per DISTINKT nämnt vin,
   alfabetiskt) till den nya `names`-facetten (se ovan). Kräver att
   `reset=true` faktiskt tillämpar medskickade `name`-parametrar på
   samma request - se granskningsfyndet i "Vinlistans filtrering minns
   sig kvar" ovan.
+  **Två buggar hittade av en riktig användare EFTER att WINE-56 redan
+  var mergad, båda åtgärdade utan eskalering (samma mönster mergad
+  funktionalitet, ny buggfixrunda):**
+  1. **Den enskilda mention-länken byggde ursprungligen en
+     fritextsökning (`/?reset=true&search=<vinnamn>`), inte samma
+     `names`-facett som samlingslänken.** Gav en missvisande,
+     "+"-mellan-orden-uppdelad filterchip (`WineController.
+     searchTermLabel`, en etikett avsedd för det allmänna sökfältets
+     OCH-semantik) för flerordiga vinnamn, i stället för samma rena chip
+     som samlingslänken redan visade för exakt samma vin. Fixat genom
+     att byta `ChatWineMentionLinker.searchLinkFor` till att bygga
+     `/?reset=true&name=<vinnamn>` - vinnamnet är redan känt EXAKT, så
+     det finns ingen anledning att gå via den bredare sökningen.
+  2. **Matchningen missade en fullständig, längre frasmatchning när
+     assistentens svarstext skrev en apostrof i en ANNAN Unicode-variant
+     än den som faktiskt låg lagrad i `Wine.name`** (typografisk `’`
+     U+2019 kontra rak `'` U+0027 - ett vanligt LLM-textgenererings-
+     beteende) - den exakta `regionMatches`-jämförelsen misslyckades då
+     redan vid startpositionen för den fullständiga frasen, och en
+     kortare, oavsiktlig delfras länkades i stället. Fixat med en egen
+     `normalizeApostrophes` (en snäv, uppräknad grupp apostrofvarianter,
+     INTE ett brett Unicode-normaliseringsschema) som BARA används för
+     själva jämförelsen (en normaliserad kopia av både text- och
+     kandidatsträngarna, tecken-för-tecken så positionerna förblir
+     oförändrade) - den TEXT som faktiskt visas i länken hämtas alltid
+     ur den ONORMALISERADE originaltexten, så assistentens ordagranna
+     formulering syns oförändrad.
+  3. **Kodgranskningsfynd på fix 2, innan den ens hunnit mergas:** javadoc-
+     kommentaren som motiverade att ordgränskontrollen kunde köras mot den
+     ONORMALISERADE texten påstod att "apostrofvarianter är aldrig
+     bokstäver/siffror" - fel för `ʼ` (U+02BC, "modifier letter
+     apostrophe"), vars Unicode-kategori är "Letter, modifier" och som
+     alltså RÄKNAS som en bokstav av `Character.isLetterOrDigit(...)`,
+     till skillnad från de andra fem apostrofvarianterna. Ett vinnamn som
+     börjar med apostrof (t.ex. `"'a Rina Etna Rosso"`, ett riktigt vinnamn
+     i samlingen) nämnt med just den varianten, direkt intill ett
+     föregående ord utan mellanslag, klassades då felaktigt som "mitt i ett
+     ord" och länkades aldrig, helt tyst. Fixat genom att låta
+     gränskontrollen behandla en apostrofvariant som ett icke-ordtecken
+     oavsett dess egen Unicode-kategori, konsekvent med hur
+     `normalizeApostrophes` redan behandlar de sex varianterna som
+     likvärdiga överallt annars.
 
 ## Flera användare - nuläge
 
