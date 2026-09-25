@@ -143,3 +143,36 @@ Egenskap: Filtrera vinlistan
       | tagg | Favorit |
     Så ska vinlistan innehålla "Barolo"
     Och vinlistan ska inte innehålla "Chablis"
+
+  # WINE-56: AI-chattens "visa dessa viner i vinlistan"-länk filtrerar på
+  # en exakt uppsättning vinnamn, inte en fritextsökning - samma
+  # OCH-mellan-facetter/ELLER-inom-facetten-princip som taggar ovan.
+  Scenario: Filtrera på en uppsättning vinnamn
+    Givet att källaren innehåller följande viner:
+      | namn      |
+      | Barolo    |
+      | Chablis   |
+      | Champagne |
+    När jag filtrerar vinlistan på:
+      | vinnamn | Barolo, Champagne |
+    Så ska vinlistan innehålla "Barolo, Champagne"
+    Och vinlistan ska inte innehålla "Chablis"
+
+  Scenario: Namnfilter kombineras med andra facetter via "och"-logik
+    Givet att källaren innehåller följande viner:
+      | namn    | vintyp |
+      | Barolo  | Rött   |
+      | Chianti | Vitt   |
+    När jag filtrerar vinlistan på:
+      | vintyp  | Rött           |
+      | vinnamn | Barolo, Chianti |
+    Så ska vinlistan innehålla "Barolo"
+    Och vinlistan ska inte innehålla "Chianti"
+
+  Scenario: Namnfiltret är skiftlägesokänsligt
+    Givet att källaren innehåller följande viner:
+      | namn   |
+      | Barolo |
+    När jag filtrerar vinlistan på:
+      | vinnamn | barolo |
+    Så ska vinlistan innehålla "Barolo"

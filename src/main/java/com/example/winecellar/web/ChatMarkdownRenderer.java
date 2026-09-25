@@ -72,7 +72,23 @@ final class ChatMarkdownRenderer {
     }
 
     static String toSafeHtml(String markdown) {
-        Node document = PARSER.parse(markdown);
+        return render(parse(markdown));
+    }
+
+    /**
+     * Uppdelad form av {@link #toSafeHtml} (WINE-56) - {@link
+     * ChatWineMentionLinker} manipulerar det tolkade syntaxträdet (länkar
+     * vinnamn, se docs/adr/0024-chat-wine-mention-links.md) MELLAN parsning
+     * och rendering, och återanvänder därför den här klassens delade
+     * {@link Parser}/{@link HtmlRenderer}-konfiguration i stället för att
+     * bygga en egen, andra uppsättning med samma säkerhetsinställningar som
+     * riskerar att drifta isär.
+     */
+    static Node parse(String markdown) {
+        return PARSER.parse(markdown);
+    }
+
+    static String render(Node document) {
         return RENDERER.render(document);
     }
 

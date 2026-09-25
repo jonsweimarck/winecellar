@@ -82,6 +82,20 @@ class ChatMarkdownRendererTest {
     }
 
     @Test
+    void skaBehållaEnRelativLänkUtanSchemaOförändrad() {
+        // WINE-56: ChatWineMentionLinker bygger vinlistelänkar som
+        // relativa URL:er (t.ex. /?search=Barolo) - CommonMarks
+        // DefaultUrlSanitizer (som NoDataUrlSanitizer delegerar till,
+        // se klasskommentaren) tillåter schemalösa/relativa länkar,
+        // blockerar bara farliga SCHEMAN. En förutsättning som verifieras
+        // explicit här, inte bara antas, eftersom den är säkerhetsrelevant
+        // för hela vinnamnslänkningen.
+        String html = ChatMarkdownRenderer.toSafeHtml("[Barolo](/?search=Barolo)");
+
+        assertThat(html).contains("href=\"/?search=Barolo\"");
+    }
+
+    @Test
     void skaRenderaEnMjukRadbrytningUtanBlankradSomEnRiktigBrTagg() {
         // Granskningsfynd (samma story): en enskild \n utan blankrad
         // (CommonMarks "soft break") renderas annars som en bokstavlig \n

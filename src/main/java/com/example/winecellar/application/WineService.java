@@ -58,6 +58,7 @@ public class WineService {
                 .filter(wine -> criteria.regions().isEmpty() || criteria.regions().contains(wine.region()))
                 .filter(wine -> criteria.subregions().isEmpty() || criteria.subregions().contains(wine.subregion()))
                 .filter(wine -> criteria.tags().isEmpty() || wine.tags().stream().anyMatch(criteria.tags()::contains))
+                .filter(wine -> criteria.names().isEmpty() || criteria.names().contains(wine.name()))
                 .filter(wine -> wine.quantity() >= criteria.minQuantity())
                 .collect(Collectors.toCollection(ArrayList::new));
         result.sort(criteria.sortField().comparator(criteria.sortDirection()));

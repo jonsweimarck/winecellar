@@ -75,14 +75,16 @@ public class WineController {
 
     /**
      * WINE-55: `search`/`sort`/`direction`/`wineType`/`country`/`region`/
-     * `subregion`/`tag` saknar sedan tidigare `defaultValue` - annars går
-     * det inte att skilja "explicit satt av användaren" från "helt
-     * frånvarande i requesten" (samma distinktion `minQuantity` redan
-     * gjorde via `parseIntegerOrNull`, se nedan). Den faktiskt använda
-     * filtreringen räknas ut av {@link #resolveFilter}, som slår ihop
-     * requestens explicita parametrar med sessionens ihågkomna filter (se
-     * ADR 0023) - INNAN {@link #populateWineListModel} (oförändrad sedan
-     * tidigare) anropas med de färdiga, effektiva värdena.
+     * `subregion`/`tag`/`name` (den sistnämnda tillagd i WINE-56, se
+     * docs/adr/0024-chat-wine-mention-links.md) saknar sedan tidigare
+     * `defaultValue` - annars går det inte att skilja "explicit satt av
+     * användaren" från "helt frånvarande i requesten" (samma distinktion
+     * `minQuantity` redan gjorde via `parseIntegerOrNull`, se nedan). Den
+     * faktiskt använda filtreringen räknas ut av {@link #resolveFilter},
+     * som slår ihop requestens explicita parametrar med sessionens
+     * ihågkomna filter (se ADR 0023) - INNAN {@link #populateWineListModel}
+     * (oförändrad sedan tidigare) anropas med de färdiga, effektiva
+     * värdena.
      */
     @GetMapping("/")
     public String wineCellar(
@@ -94,6 +96,7 @@ public class WineController {
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
             @RequestParam(required = false) Set<String> tag,
+            @RequestParam(required = false) Set<String> name,
             @RequestParam(required = false) String minQuantity,
             @RequestParam(required = false) String reset,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
@@ -101,10 +104,10 @@ public class WineController {
             Model model, Authentication authentication) {
         Optional<User> currentUser = CurrentUser.find(authentication, userRepository);
         RememberedFilter filter = resolveFilter(
-                request, reset, search, sort, direction, wineType, country, region, subregion, tag);
+                request, reset, search, sort, direction, wineType, country, region, subregion, tag, name);
         populateWineListModel(
                 model, filter.search(), filter.sort(), filter.direction(),
-                filter.wineType(), filter.country(), filter.region(), filter.subregion(), filter.tag(),
+                filter.wineType(), filter.country(), filter.region(), filter.subregion(), filter.tag(), filter.name(),
                 minQuantity, currentUser);
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
     }
@@ -150,33 +153,43 @@ public class WineController {
      *     oavsiktligt kunnat nollställa hela det ihågkomna filtret.</li>
      * </ul>
      * {@code reset=true} (satt av "Rensa filter"/"Rensa sökning och
-     * filter"-länkarna i vinkallare.html) tömmer sessionens minne helt och
-     * faller tillbaka på kodens vanliga standardvärden - utan den signalen
-     * hade de länkarna (som pekar på en helt parameterlös {@code /}) bara
-     * återställt exakt samma filter de skulle ta bort. {@code reset=true}
-     * ignorerar medvetet ev. andra queryparametrar på samma request (de
-     * två "Rensa"-länkarna bär aldrig några) - en request som av någon
-     * anledning skulle skicka BÅDA {@code reset=true} och t.ex. ett eget
-     * {@code search} vore tvetydig, och tolkas här alltid som en fullständig
-     * nollställning.
+     * filter"-länkarna i vinkallare.html, och av AI-chattens "visa dessa
+     * viner i vinlistan"-länk, se {@code name} nedan) tömmer sessionens
+     * minne helt - utan den signalen hade de länkarna (som annars pekar på
+     * en helt parameterlös {@code /}) bara återställt exakt samma filter de
+     * skulle ta bort. {@code reset=true} betyder alltså "utgå från
+     * standardvärdena i stället för sessionens minne", INTE "ignorera
+     * övriga queryparametrar på samma request" (granskningsfynd, WINE-56) -
+     * en request kan kombinera {@code reset=true} med en egen, explicit
+     * parameter (t.ex. AI-chattens länk, som skickar {@code reset=true}
+     * TILLSAMMANS med en uppsättning {@code name}-parametrar för att visa
+     * exakt de nämnda vinerna, oavsett vad som råkade vara aktivt filtrerat
+     * sedan innan) - en sådan parameter tillämpas då på samma sätt som i
+     * den vanliga fält-för-fält-grenen nedan, fast med
+     * {@link RememberedFilter#defaults()} som bas istället för sessionens
+     * ihågkomna värde. De två befintliga "Rensa"-länkarna bär aldrig några
+     * andra parametrar, så deras beteende är oförändrat: reset=true utan
+     * några andra parametrar ger exakt standardvärdena, precis som innan.
      */
     private RememberedFilter resolveFilter(
             HttpServletRequest request, String reset,
             String search, SortField sort, SortDirection direction,
-            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag) {
+            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag,
+            Set<String> name) {
         HttpSession session = request.getSession();
-        if ("true".equals(reset)) {
+        boolean resetting = "true".equals(reset);
+        if (resetting) {
             session.removeAttribute(SESSION_KEY_REMEMBERED_FILTER);
-            return RememberedFilter.defaults();
         }
 
         RememberedFilter effective;
         if (sort != null && direction != null) {
             effective = new RememberedFilter(
                     search, sort != null ? sort : SortField.NAME, direction != null ? direction : SortDirection.ASCENDING,
-                    emptyIfNull(wineType), emptyIfNull(country), emptyIfNull(region), emptyIfNull(subregion), emptyIfNull(tag));
+                    emptyIfNull(wineType), emptyIfNull(country), emptyIfNull(region), emptyIfNull(subregion), emptyIfNull(tag),
+                    emptyIfNull(name));
         } else {
-            RememberedFilter remembered = (RememberedFilter) session.getAttribute(SESSION_KEY_REMEMBERED_FILTER);
+            RememberedFilter remembered = resetting ? null : (RememberedFilter) session.getAttribute(SESSION_KEY_REMEMBERED_FILTER);
             RememberedFilter base = remembered != null ? remembered : RememberedFilter.defaults();
             effective = new RememberedFilter(
                     search != null ? search : base.search(),
@@ -186,7 +199,8 @@ public class WineController {
                     country != null ? country : base.country(),
                     region != null ? region : base.region(),
                     subregion != null ? subregion : base.subregion(),
-                    tag != null ? tag : base.tag());
+                    tag != null ? tag : base.tag(),
+                    name != null ? name : base.name());
         }
         session.setAttribute(SESSION_KEY_REMEMBERED_FILTER, effective);
         return effective;
@@ -200,10 +214,11 @@ public class WineController {
      */
     private record RememberedFilter(
             String search, SortField sort, SortDirection direction,
-            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag
+            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag,
+            Set<String> name
     ) implements Serializable {
         static RememberedFilter defaults() {
-            return new RememberedFilter(null, SortField.NAME, SortDirection.ASCENDING, Set.of(), Set.of(), Set.of(), Set.of(), Set.of());
+            return new RememberedFilter(null, SortField.NAME, SortDirection.ASCENDING, Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of());
         }
     }
 
@@ -223,12 +238,14 @@ public class WineController {
     private void populateWineListModel(
             Model model, String search, SortField sort, SortDirection direction,
             Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag,
+            Set<String> name,
             String minQuantity, Optional<User> currentUser) {
         Set<String> selectedWineTypes = emptyIfNull(wineType);
         Set<String> selectedCountries = emptyIfNull(country);
         Set<String> selectedRegions = emptyIfNull(region);
         Set<String> selectedSubregions = emptyIfNull(subregion);
         Set<String> selectedTags = emptyIfNull(tag);
+        Set<String> selectedNames = emptyIfNull(name);
         UserId owner = currentUser.map(User::id).orElse(null);
 
         /*
@@ -252,12 +269,13 @@ public class WineController {
                 .regions(selectedRegions)
                 .subregions(selectedSubregions)
                 .tags(selectedTags)
+                .names(selectedNames)
                 .minQuantity(effectiveMinQuantity)
                 .build();
         List<Wine> result = wineService.search(criteria, owner);
         List<OriginNode> originTree = wineService.originTree(owner);
         ExpandedNodes expanded = calculateExpandedNodes(originTree, selectedRegions, selectedSubregions);
-        SearchView searchView = new SearchView(search, sort, direction, selectedWineTypes, selectedCountries, selectedRegions, selectedSubregions, selectedTags);
+        SearchView searchView = new SearchView(search, sort, direction, selectedWineTypes, selectedCountries, selectedRegions, selectedSubregions, selectedTags, selectedNames);
 
         model.addAttribute("wines", result);
         model.addAttribute("totalCount", wineService.listWines(owner).size());
@@ -274,6 +292,7 @@ public class WineController {
         model.addAttribute("expandedRegions", expanded.regions());
         model.addAttribute("allTags", wineService.distinctTags(owner));
         model.addAttribute("selectedTags", selectedTags);
+        model.addAttribute("selectedNames", selectedNames);
         model.addAttribute("minQuantity", effectiveMinQuantity);
         model.addAttribute("minQuantityFilterActive", minQuantityFilterActive);
         model.addAttribute("chips", buildChips(searchView));
@@ -321,6 +340,9 @@ public class WineController {
         for (String tag : searchView.tags()) {
             chips.add(new Chip(tag, searchView.urlWithout("tag", tag)));
         }
+        for (String name : searchView.names()) {
+            chips.add(new Chip(name, searchView.urlWithout("name", name)));
+        }
         return chips;
     }
 
@@ -348,7 +370,8 @@ public class WineController {
      */
     private record SearchView(
             String search, SortField sort, SortDirection direction,
-            Set<String> wineTypes, Set<String> countries, Set<String> regions, Set<String> subregions, Set<String> tags
+            Set<String> wineTypes, Set<String> countries, Set<String> regions, Set<String> subregions, Set<String> tags,
+            Set<String> names
     ) {
         String urlWithout(String facet, String value) {
             UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/");
@@ -362,6 +385,7 @@ public class WineController {
             addAllExcept(builder, "region", regions, facet, value);
             addAllExcept(builder, "subregion", subregions, facet, value);
             addAllExcept(builder, "tag", tags, facet, value);
+            addAllExcept(builder, "name", names, facet, value);
             return builder.build().encode().toUriString();
         }
 
