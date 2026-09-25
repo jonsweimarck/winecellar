@@ -25,7 +25,10 @@ inloggade ägarens FAKTISKA vinnamn, inte en gissning.
 Två saker läggs till svarets rendering:
 
 1. Varje förekomst av ett av ägarens vinnamn i assistentens svar blir en
-   länk till en fritextsökning på just det namnet i vinlistan. Matchningen
+   länk till en fritextsökning på just det namnet i vinlistan. Precis som
+   samlingslänken (se nedan) kombineras länken med samma nollställning av
+   vinlistans sessionsbundna filtrering, av samma skäl - annars hade ett
+   redan aktivt filter kunnat dölja det nämnda vinet. Matchningen
    är exakt (skiftlägesokänslig, ordgränsmedveten) - ingen böjningsform-
    medveten eller ungefärlig matchning. Den avgörs mot det redan tolkade
    syntaxträdet för svarets markdown, inte genom att leta efter

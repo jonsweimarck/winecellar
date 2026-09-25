@@ -80,7 +80,7 @@ class ChatWineMentionLinkerTest {
 
         assertThat(html)
                 .contains(linkContaining("https://example.com/barolo", "Barolo"))
-                .doesNotContain("/?search=Barolo");
+                .doesNotContain("/?reset=true&amp;search=Barolo");
     }
 
     @Test
@@ -90,7 +90,7 @@ class ChatWineMentionLinkerTest {
 
         assertThat(html)
                 .contains("<code>SELECT * FROM Barolo</code>")
-                .doesNotContain("/?search=Barolo");
+                .doesNotContain("/?reset=true&amp;search=Barolo");
     }
 
     @Test
