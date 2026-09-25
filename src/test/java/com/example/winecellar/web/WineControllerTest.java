@@ -1430,6 +1430,80 @@ class WineControllerTest {
                     .minQuantity(1)
                     .build(), null);
         }
+
+        /**
+         * Scenario 6 (granskningsfynd, WINE-55): {@code sort} satt UTAN
+         * {@code direction} ska INTE tolkas som en fullständig
+         * verktygsradsbeskrivning (den grenen kräver BÅDA fälten, se
+         * {@link WineController#resolveFilter}) - requesten hamnar i
+         * stället i fält-för-fält-grenen, som en vanlig explicit
+         * queryparameter. Övriga redan ihågkomna fält (här: wineType) ska
+         * alltså BEVARAS, inte tappas bort som vid en total-ersättning.
+         */
+        @Test
+        @DisplayName("bara sort satt (ingen direction) ska bara uppdatera sorteringsfältet och bevara övriga ihågkomna facetter")
+        void skaBaraUppdateraSortNärDirectionSaknasOchBevaraÖvrigaIhågkomnaFacetter() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("sort", "PRICE").param("direction", "DESCENDING")
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            MockHttpSession session = sessionFrån(förstaRequesten);
+
+            // Bara sort satt - VARKEN en hel verktygsradsrequest (som kräver
+            // BÅDA fälten) eller en bar navigering.
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .session(session).param("sort", "NAME"))
+                    .andExpect(status().isOk());
+
+            // direction och wineType hämtas ur minnet - PARTIELL uppdatering,
+            // inte en total-ersättning (som hade tappat bort wineType=RED
+            // eftersom den andra requesten inte skickar den parametern alls).
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.DESCENDING)
+                    .wineTypes(Set.of(WineType.RED))
+                    .minQuantity(1)
+                    .build(), null);
+        }
+
+        /**
+         * Scenario 7 (granskningsfynd, WINE-55): bevisar den faktiska
+         * motiveringen för att en FULLSTÄNDIG verktygsradsrequest (BÅDA
+         * sort och direction satta) ska ERSÄTTA hela det ihågkomna
+         * filtret i stället för att slås ihop - en avmarkerad sista
+         * kryssrutan i en facett (här: wineType) måste faktiskt kunna
+         * försvinna ur minnet, inte tyst återställas av en efterföljande
+         * bar navigering.
+         */
+        @Test
+        @DisplayName("en andra fullständig verktygsradsrequest med färre valda facetter ska ersätta - inte slå ihop med - den första")
+        void skaErsättaHelaDetIhågkomnaFiltretVidEnAndraFullständigVerktygsradsrequest() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("sort", "NAME").param("direction", "ASCENDING")
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            MockHttpSession session = sessionFrån(förstaRequesten);
+
+            // Andra, fullständiga verktygsradsrequesten - wineType-kryssrutan
+            // har nu avmarkerats helt (ingen wineType-parameter alls).
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .session(session)
+                            .param("sort", "NAME").param("direction", "ASCENDING"))
+                    .andExpect(status().isOk());
+
+            // En TREDJE, helt bar navigering - wineType=RED ska INTE längre
+            // vara ihågkommet.
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()).session(session))
+                    .andExpect(status().isOk());
+
+            verify(wineService, times(2)).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(1)
+                    .build(), null);
+        }
     }
 
     @Nested
