@@ -15,6 +15,8 @@ import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 import com.example.winecellar.domain.WineType;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +35,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -70,22 +73,138 @@ public class WineController {
         return CurrentUser.owner(authentication, userRepository);
     }
 
+    /**
+     * WINE-55: `search`/`sort`/`direction`/`wineType`/`country`/`region`/
+     * `subregion`/`tag` saknar sedan tidigare `defaultValue` - annars går
+     * det inte att skilja "explicit satt av användaren" från "helt
+     * frånvarande i requesten" (samma distinktion `minQuantity` redan
+     * gjorde via `parseIntegerOrNull`, se nedan). Den faktiskt använda
+     * filtreringen räknas ut av {@link #resolveFilter}, som slår ihop
+     * requestens explicita parametrar med sessionens ihågkomna filter (se
+     * ADR 0023) - INNAN {@link #populateWineListModel} (oförändrad sedan
+     * tidigare) anropas med de färdiga, effektiva värdena.
+     */
     @GetMapping("/")
     public String wineCellar(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false, defaultValue = "NAME") SortField sort,
-            @RequestParam(required = false, defaultValue = "ASCENDING") SortDirection direction,
+            @RequestParam(required = false) SortField sort,
+            @RequestParam(required = false) SortDirection direction,
             @RequestParam(required = false) Set<String> wineType,
             @RequestParam(required = false) Set<String> country,
             @RequestParam(required = false) Set<String> region,
             @RequestParam(required = false) Set<String> subregion,
             @RequestParam(required = false) Set<String> tag,
             @RequestParam(required = false) String minQuantity,
+            @RequestParam(required = false) String reset,
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
+            HttpServletRequest request,
             Model model, Authentication authentication) {
         Optional<User> currentUser = CurrentUser.find(authentication, userRepository);
-        populateWineListModel(model, search, sort, direction, wineType, country, region, subregion, tag, minQuantity, currentUser);
+        RememberedFilter filter = resolveFilter(
+                request, reset, search, sort, direction, wineType, country, region, subregion, tag);
+        populateWineListModel(
+                model, filter.search(), filter.sort(), filter.direction(),
+                filter.wineType(), filter.country(), filter.region(), filter.subregion(), filter.tag(),
+                minQuantity, currentUser);
         return "true".equals(hxRequest) ? "vinkallare :: lista" : "vinkallare";
+    }
+
+    private static final String SESSION_KEY_REMEMBERED_FILTER = "rememberedWineFilter";
+
+    /**
+     * WINE-55 ("Kom ihåg filtrering", se ADR 0023): en vald filtrering ska
+     * finnas kvar tills användaren aktivt ändrar den, oberoende av mellanliggande
+     * besök på andra sidor (Inställningar, redigera vin, ...) - sessionsbunden,
+     * inte databaspersisterad (till skillnad från `minQuantity`s eget,
+     * redan existerande {@code defaultMinQuantityFilter}, som är oförändrat
+     * och hanteras separat i {@link #populateWineListModel}).
+     * <p>
+     * Två helt skilda vägar hit, avgjorda av om {@code sort}/{@code direction}
+     * är satta i requesten:
+     * <ul>
+     *     <li>{@code sort}/{@code direction} SAKNAS BÅDA - en "bar" navigering
+     *     (redirect efter tillägg/redigering/borttagning, "Avbryt"-länken i
+     *     formuläret, en typad/bokmärkt URL). Varje enskilt fält faller för
+     *     sig tillbaka på sessionens ihågkomna värde om requesten själv
+     *     saknar just det fältet - en explicit queryparameter (t.ex. en
+     *     delad länk med bara {@code ?search=...}) åsidosätter ändå alltid
+     *     bara sitt EGET fält, resten hämtas ur minnet.</li>
+     *     <li>{@code sort} OCH {@code direction} är BÅDA satta -
+     *     verktygsradens formulär (hx-trigger="change") och chipsens
+     *     borttagningslänkar (se {@link SearchView#urlWithout}) bygger
+     *     BÅDA alltid om HELA verktygsradens tillstånd och skickar
+     *     {@code sort}/{@code direction} tillsammans, oavsett vilket
+     *     enskilt fält som faktiskt ändrades - en sådan request är alltså
+     *     redan en fullständig, avsiktlig beskrivning av ALLA fält (en
+     *     frånvarande facett betyder "inga kryssrutor markerade", inte
+     *     "rör inte det här fältet"). Den ersätter därför HELA det
+     *     ihågkomna filtret rakt av, i stället för att slås ihop fält för
+     *     fält - annars hade t.ex. en avmarkerad sista kryssrutan i en
+     *     facett varit omöjlig att spara (frånvaron av facettparametern
+     *     hade tolkats som "obestämd", inte "tom", och minnet hade tyst
+     *     återställt den borttagna markeringen). Kravet på BÅDA fälten
+     *     (inte bara ettdera) håller det här villkoret konsekvent med
+     *     grenens generella princip att en enskild explicit
+     *     queryparameter bara åsidosätter sitt eget fält - annars hade
+     *     t.ex. en framtida länk som bara satte sorteringsfältet
+     *     oavsiktligt kunnat nollställa hela det ihågkomna filtret.</li>
+     * </ul>
+     * {@code reset=true} (satt av "Rensa filter"/"Rensa sökning och
+     * filter"-länkarna i vinkallare.html) tömmer sessionens minne helt och
+     * faller tillbaka på kodens vanliga standardvärden - utan den signalen
+     * hade de länkarna (som pekar på en helt parameterlös {@code /}) bara
+     * återställt exakt samma filter de skulle ta bort. {@code reset=true}
+     * ignorerar medvetet ev. andra queryparametrar på samma request (de
+     * två "Rensa"-länkarna bär aldrig några) - en request som av någon
+     * anledning skulle skicka BÅDA {@code reset=true} och t.ex. ett eget
+     * {@code search} vore tvetydig, och tolkas här alltid som en fullständig
+     * nollställning.
+     */
+    private RememberedFilter resolveFilter(
+            HttpServletRequest request, String reset,
+            String search, SortField sort, SortDirection direction,
+            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag) {
+        HttpSession session = request.getSession();
+        if ("true".equals(reset)) {
+            session.removeAttribute(SESSION_KEY_REMEMBERED_FILTER);
+            return RememberedFilter.defaults();
+        }
+
+        RememberedFilter effective;
+        if (sort != null && direction != null) {
+            effective = new RememberedFilter(
+                    search, sort != null ? sort : SortField.NAME, direction != null ? direction : SortDirection.ASCENDING,
+                    emptyIfNull(wineType), emptyIfNull(country), emptyIfNull(region), emptyIfNull(subregion), emptyIfNull(tag));
+        } else {
+            RememberedFilter remembered = (RememberedFilter) session.getAttribute(SESSION_KEY_REMEMBERED_FILTER);
+            RememberedFilter base = remembered != null ? remembered : RememberedFilter.defaults();
+            effective = new RememberedFilter(
+                    search != null ? search : base.search(),
+                    sort != null ? sort : base.sort(),
+                    direction != null ? direction : base.direction(),
+                    wineType != null ? wineType : base.wineType(),
+                    country != null ? country : base.country(),
+                    region != null ? region : base.region(),
+                    subregion != null ? subregion : base.subregion(),
+                    tag != null ? tag : base.tag());
+        }
+        session.setAttribute(SESSION_KEY_REMEMBERED_FILTER, effective);
+        return effective;
+    }
+
+    /**
+     * Se {@link #resolveFilter} - `Serializable` eftersom allt annat som
+     * läggs i `HttpSession` normalt förväntas kunna serialiseras (t.ex. om
+     * containern någon gång konfigureras att persistera sessioner), även om
+     * inget i projektet idag faktiskt kräver det.
+     */
+    private record RememberedFilter(
+            String search, SortField sort, SortDirection direction,
+            Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag
+    ) implements Serializable {
+        static RememberedFilter defaults() {
+            return new RememberedFilter(null, SortField.NAME, SortDirection.ASCENDING, Set.of(), Set.of(), Set.of(), Set.of(), Set.of());
+        }
     }
 
     /**

@@ -515,7 +515,11 @@
                 </fieldset>
 
                 <div class="filter-atgarder">
-                    <a href="/">Rensa filter</a>
+                    <!-- WINE-55: en bar "/" hade bara återställt exakt samma
+                         ihågkomna filter (se WineController.resolveFilter/
+                         ADR 0023) - reset=true signalerar explicit att
+                         sessionens minne ska tömmas, inte bara läsas. -->
+                    <a href="/?reset=true">Rensa filter</a>
                     <button type="submit" onclick="event.preventDefault(); this.closest('details').removeAttribute('open')">Dölj filter</button>
                 </div>
             </div>
@@ -603,7 +607,8 @@
             <h2>Inga viner matchar</h2>
             <p>Inget av dina <span th:text="${totalCount}"></span> viner passar sökningen eller filtren.</p>
             <div class="tomt-lage-atgarder">
-                <a class="knapp knapp-sekundar" href="/">Rensa sökning och filter</a>
+                <!-- Se motsvarande kommentar vid "Rensa filter" ovan - WINE-55. -->
+                <a class="knapp knapp-sekundar" href="/?reset=true">Rensa sökning och filter</a>
             </div>
         </div>
 
