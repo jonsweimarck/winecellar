@@ -130,6 +130,9 @@ public class SearchAndFilterSteps {
         if (criteriaRow.containsKey("tagg")) {
             builder.tags(new HashSet<>(commaList(criteriaRow.get("tagg"))));
         }
+        if (criteriaRow.containsKey("vinnamn")) {
+            builder.names(new HashSet<>(commaList(criteriaRow.get("vinnamn"))));
+        }
         result = wineService.search(builder.build(), null);
     }
 

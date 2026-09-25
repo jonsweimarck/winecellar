@@ -3,12 +3,14 @@ package com.example.winecellar.web;
 import com.example.winecellar.application.ChatResult;
 import com.example.winecellar.application.ChatService;
 import com.example.winecellar.application.UserRepository;
+import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.ChatMessage;
 import com.example.winecellar.domain.ChatMessage.Role;
 import com.example.winecellar.domain.Conversation;
 import com.example.winecellar.domain.Conversation.ConversationId;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
+import com.example.winecellar.domain.Wine;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -59,6 +61,9 @@ class ChatControllerTest {
     @MockBean
     private UserRepository userRepository;
 
+    @MockBean
+    private WineService wineService;
+
     private static Conversation konversation() {
         return new Conversation(KONVERSATION_ID, ÄGARE, "Vilket vin passar till rödkött?", Instant.now());
     }
@@ -66,6 +71,10 @@ class ChatControllerTest {
     private void inloggadAnvändareFinns() {
         when(userRepository.findByUsername("testperson"))
                 .thenReturn(Optional.of(new User(ÄGARE, "testperson", "hash", Instant.now(), 1, false)));
+        // WINE-56: en tom vinlista som standard - testerna som faktiskt
+        // bryr sig om vinnamnslänkning stubbar wineService.listWines(...)
+        // själva med sina egna viner.
+        when(wineService.listWines(ÄGARE)).thenReturn(List.of());
     }
 
     @Test
@@ -221,6 +230,44 @@ class ChatControllerTest {
         mockMvc.perform(get("/chatt/7").with(user("testperson")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"nytt-meddelande-status\"")));
+    }
+
+    /**
+     * WINE-56 (se docs/adr/0024-chat-wine-mention-links.md): den detaljerade
+     * matchnings-/länkningslogiken testas i {@link ChatWineMentionLinkerTest}
+     * - det här verifierar bara att {@link ChatController} faktiskt
+     * kopplar ihop den inloggade ägarens EGNA vinnamn (via
+     * {@link WineService#listWines}) med assistentens renderade svar.
+     */
+    @Test
+    void skaLänkaEttNämntVinnamnTillEnNamnsökningIAssistentensSvar() throws Exception {
+        inloggadAnvändareFinns();
+        when(chatService.findConversation(ÄGARE, KONVERSATION_ID)).thenReturn(Optional.of(konversation()));
+        when(wineService.listWines(ÄGARE)).thenReturn(List.of(Wine.builder().name("Barolo").build()));
+        when(chatService.messages(KONVERSATION_ID)).thenReturn(List.of(
+                assistantMessage("Prova en Barolo till rödkött.")));
+
+        mockMvc.perform(get("/chatt/7").with(user("testperson")))
+                .andExpect(status().isOk())
+                // CommonMark renderar rel="nofollow" FÖRE href (se ChatMarkdownRenderer,
+                // sanitizeUrls(true)) - kollar bara att attributet/länktexten finns,
+                // inte den exakta attributordningen.
+                .andExpect(content().string(containsString("href=\"/?search=Barolo\">Barolo</a>")))
+                .andExpect(content().string(containsString("Visa dessa viner i vinlistan")));
+    }
+
+    @Test
+    void skaInteLänkaNågotOmIngetAvÄgarensVinerNämnsIAssistentensSvar() throws Exception {
+        inloggadAnvändareFinns();
+        when(chatService.findConversation(ÄGARE, KONVERSATION_ID)).thenReturn(Optional.of(konversation()));
+        when(wineService.listWines(ÄGARE)).thenReturn(List.of(Wine.builder().name("Barolo").build()));
+        when(chatService.messages(KONVERSATION_ID)).thenReturn(List.of(
+                assistantMessage("Jag har inga förslag just nu.")));
+
+        mockMvc.perform(get("/chatt/7").with(user("testperson")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("/?search="))))
+                .andExpect(content().string(not(containsString("Visa dessa viner i vinlistan"))));
     }
 
     @Test

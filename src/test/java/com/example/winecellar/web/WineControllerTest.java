@@ -1504,6 +1504,73 @@ class WineControllerTest {
                     .minQuantity(1)
                     .build(), null);
         }
+
+        /**
+         * Scenario 8 (WINE-56, se docs/adr/0024-chat-wine-mention-links.md):
+         * AI-chattens "visa dessa viner i vinlistan"-länk kombinerar
+         * {@code reset=true} med en uppsättning {@code name}-parametrar i
+         * SAMMA request - granskningsfynd från WINE-55 som gjorde att
+         * {@code reset=true} tidigare ignorerade övriga queryparametrar på
+         * samma request helt (returnerade rakt av
+         * {@code RememberedFilter.defaults()}). Den kombinationen måste
+         * visa EXAKT de nämnda vinerna, oavsett vad som var aktivt
+         * filtrerat sedan innan.
+         */
+        @Test
+        @DisplayName("reset=true kombinerat med name-parametrar i samma request ska visa exakt de namngivna vinerna, oavsett tidigare aktivt filter")
+        void skaKombineraResetMedNameParametrarISammaRequest() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("sort", "PRICE").param("direction", "DESCENDING")
+                            .param("wineType", "RED"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            MockHttpSession session = sessionFrån(förstaRequesten);
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .session(session)
+                            .param("reset", "true")
+                            .param("name", "Barolo").param("name", "Chablis"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .names(Set.of("Barolo", "Chablis"))
+                    .minQuantity(1)
+                    .build(), null);
+        }
+
+        /**
+         * Scenario 11 (regressionstest, WINE-56): de BEFINTLIGA "Rensa
+         * filter"/"Rensa sökning och filter"-länkarna (en bar
+         * {@code /?reset=true}, utan några andra parametrar) ska fortsätta
+         * bete sig EXAKT som innan denna story - en fullständig
+         * nollställning, ingen kvarvarande facett. Bevisar att fixen ovan
+         * (reset=true tillämpar övriga explicita parametrar) inte råkade
+         * ändra beteendet när det INTE finns några andra parametrar att
+         * tillämpa.
+         */
+        @Test
+        @DisplayName("reset=true utan några andra parametrar ska fortfarande nollställa filtret helt (regressionstest)")
+        void skaFortfarandeNollställaHeltNärResetSaknarÖvrigaParametrar() throws Exception {
+            MvcResult förstaRequesten = mockMvc.perform(get("/")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("search", "barolo")
+                            .param("sort", "PRICE").param("direction", "DESCENDING")
+                            .param("wineType", "RED").param("tag", "Favorit"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            MockHttpSession session = sessionFrån(förstaRequesten);
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf())
+                            .session(session).param("reset", "true"))
+                    .andExpect(status().isOk());
+
+            verify(wineService).search(SearchCriteria.builder()
+                    .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
+                    .minQuantity(1)
+                    .build(), null);
+        }
     }
 
     @Nested

@@ -3,10 +3,12 @@ package com.example.winecellar.web;
 import com.example.winecellar.application.ChatResult;
 import com.example.winecellar.application.ChatService;
 import com.example.winecellar.application.UserRepository;
+import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.ChatMessage;
 import com.example.winecellar.domain.Conversation;
 import com.example.winecellar.domain.Conversation.ConversationId;
 import com.example.winecellar.domain.User.UserId;
+import com.example.winecellar.domain.Wine;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.List;
 
 /**
  * AI-chatten om vinsamlingen (WINE-48) - se docs/adr/
@@ -32,10 +36,12 @@ public class ChatController {
 
     private final ChatService chatService;
     private final UserRepository userRepository;
+    private final WineService wineService;
 
-    public ChatController(ChatService chatService, UserRepository userRepository) {
+    public ChatController(ChatService chatService, UserRepository userRepository, WineService wineService) {
         this.chatService = chatService;
         this.userRepository = userRepository;
+        this.wineService = wineService;
     }
 
     @GetMapping
@@ -71,9 +77,10 @@ public class ChatController {
     @GetMapping("/{id}")
     public String show(@PathVariable Long id, Model model, Authentication authentication) {
         Conversation conversation = findOwnedConversationOr404(id, authentication);
+        List<String> wineNames = wineService.listWines(owner(authentication)).stream().map(Wine::name).toList();
         model.addAttribute("conversation", conversation);
         model.addAttribute("messages", chatService.messages(conversation.id()).stream()
-                .map(ChatController::toView)
+                .map(message -> toView(message, wineNames))
                 .toList());
         return "chatt";
     }
@@ -115,18 +122,25 @@ public class ChatController {
 
     /**
      * WINE-53: assistentsvar innehåller markdown-syntax från LLM:et och
-     * tolkas till HTML (se {@link ChatMarkdownRenderer}) innan de når
-     * {@code chatt.html} - beräknat här, inte i mallen, samma princip som
-     * övriga rendering-klara modellattribut controllern bygger
-     * (t.ex. {@code WineController}s fältetiketter). Användarens EGNA
-     * meddelanden renderas medvetet INTE som markdown - bara {@code html}
-     * är satt (icke-null) för ett ASSISTANT-meddelande, {@code content}
-     * visas rakt av (escapad text, som innan denna story) för ett
-     * USER-meddelande.
+     * tolkas till HTML innan de når {@code chatt.html} - beräknat här,
+     * inte i mallen, samma princip som övriga rendering-klara
+     * modellattribut controllern bygger (t.ex. {@code WineController}s
+     * fältetiketter). Användarens EGNA meddelanden renderas medvetet INTE
+     * som markdown - bara {@code html} är satt (icke-null) för ett
+     * ASSISTANT-meddelande, {@code content} visas rakt av (escapad text,
+     * som innan denna story) för ett USER-meddelande.
+     *
+     * <p>WINE-56: ett ASSISTANT-meddelande går via
+     * {@link ChatWineMentionLinker} (inte direkt
+     * {@link ChatMarkdownRenderer#toSafeHtml}) - länkar varje förekomst av
+     * ett av `wineNames` (ägarens faktiska vinnamn, hämtade av
+     * {@link #show}) till en namnsökning i vinlistan, och avslutar svaret
+     * med en samlingslänk om minst ett vin nämndes. Se docs/adr/
+     * 0024-chat-wine-mention-links.md.
      */
-    private static ChatMessageView toView(ChatMessage message) {
+    private static ChatMessageView toView(ChatMessage message, List<String> wineNames) {
         String html = message.role() == ChatMessage.Role.ASSISTANT
-                ? ChatMarkdownRenderer.toSafeHtml(message.content())
+                ? ChatWineMentionLinker.toHtmlWithWineLinks(message.content(), wineNames)
                 : null;
         return new ChatMessageView(message.role(), message.content(), html);
     }

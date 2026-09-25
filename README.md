@@ -191,6 +191,10 @@ Vald sortering/filtrering/sökning hamnar i URL:en
 bokmärkbart och delbart. Orkestreringen ligger i
 `WineService.search(SearchCriteria)`, inte i controllern - se
 [ADR 0006](docs/adr/0006-search-orchestration-in-application-layer.md).
+En `name`-queryparameter (upprepningsbar, en per vin) filtrerar dessutom
+på en EXAKT uppsättning vinnamn - ingen egen kontroll i filterpanelen,
+bara nåbar via en delad länk, se AI-chattens vinnamnslänkar
+([ADR 0024](docs/adr/0024-chat-wine-mention-links.md)) nedan.
 
 En vald filtrering/sökning/sortering minns sig dessutom kvar för hela
 webbläsarsessionen (sedan [ADR 0023](docs/adr/0023-session-scoped-filter-memory.md))
@@ -228,6 +232,12 @@ för de arkitektoniska besluten.
   gräns blockerar med ett tydligt felmeddelande - inget trimmas bort
   automatiskt. Användaren kan radera en egen konversation (samma
   `<dialog>`-bekräftelse som "Radera vinet", se Vinlistan ovan).
+- **Vinnamn som nämns i assistentens svar länkar direkt till vinlistan**
+  (se [ADR 0024](docs/adr/0024-chat-wine-mention-links.md)) - varje
+  förekomst av ett av användarens egna, faktiska vinnamn blir en länk
+  till en sökning på just det vinet, och svaret avslutas med en
+  samlingslänk som visar exakt de vin som nämndes, om minst ett gjorde
+  det. Matchningen är exakt (skiftlägesokänslig), inte en gissning.
 - Kräver `WINECELLAR_ANTHROPIC_API_KEY` (se Säkerhet nedan) - utan den
   svarar assistenten alltid med ett standardmeddelande om att den inte
   kunde svara, istället för att krascha.

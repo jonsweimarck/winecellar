@@ -168,7 +168,13 @@ dem:
   Gherkin-scenarierna testar applikationslagret direkt, så
   orkestreringen måste ligga där för att kunna testas utan MockMvc/HTTP.
   `SearchCriteria` (Builder-record) kombinerar facetter (vintyp, land,
-  region, underregion) med OCH sinsemellan, ELLER inom en facett.
+  region, underregion, taggar, sedan WINE-56 även vinnamn - se
+  [ADR 0024](docs/adr/0024-chat-wine-mention-links.md)) med OCH
+  sinsemellan, ELLER inom en facett. `names`-facetten matchar EXAKT
+  (skiftlägesokänsligt) mot `Wine.name()`, till skillnad från den
+  vanliga fritextsökningen (`searchTerm`) - byggd för AI-chattens "visa
+  dessa viner i vinlistan"-länk (se "Chatt om vinsamlingen" nedan), som
+  behöver peka på en exakt uppsättning namngivna viner.
 - **`SortField`-fälla att undvika vid ändring:** varje konstants
   comparator bygger `nullsLast(...)` **efter** att riktningen redan
   avgjort om ordningen ska vara `.reversed()`, inte tvärtom - annars
@@ -766,6 +772,28 @@ kontra enstaka strukturerad extraktion).
   efterföljande `<br>`) kan dela exakt samma Y-position inom en och
   samma rad - `distinct()` på den avlästa listan innan den jämförs,
   annars ger jämförelsen falska antal.
+- **Assistentsvaret länkar till nämnda viner i vinlistan (WINE-56, se
+  [ADR 0024](docs/adr/0024-chat-wine-mention-links.md)).** Ny
+  `ChatWineMentionLinker` (paketprivat, `web`-paketet) körs MELLAN
+  markdown-parsning och HTML-rendering (`ChatMarkdownRenderer` fick
+  `parse`/`render` uppdelade som två steg för det, delar samma
+  `Parser`/`HtmlRenderer`-instanser som `toSafeHtml` för att inte drifta
+  isär säkerhetsinställningarna) - matchar den inloggade ägarens
+  FAKTISKA vinnamn (`WineService.listWines(owner)`, hämtade av
+  `ChatController.show`) mot det redan tolkade syntaxträdet, EXAKT
+  (skiftlägesokänsligt, ordgränsmedvetet, längsta match vinner vid
+  överlapp). Går via en `AbstractVisitor` som medvetet INTE descenderar
+  in i en redan existerande länk - text som redan är en del av en länk
+  eller ett kodstycke i svaret länkas alltså aldrig om (ett kodstycke
+  har ingen egen textnod att träffa över huvud taget). Varje matchning
+  slås in i en riktig länknod till en fritextsökning
+  (`/?search=<vinnamn>`); nämns minst ett vin läggs en avslutande
+  stycke-nod till sist i syntaxträdet med en samlingslänk
+  (`/?reset=true&name=<vinnamn>...`, en per DISTINKT nämnt vin,
+  alfabetiskt) till den nya `names`-facetten (se ovan). Kräver att
+  `reset=true` faktiskt tillämpar medskickade `name`-parametrar på
+  samma request - se granskningsfyndet i "Vinlistans filtrering minns
+  sig kvar" ovan.
 
 ## Flera användare - nuläge
 
@@ -836,6 +864,19 @@ utan den signalen hade länkarna bara återställt exakt det filter de
 skulle ta bort, eftersom en bar `/` annars läser minnet i stället för
 att tömma det. En ny session (ny inloggning) startar alltid om från
 kodens vanliga standardvärden, precis som innan WINE-55.
+**Granskningsfynd från WINE-55, åtgärdat i WINE-56:** `reset=true`
+tömde tidigare minnet och returnerade rakt av standardvärdena, UTAN att
+tillämpa några explicita queryparametrar som skickades med på SAMMA
+request - vilket gjorde det omöjligt att kombinera en nollställning med
+en egen, explicit parameter i ett och samma anrop. `resolveFilter`
+behandlar numera `reset=true` som "utgå från standardvärdena i stället
+för sessionens minne" och applicerar därefter övriga explicita
+parametrar på exakt samma sätt som den vanliga fält-för-fält-grenen -
+de två befintliga "Rensa"-länkarna (som aldrig bär några andra
+parametrar) beter sig oförändrat. Se
+[ADR 0024](docs/adr/0024-chat-wine-mention-links.md) för den
+konkreta anropsplatsen som krävde det (AI-chattens "visa dessa viner"-
+länk, se nedan).
 
 **`User.ownRatingFromScale` (WINE-50, se [ADR 0022](docs/adr/0022-own-rating-freetext.md))**
 styr om `vin-formular.html`
