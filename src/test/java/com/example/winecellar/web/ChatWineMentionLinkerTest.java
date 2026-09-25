@@ -196,6 +196,65 @@ class ChatWineMentionLinkerTest {
                 .contains(linkContaining("/?reset=true&amp;name='a%20Rina%20Etna%20Rosso", "ʼa Rina Etna Rosso"));
     }
 
+    /**
+     * WINE-56, tredje buggfyndet (riktig användning, efter merge av de två
+     * föregående fixarna): "Etna Bianco" är ett exakt ORD-FÖR-ORD-PREFIX av
+     * "Etna Bianco Superiore" - båda är riktiga vinnamn i användarens
+     * samling. En svensk böjningsändelse (genitiv-s) klistrad direkt på
+     * slutet av det längre namnet, utan mellanslag, gör att det längre
+     * namnets EGEN slutgräns misslyckas ("Superiores" är inget ordslut) -
+     * utan skydd mot att då falla tillbaka på en kortare kandidat vid samma
+     * startposition länkades tidigare bara "Etna Bianco", eftersom just DEN
+     * kortare frasen råkar sluta på det redan existerande mellanslaget
+     * mellan "Bianco" och "Superiore". Rätt beteende: ingen länk alls för
+     * det här omnämnandet - hellre ingen länk än en felaktig, avkortad en.
+     */
+    @Test
+    void skaInteLänkaEttKortareOrdprefixNärDetLängreNamnetsSlutgränsMisslyckasPåGrundAvKlistradBöjningsändelse() {
+        String html = ChatWineMentionLinker.toHtmlWithWineLinks(
+                "Prova Etna Bianco Superiores fina smak.",
+                List.of("Etna Bianco Superiore", "Etna Bianco"));
+
+        assertThat(html)
+                .doesNotContain("href=")
+                .doesNotContain(">Etna Bianco</a>")
+                .contains("Etna Bianco Superiores fina smak.");
+    }
+
+    /**
+     * Samma grundfel som ovan, fast med en hopklistrad årgång (ett annat
+     * troligt LLM-svarsmönster) i stället för en böjningsändelse.
+     */
+    @Test
+    void skaInteLänkaEttKortareOrdprefixNärDetLängreNamnetsSlutgränsMisslyckasPåGrundAvKlistradÅrgång() {
+        String html = ChatWineMentionLinker.toHtmlWithWineLinks(
+                "Prova Etna Bianco Superiore2020.",
+                List.of("Etna Bianco Superiore", "Etna Bianco"));
+
+        assertThat(html)
+                .doesNotContain("href=")
+                .doesNotContain(">Etna Bianco</a>")
+                .contains("Etna Bianco Superiore2020.");
+    }
+
+    /**
+     * Negativ kontroll till de två testerna ovan: en RIKTIG, fristående
+     * förekomst av båda namnen (vardera med en egen, giltig ordgräns) ska
+     * fortfarande ge två separata, korrekta länkar - fixen ska bara
+     * förhindra den felaktiga reservlösningen, inte länkning av det kortare
+     * namnet i allmänhet.
+     */
+    @Test
+    void skaLänkaBådaNamnenSeparatNärDeFörekommerFriståendeIStälletFörSomOrdprefixkollision() {
+        String html = ChatWineMentionLinker.toHtmlWithWineLinks(
+                "Jag rekommenderar både Etna Bianco och Etna Bianco Superiore.",
+                List.of("Etna Bianco Superiore", "Etna Bianco"));
+
+        assertThat(html)
+                .contains(linkContaining("/?reset=true&amp;name=Etna%20Bianco", "Etna Bianco"))
+                .contains(linkContaining("/?reset=true&amp;name=Etna%20Bianco%20Superiore", "Etna Bianco Superiore"));
+    }
+
     private static String linkContaining(String href, String linkText) {
         return "href=\"" + href + "\">" + linkText + "</a>";
     }
