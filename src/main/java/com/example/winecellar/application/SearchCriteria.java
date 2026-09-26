@@ -34,6 +34,11 @@ import java.util.TreeSet;
  * OCH-mellan-facetter/ELLER-inom-facetten-princip som `tags`. Byggd för
  * AI-chattens "visa dessa viner i vinlistan"-länk, som behöver peka på
  * en exakt uppsättning namngivna viner snarare än en fritextsökning.
+ * Både byggarens värden och det lagrade vinnamnet trimmas innan
+ * jämförelsen (WineService.search(...)) - ett fjärde WINE-56-
+ * granskningsfynd visade att ett redan lagrat vinnamn kan ha ett
+ * skräp-mellanslag (t.ex. från en inklistrad kalkylbladscell), vilket
+ * annars gör att en i övrigt korrekt genererad namnlänk aldrig matchar.
  */
 public record SearchCriteria(
         String searchTerm,
@@ -111,12 +116,15 @@ public record SearchCriteria(
          * WINE-56: exakt (skiftlägesokänslig) matchning mot `Wine.name()`,
          * OCH med övriga facetter, ELLER inom facetten - samma mönster och
          * samma skiftlägesokänsliga `TreeSet`-normalisering som
-         * `tags(...)` ovan.
+         * `tags(...)` ovan. Trimmar varje värde (WINE-56, fjärde
+         * granskningsfyndet, se docs/adr/0024) - för symmetri med
+         * jämförelsen i WineService.search(...), som trimmar det lagrade
+         * vinnamnet innan det slås upp här.
          */
         public Builder names(Set<String> names) {
             this.names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             if (names != null) {
-                this.names.addAll(names);
+                names.stream().filter(name -> name != null).map(String::trim).forEach(this.names::add);
             }
             return this;
         }
