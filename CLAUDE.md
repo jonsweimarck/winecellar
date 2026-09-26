@@ -858,6 +858,36 @@ kontra enstaka strukturerad extraktion).
      kandidatens längd innan den fortsätter - både korrekt och effektivare
      än den tidigare tecken-för-tecken-vidareskanningen genom en redan
      avvisad kandidats span.
+  5. **Ett fjärde buggfynd i produktion, i praktiken olösligt att återskapa
+     lokalt eller med syntetiska testdata förrän en riktig export av
+     användarens faktiska data faktiskt inspekterades (`Vinlista-
+     gällande.xlsx`s `xl/sharedStrings.xml`, `xml:space="preserve"`
+     avslöjade ett avslutande mellanslag i det lagrade vinnamnet
+     `"Contrada Volpare Etna Bianco Superiore "`).** Ett sådant
+     skräp-mellanslag gjorde att den fullständiga, korrekta frasens EGEN
+     slutgräns misslyckades så fort assistentens svarstext (helt naturligt)
+     inte hade ett mellanslag före ett efterföljande skiljetecken -
+     `findMatches` hittade då i stället en helt annan, kortare, men fullt
+     giltig delsträng av frasen (`"Etna Bianco"`, ett eget, separat vinnamn
+     i samlingen) och länkade fel vin. Notera att detta INTE är samma bugg
+     som fix 4 ovan (den bygger på att en KORTARE kandidat råkar sluta på
+     ett mellanslag som finns I den längre frasen - här är det den LÄNGRE
+     kandidatens egen lagrade sträng som har ett extra tecken texten aldrig
+     innehåller). Löst genom trimning på TRE ställen samtidigt, inte bara
+     vid matchningen: `ChatWineMentionLinker.linkMentions` trimmar nu
+     kandidatlistan (`wineNames`) innan den bygger `Candidate`-objekten -
+     `Candidate.name()` (och därmed även länkens `name=`-värde) är alltså
+     redan trimmat. `WineController.applyFormFields` trimmar `name` innan
+     det sparas, så att nya skräp-mellanslag inte kan uppstå vid vanlig
+     inmatning (Excel-importens `WineRowParser.text(...)` trimmade redan
+     sedan tidigare). `WineService.search(...)`s namnfacett trimmar det
+     LAGRADE `wine.name()`-värdet vid jämförelsen (och
+     `SearchCriteria.Builder.names(...)` trimmar symmetriskt de inkommande
+     värdena) - eftersom redan existerande, sparad data kan ha
+     skräp-mellanslag oavsett hur väl framtida inmatning trimmas.
+     Regressionstestet i `ChatWineMentionLinkerTest` återskapar det exakta
+     produktionsscenariot (kandidatlistan innehåller det avslutande
+     mellanslaget, texten gör det inte).
 
 ## Flera användare - nuläge
 

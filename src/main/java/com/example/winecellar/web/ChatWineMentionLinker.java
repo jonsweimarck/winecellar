@@ -63,6 +63,18 @@ final class ChatWineMentionLinker {
         Set<String> mentionedWineNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         List<Candidate> candidatesByLengthDescending = wineNames.stream()
                 .filter(name -> name != null && !name.isBlank())
+                // WINE-56, fjärde granskningsfyndet (se docs/adr/0024):
+                // ett riktigt, lagrat vinnamn kan ha ett skräp-mellanslag i
+                // ena eller båda ändarna (t.ex. inklistrat från en
+                // kalkylbladscell). Ett sådant avslutande mellanslag gör
+                // att den fullständiga, korrekta frasen aldrig matchar mot
+                // assistentens naturliga svarstext (som sällan har ett
+                // mellanslag före ett efterföljande skiljetecken) - skanningen
+                // hittade då i stället en kortare, oavsiktlig delsträng som
+                // råkade vara ett annat, eget vinnamn. Trimning här löser
+                // grundorsaken vid källan, oavsett var i kedjan mellanslaget
+                // en gång smög sig in.
+                .map(String::trim)
                 .distinct()
                 .sorted(Comparator.comparingInt(String::length).reversed())
                 .map(name -> new Candidate(name, normalizeApostrophes(name)))

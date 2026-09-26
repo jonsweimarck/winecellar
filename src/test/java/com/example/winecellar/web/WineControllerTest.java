@@ -2028,6 +2028,30 @@ class WineControllerTest {
         }
 
         /**
+         * WINE-56, fjärde granskningsfyndet (se docs/adr/0024): ett
+         * skräp-mellanslag i det lagrade vinnamnet bröt AI-chattens exakta
+         * vinnamnsmatchning, spårat till riktig produktionsdata. Trimning
+         * vid inmatningen förhindrar att nya skräp-mellanslag uppstår -
+         * detta test bevisar det för TILLÄGG (samma applyFormFields delas
+         * av redigering, se motsvarande test i NärEttVinRedigeras).
+         */
+        @Test
+        @DisplayName("ska trimma omgivande mellanslag ur namnet innan vinet sparas")
+        void skaTrimmaNamnetVidTillägg() throws Exception {
+            mockMvc.perform(post("/wines")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "  Chianti Classico  ")
+                            .param("quantity", "1"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/"));
+
+            verify(wineService).save(Wine.builder()
+                    .name("Chianti Classico")
+                    .quantity(1)
+                    .build());
+        }
+
+        /**
          * WINE-51: taggar binds direkt till Set<String> (samma mönster som
          * filterpanelens wineType/country-kryssrutor) - en kryssruta per
          * tagg (name="tags"), inte ett kommaseparerat textfält. Ett
@@ -2360,6 +2384,31 @@ class WineControllerTest {
             mockMvc.perform(post("/wines/1/redigera")
                             .with(user("admin").roles("ADMIN")).with(csrf())
                             .param("name", "Barolo")
+                            .param("wineType", "RED")
+                            .param("producer", "Pio Cesare")
+                            .param("country", "Italien")
+                            .param("vintage", "2018")
+                            .param("quantity", "3")
+                            .param("location", "Låda 1"))
+                    .andExpect(status().is3xxRedirection());
+
+            verify(wineService).save(BAROLO);
+        }
+
+        /**
+         * WINE-56, fjärde granskningsfyndet (se docs/adr/0024) - samma
+         * trimning som TILLÄGG (se NärEttVinLäggsTill), bevisad separat
+         * här eftersom redigering går via en egen POST-rutt, även om båda
+         * delar applyFormFields.
+         */
+        @Test
+        @DisplayName("ska trimma omgivande mellanslag ur namnet innan vinet sparas")
+        void skaTrimmaNamnetVidRedigering() throws Exception {
+            when(wineService.findById(eq(new WineId(1L)), any())).thenReturn(Optional.of(BAROLO));
+
+            mockMvc.perform(post("/wines/1/redigera")
+                            .with(user("admin").roles("ADMIN")).with(csrf())
+                            .param("name", "  Barolo  ")
                             .param("wineType", "RED")
                             .param("producer", "Pio Cesare")
                             .param("country", "Italien")

@@ -255,6 +255,40 @@ class ChatWineMentionLinkerTest {
                 .contains(linkContaining("/?reset=true&amp;name=Etna%20Bianco%20Superiore", "Etna Bianco Superiore"));
     }
 
+    /**
+     * WINE-56, fjärde granskningsfyndet (riktig produktionsdata, se
+     * docs/adr/0024): ett riktigt, lagrat vinnamn kan ha ett skräp-
+     * mellanslag i slutet (upptäckt genom att inspektera en riktig export
+     * av användarens data - `xml:space="preserve"` i den underliggande
+     * `.xlsx`-filens delade strängar avslöjade ett avslutande mellanslag i
+     * "Contrada Volpare Etna Bianco Superiore "). Ett sådant mellanslag gör
+     * att den fullständiga frasens EGEN slutgräns misslyckas så fort
+     * assistentens text (helt naturligt) inte har ett mellanslag före ett
+     * efterföljande skiljetecken - skanningen hittade då i stället en helt
+     * annan, kortare kandidat ("Etna Bianco") som råkar vara en äkta
+     * delsträng mitt i den längre frasen. Detta är INTE samma bugg som
+     * ord-prefix-kollisionen ovan (den bygger på att den kortare kandidaten
+     * råkar sluta på ett mellanslag SOM FINNS I den längre frasen - här är
+     * det den längre KANDIDATENS egen lagrade sträng som har ett extra
+     * tecken texten aldrig innehåller).
+     */
+    @Test
+    void skaLänkaHelaFrasenÄvenOmDenLagradeKandidatenHarEttSkräpMellanslagPåSlutet() {
+        String html = ChatWineMentionLinker.toHtmlWithWineLinks(
+                "Jag rekommenderar Contrada Volpare Etna Bianco Superiore, Maugeri, 2022.",
+                List.of("Contrada Volpare Etna Bianco Superiore ", "Etna Bianco"));
+
+        assertThat(html)
+                .contains(linkContaining(
+                        "/?reset=true&amp;name=Contrada%20Volpare%20Etna%20Bianco%20Superiore",
+                        "Contrada Volpare Etna Bianco Superiore"))
+                .doesNotContain(">Etna Bianco</a>")
+                // Länkmålet ska INTE innehålla ett URL-kodat avslutande
+                // mellanslag (%20) precis före citattecknet som avslutar
+                // href-attributet.
+                .doesNotContain("Superiore%20\"");
+    }
+
     private static String linkContaining(String href, String linkText) {
         return "href=\"" + href + "\">" + linkText + "</a>";
     }

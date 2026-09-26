@@ -136,3 +136,22 @@ länken.
   just DEN kandidatens egen gräns misslyckas skapas ingen länk alls för
   omnämnandet - samma "hellre ingen länk än en felaktig"-princip som
   redan gällde för de två tidigare granskningsfynden.
+- Ett fjärde fynd, i praktiken olösligt att återskapa lokalt eller med
+  syntetiska testdata och därför spårat till en riktig exportfil av en
+  användares faktiska data: ett lagrat vinnamn kan ha ett skräp-mellanslag
+  i ena eller båda ändarna (t.ex. inklistrat från en kalkylbladscell), utan
+  att det syns vid en vanlig blick på texten. Ett sådant mellanslag fick
+  den fullständiga, korrekta frasens egen slutgräns att misslyckas så fort
+  assistentens svarstext (helt naturligt) inte hade ett mellanslag före ett
+  efterföljande skiljetecken - skanningen hittade då i stället en helt
+  annan, kortare, men fullt giltig delsträng av frasen som råkade vara ett
+  eget, separat vinnamn i samlingen, och länkade fel vin. Löst genom att
+  trimma vinnamn vid flera gränser samtidigt, inte bara vid själva
+  matchningen: dels kandidatlistan som matchningen bygger på, dels
+  inmatningen när ett vin sparas (så att nya skräp-mellanslag inte kan
+  uppstå), dels själva jämförelsen mot redan lagrade namn (eftersom
+  befintlig, redan sparad data kan ha skräp-mellanslag oavsett). Samma
+  "hellre ingen matchning än en felaktig"-tankegång gäller inte här -
+  målet är i stället att ett mellanslag som uppenbart inte är en del av
+  vinets faktiska namn aldrig ska kunna störa vare sig en ny matchning
+  eller en jämförelse mot äldre, redan lagrad data.

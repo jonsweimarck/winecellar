@@ -763,7 +763,7 @@ public class WineController {
             String otherReference, String location, Set<String> tags
     ) {
         return builder
-                .name(name).wineType(parseWineType(wineType))
+                .name(trimName(name)).wineType(parseWineType(wineType))
                 .producer(blankToNull(producer)).country(blankToNull(country))
                 .region(blankToNull(region)).subregion(blankToNull(subregion)).grapes(blankToNull(grapes))
                 .vintage(parseInteger(vintage)).purchaseDate(parseDate(purchaseDate)).price(parseDecimal(price))
@@ -782,6 +782,21 @@ public class WineController {
 
     private static String blankToNull(String value) {
         return (value == null || value.isBlank()) ? null : value;
+    }
+
+    /**
+     * WINE-56 (fjärde granskningsfyndet, se docs/adr/0024): trimmar
+     * omgivande mellanslag ur `name` innan det sparas - ett riktigt,
+     * lagrat vinnamn med ett skräp-mellanslag (t.ex. inklistrat från ett
+     * kalkylblad) bröt AI-chattens exakta vinnamnsmatchning på ett sätt
+     * som var mycket svårt att diagnostisera, se
+     * {@link com.example.winecellar.web.ChatWineMentionLinker}. `name` är
+     * i teorin nullable här (en trasig request), men annars alltid satt
+     * eftersom fältet är obligatoriskt (ADR 0016) - null-säker för att
+     * inte introducera ett nytt sätt att krascha.
+     */
+    private static String trimName(String name) {
+        return name == null ? null : name.trim();
     }
 
     /**
