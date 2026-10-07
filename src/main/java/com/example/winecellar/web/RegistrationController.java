@@ -70,9 +70,9 @@ public class RegistrationController {
      * mekanism SecurityContextHolderFilter/SecurityContextRepository
      * annars sköter automatiskt vid en vanlig formLogin-rundtur.
      *
-     * Inga authorities behövs (WINE-15 tog bort hela rollbegreppet -
-     * `SecurityConfig` kräver bara `authenticated()`, ingen route bryr
-     * sig om roller längre).
+     * Inga authorities behövs: ett nytt konto är aldrig admin (se ADR 0025).
+     * Det finns en enda adminroll; `SecurityConfig` kräver rollen för
+     * `/admin/**`, medan övriga rutter bara kräver inloggning.
      */
     private void loggaInAutomatiskt(String username, HttpServletRequest request, HttpServletResponse response) {
         var authentication = new UsernamePasswordAuthenticationToken(username, null, List.of());

@@ -583,13 +583,15 @@ tidigare HTTP Basic-modellen helt, se
 
 - Öppen självregistrering på `/registrera` - vem som helst kan skapa
   ett konto. Varje användares vinlista är helt privat (`owner_id` på
-  `wines`, `NOT NULL`) - ingen delning, ingen rollindelning. De tidigare
+  `wines`, `NOT NULL`) - ingen delning. Det finns en enda adminroll (WINE-61, ADR 0025) - se
+  "Flera användare - nuläge". De tidigare
   hårdkodade `admin`/`readonly`-kontona och `WINECELLAR_ADMIN_PASSWORD`
   är helt borttagna.
 - `UserDetailsService` läser bara från `UserRepository` (databasen).
   `authorizeHttpRequests` är `.requestMatchers("/registrera").
-  permitAll()` + `.anyRequest().authenticated()` - ingen `hasRole`
-  någonstans.
+  permitAll()` + `.requestMatchers("/admin/**").hasRole("ADMIN")` +
+  `.anyRequest().authenticated()` - `/admin/**` är den enda rollspärrade
+  delen (en enda adminroll, ADR 0025); övriga rutter kräver bara inloggning.
 - **CSRF är påslaget.** `thymeleaf-extras-springsecurity6` injicerar
   automatiskt CSRF-token i varje `th:action`-formulär; `vinkallare.html`
   har en `htmx:configRequest`-lyssnare som lägger till CSRF-headern på

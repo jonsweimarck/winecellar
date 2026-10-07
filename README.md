@@ -250,7 +250,8 @@ Hela appen kräver inloggning - formulärbaserad, med session, se
 ursprungliga HTTP Basic-modellen i
 [ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md)). Vem som helst
 kan registrera ett eget konto på `/registrera` - varje konto får en
-helt privat, egen vinlista, ingen delning och ingen rollindelning
+helt privat, egen vinlista, ingen delning och ingen rollindelning för vanliga användare - det finns
+bara en enda adminroll, se "Admin" nedan
 (de tidigare hårdkodade `admin`/`readonly`-kontona och
 `WINECELLAR_ADMIN_PASSWORD` är borttagna).
 
