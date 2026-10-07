@@ -484,6 +484,8 @@ public class WineController {
     @PostMapping("/wines/tolka-etikett")
     public String interpretLabel(
             @RequestParam("bild") MultipartFile image, Model model, Authentication authentication) throws IOException {
+        // Fail-closed FÖRE det betalda LLM-anropet (WINE-63): en raderad användare får inte utlösa det.
+        UserId owner = currentOwner(authentication);
         LabelInterpretationResult result = labelInterpretationService.interpret(image.getBytes(), image.getContentType());
         Wine wine;
         if (result instanceof LabelInterpretationResult.Interpreted interpreted) {
@@ -498,7 +500,7 @@ public class WineController {
         model.addAttribute("ratings", Rating.values());
         model.addAttribute("ownRatingFromScale", currentOwnRatingFromScale(authentication));
         model.addAttribute("ownRatingUnmatched", isOwnRatingUnmatched(wine));
-        model.addAttribute("tagSuggestions", wineService.distinctTags(currentOwner(authentication)));
+        model.addAttribute("tagSuggestions", wineService.distinctTags(owner));
         return "vin-formular";
     }
 

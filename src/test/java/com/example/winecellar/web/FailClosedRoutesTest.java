@@ -186,8 +186,7 @@ class FailClosedRoutesTest {
                         .with(user("spöke")).with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(LOGIN));
-        // /wines/tolka-etikett anropar tolkningstjänsten INNAN första CurrentUser-uppslaget
-        // (nekas först vid modellbygget) - se rapporten; här låses bara att svaret är /login.
+        // /wines/tolka-etikett slår upp användaren FÖRE det betalda LLM-anropet.
         mockMvc.perform(multipart("/wines/tolka-etikett")
                         .file(new MockMultipartFile("bild", "e.png", "image/png", new byte[] {1}))
                         .with(user("spöke")).with(csrf()))
@@ -195,5 +194,6 @@ class FailClosedRoutesTest {
                 .andExpect(redirectedUrl(LOGIN));
 
         verify(wineService, never()).save(any());
+        verifyNoInteractions(labelInterpretationService);
     }
 }

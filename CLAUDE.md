@@ -917,7 +917,7 @@ användaren inte finns i databasen, i stället för det gamla `.orElse(null)`.
 Ett null-ägarargument betyder "oscopeat" (ALLA användares viner) i
 service-/repositorylagret, så en tyst null från `CurrentUser` var ett
 dataläckage. Nya anropsplatser får aldrig själva falla tillbaka på null.
-Settings-POST-vägarna använder numera `CurrentUser.find` (fail-closed, WINE-63; `FailClosedRoutesTest`).
+Settings-POST-vägarna använder numera `CurrentUser.find` (fail-closed, WINE-63; `FailClosedRoutesTest`), och `WineController.interpretLabel` slår upp användaren FÖRE det betalda LLM-anropet. Regel: ingen extern tjänst eller skrivning före första `CurrentUser`-uppslaget.
 Controller-tester som loggar in med `user(...)` utan riktig användarpost
 måste därför stubba `userRepository.findByUsername` (se
 `defaultUserForAnyPrincipal` i `WineControllerTest`). **Fällor:** (1) `new User(...)` har nu sju komponenter - varje kod
