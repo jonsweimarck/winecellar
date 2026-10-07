@@ -607,6 +607,20 @@ class WineControllerTest {
         }
 
         @Test
+        @DisplayName("ska visa typetiketten Orange på vinkortet i både bred och smal vy")
+        void skaVisaOrangeTypetikettIBredOchSmalVy() throws Exception {
+            when(wineService.search(any(), any()))
+                    .thenReturn(List.of(BAROLO.toBuilder().wineType(WineType.ORANGE).build()));
+
+            mockMvc.perform(get("/").with(user("admin").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("<p class=\"vk-typ\">(<span><span>Orange</span></span>)</p>"),
+                            containsString("<p class=\"vinkort-typ\">(<span><span>Orange</span></span>)</p>")
+                    )));
+        }
+
+        @Test
         @DisplayName("ska rendera kortvyns badge, staplade betygs-/detaljfält och flytta åtgärderna in i Detaljer")
         void skaRenderaKortvynsNyaStruktur() throws Exception {
             Wine barolo = BAROLO.toBuilder()
@@ -775,6 +789,7 @@ class WineControllerTest {
                             containsString("Rött"),
                             containsString("Vitt"),
                             containsString("Rosé"),
+                            containsString("Orange"),
                             containsString("Mousserande"),
                             containsString("Starkvin")
                     )));
@@ -1750,6 +1765,22 @@ class WineControllerTest {
                             // fortfarande just Rating-konstantens korta namn som
                             // värde, helt legitimt för det fältet.
                             containsString("value=\"" + Rating.R16.label() + "\"")
+                    )));
+        }
+
+        @Test
+        @DisplayName("ska erbjuda Orange som val och förvälja det för ett orange vin i vinformuläret")
+        void skaErbjudaOchFörväljaOrangeIFormuläret() throws Exception {
+            when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+            when(wineService.findById(eq(new WineId(1L)), any()))
+                    .thenReturn(Optional.of(BAROLO.toBuilder().wineType(WineType.ORANGE).build()));
+
+            mockMvc.perform(get("/wines/1/redigera").with(user("testperson")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(allOf(
+                            containsString("<option value=\"ORANGE\" selected=\"selected\">Orange</option>"),
+                            containsString("<option value=\"RED\">Rött</option>")
                     )));
         }
 
