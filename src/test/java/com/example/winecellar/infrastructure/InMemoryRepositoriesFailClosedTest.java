@@ -68,4 +68,12 @@ class InMemoryRepositoriesFailClosedTest {
         assertThat(repository.findByIdAndOwner(alices.id(), BOB)).isEmpty();
         assertThat(repository.findByIdAndOwner(new ConversationId(999L), ALICE)).isEmpty();
     }
+
+    @Test
+    void wineRepositorySaveSkaKastaVidNullOwner() {
+        InMemoryWineRepository repository = new InMemoryWineRepository();
+
+        assertThatThrownBy(() -> repository.save(Wine.builder().name("Barolo").quantity(1).build()))
+                .isInstanceOf(NullPointerException.class);
+    }
 }

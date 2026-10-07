@@ -27,6 +27,7 @@ public class InMemoryWineRepository implements WineRepository {
 
     @Override
     public Wine save(Wine wine) {
+        Objects.requireNonNull(wine.owner(), "wine.owner must not be null");
         Wine toStore = wine.id() != null
                 ? wine
                 : wine.toBuilder().id(new WineId(nextId.getAndIncrement())).build();
@@ -54,7 +55,7 @@ public class InMemoryWineRepository implements WineRepository {
     }
 
     private static void requireOwner(UserId owner) {
-        Objects.requireNonNull(owner, "owner must not be null (WINE-64: fail-closed, null means NOT all users)");
+        Objects.requireNonNull(owner, "owner must not be null");
     }
 
     @Override

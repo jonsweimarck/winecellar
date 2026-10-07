@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * WINE-61: CurrentUser är fail-closed. En autentiserad principal vars användare
  * saknas i databasen (raderad medan sessionen lever) får ALDRIG tolkas som
- * "oscopeat" (null-ägare = alla viner) - hen skickas till inloggningen, och
+ * "ingen ägare" - hen skickas till inloggningen, och
  * varken vinlistan eller exporten läser någon data.
  */
 @WebMvcTest({WineController.class, ExportController.class, SettingsController.class,

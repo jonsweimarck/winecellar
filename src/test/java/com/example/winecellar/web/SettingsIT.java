@@ -77,8 +77,8 @@ class SettingsIT extends SharedPostgres {
      */
     @AfterEach
     void tömKällaren() {
-        var owner = userRepository.findByUsername(TESTKONTO_ANVÄNDARNAMN).orElseThrow().id();
-        wineService.listWines(owner).forEach(vin -> wineService.removeWine(vin.id(), owner));
+        userRepository.findByUsername(TESTKONTO_ANVÄNDARNAMN).map(com.example.winecellar.domain.User::id).ifPresent(owner ->
+                wineService.listWines(owner).forEach(vin -> wineService.removeWine(vin.id(), owner)));
     }
 
     @Test

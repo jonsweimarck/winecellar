@@ -346,8 +346,8 @@ dem:
   egenskapsvärden låter Spring återanvända testkontexten mellan klasser.
   Konsekvens: databasen delas, så varje test måste sätta upp sina egna
   data i `@BeforeEach` - lita inte på att något överlever mellan
-  testmetoder, och notera att `listWines(null)` returnerar SAMTLIGA
-  viner (används av en städmetod som alltså tömmer hela tabellen).
+  testmetoder. Ett null-ägarargument kastar (WINE-64) - städa per ägare/testkonto,
+  aldrig "alla viner".
 - **Playwrights `isVisible()` är fel verktyg för `clip`-dolda element** -
   en 1x1-pixel-input räknas som synlig. Mät den renderade ytan i stället.
   `evaluate` returnerar dessutom `Integer` för hela tal och `Double`

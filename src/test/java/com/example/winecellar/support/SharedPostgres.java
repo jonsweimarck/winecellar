@@ -24,7 +24,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * **Konsekvens att känna till:** databasen delas nu av alla klasser. Det
  * bär eftersom vinlistan är ägarscopead och varje klass använder sitt
  * eget testkonto. Städning sker per ägare (WINE-64: ett null-ägararg
- * kastar i repositoryna, så ingen klass kan längre rensa OSCOPEAT och tömma andra
+ * kastar i repositoryna, så ingen klass kan längre rensa andra klassers data
  * klassers rader). Varje test ska ändå sätta upp sina egna
  * data i @BeforeEach, vilket alla nuvarande klasser gör. Lägg inte till
  * en klass som förväntar sig att data överlever mellan testmetoder.

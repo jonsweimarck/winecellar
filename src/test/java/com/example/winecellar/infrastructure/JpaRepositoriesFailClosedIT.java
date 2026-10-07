@@ -6,6 +6,7 @@ import com.example.winecellar.domain.Conversation;
 import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.support.SharedPostgres;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +34,17 @@ class JpaRepositoriesFailClosedIT extends SharedPostgres {
 
     @Autowired
     private UserRepository userRepository;
+
+    @AfterEach
+    void städaAnvändare() {
+        for (String username : new String[] {"failClosedAlice", "failClosedBob", "failClosedCarol", "failClosedDave"}) {
+            userRepository.findByUsername(username).ifPresent(user -> {
+                conversationRepository.deleteAllByOwner(user.id());
+                wineRepository.deleteAllByOwner(user.id());
+                userRepository.deleteById(user.id());
+            });
+        }
+    }
 
     private UserId user(String username) {
         registrationService.register(username, "testlösenord123");

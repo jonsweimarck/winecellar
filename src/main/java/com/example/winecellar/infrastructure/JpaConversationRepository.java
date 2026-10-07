@@ -107,7 +107,7 @@ public class JpaConversationRepository implements ConversationRepository {
     }
 
     private static void requireOwner(UserId owner) {
-        Objects.requireNonNull(owner, "owner must not be null (WINE-64: fail-closed, null means NOT all users)");
+        Objects.requireNonNull(owner, "owner must not be null");
     }
 
     /** Används av acceptanstesterna för att nollställa tillstånd mellan scenarier. */
