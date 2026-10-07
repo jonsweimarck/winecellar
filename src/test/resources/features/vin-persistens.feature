@@ -17,6 +17,15 @@ Egenskap: Viner överlever en omstart
     När applikationen startas om
     Så ska vinet "Barolo" fortfarande ha eget betyg "Supergott, dricka nu!"
 
+  # WINE-57: wine_type har en CHECK-constraint i databasen (skapad av
+  # Hibernate på en färsk databas) - Orange måste gå att spara mot en riktig
+  # Postgres, inte bara mot in-minnet. Bevisar INTE migreringen av en
+  # befintlig databas (se db/migrations/2026-10-07-*.sql, verifierad manuellt).
+  Scenario: Ett orange vin överlever en omstart av applikationen
+    Givet att vinet "Skinnkontakt" av vintypen "ORANGE" är sparat i källaren
+    När applikationen startas om
+    Så ska vinet "Skinnkontakt" fortfarande ha vintypen "ORANGE"
+
   # WINE-51: taggar lagras i en egen junction-tabell (wine_tags), inte som
   # en kolumn på wines - ett eget scenario mot en riktig Postgres krävs för
   # att bevisa att @ElementCollection-mappningen (EAGER, se WineEntity)

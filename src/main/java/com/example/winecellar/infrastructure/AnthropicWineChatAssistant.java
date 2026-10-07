@@ -40,6 +40,7 @@ public class AnthropicWineChatAssistant implements WineChatAssistant {
             WineType.RED, "rött",
             WineType.WHITE, "vitt",
             WineType.ROSE, "rosé",
+            WineType.ORANGE, "orange",
             WineType.SPARKLING, "mousserande",
             WineType.FORTIFIED, "starkvin"
     );

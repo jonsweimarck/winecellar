@@ -306,6 +306,7 @@ public class WineController {
             "RED", "Rött",
             "WHITE", "Vitt",
             "ROSE", "Rosé",
+            "ORANGE", "Orange",
             "SPARKLING", "Mousserande",
             "FORTIFIED", "Starkvin"
     );

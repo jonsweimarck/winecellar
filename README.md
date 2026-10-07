@@ -49,7 +49,7 @@ Tabell `wines`:
 |---|---|---|
 | id | `bigserial` PK | |
 | owner_id | `bigint` FK → `users.id`, **NOT NULL** | Se "Flera användare" nedan |
-| wine_type | `text` + `CHECK`, nullable | Enum: RED, WHITE, ROSE, SPARKLING, FORTIFIED |
+| wine_type | `text` + `CHECK`, nullable | Enum: RED, WHITE, ROSE, ORANGE, SPARKLING, FORTIFIED |
 | country | `text`, nullable | |
 | region | `text`, nullable | |
 | subregion | `text`, nullable | |
@@ -164,7 +164,7 @@ Verktygsraden ovanför listan har:
   Årgång, Antal flaskor, Pris, Inköpsdatum, Eget betyg, Munskänkarnas
   betyg och Vivino-betyg. Viner utan värde för det sorterade fältet
   hamnar alltid sist, oavsett riktning.
-- En hopfällbar filterpanel med vintyp (fem kryssrutor), ett
+- En hopfällbar filterpanel med vintyp (sex kryssrutor), ett
   "Antal flaskor minst"-fält, ursprung (land→region→underregion,
   nästlade kryssrutor) och en flat lista med kryssrutor för taggar
   (döljs helt om ingen tagg finns ännu). Facetter kombineras med OCH

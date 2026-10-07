@@ -81,6 +81,17 @@ class WineRowParserTest {
     }
 
     @Test
+    void skaTolkaOrangeSomVintyp() {
+        Row row = rowWith(sheet -> {
+        });
+        writeCell(row, 0, "Orange");
+        writeCell(row, 6, "Skinnkontakt");
+        writeCell(row, 10, 1);
+
+        assertThat(parser.parse(row).wineType()).isEqualTo(WineType.ORANGE);
+    }
+
+    @Test
     void skaHoppaÖverRadSomSaknarNamn() {
         Row row = rowWith(sheet -> {
         });

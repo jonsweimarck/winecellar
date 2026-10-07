@@ -87,6 +87,7 @@ public final class WineRowParser {
             "rött", WineType.RED,
             "vitt", WineType.WHITE,
             "rosé", WineType.ROSE,
+            "orange", WineType.ORANGE,
             "mousserande", WineType.SPARKLING,
             "starkvin", WineType.FORTIFIED
     );
