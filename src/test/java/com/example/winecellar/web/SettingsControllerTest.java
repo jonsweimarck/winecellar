@@ -69,7 +69,7 @@ class SettingsControllerTest {
     @Test
     void skaVisaSparatStandardvärdeFörAntalFlaskorFilter() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -86,7 +86,7 @@ class SettingsControllerTest {
     @Test
     void skaInteVisaEnSparaKnappFörAntalFlaskorFilter() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -96,7 +96,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaNyttStandardvärdeOchOmdirigeraTillbaka() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -112,7 +112,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaEttOmFältetLämnasTomt() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -133,7 +133,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaEttOmFältetInteGårAttTolkaSomEttTal() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -164,7 +164,7 @@ class SettingsControllerTest {
     @Test
     void skaVisaKryssrutaFörEgetBetygFrånSkala() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -176,7 +176,7 @@ class SettingsControllerTest {
     @Test
     void skaVisaKryssrutanIkryssadNärInställningenÄrPå() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -186,7 +186,7 @@ class SettingsControllerTest {
     @Test
     void skaSättaOwnRatingFromScaleTillSantNärRutanKryssasI() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false, false)));
 
         mockMvc.perform(post("/installningar/eget-betyg-skala")
                         .with(user("testperson")).with(csrf())
@@ -207,7 +207,7 @@ class SettingsControllerTest {
     @Test
     void skaSättaOwnRatingFromScaleTillFalsktNärRutanLämnasOkryssad() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true, false)));
 
         mockMvc.perform(post("/installningar/eget-betyg-skala")
                         .with(user("testperson")).with(csrf()))

@@ -52,6 +52,15 @@ public class UserEntity {
     @Column(name = "own_rating_from_scale")
     private Boolean ownRatingFromScale;
 
+    /**
+     * WINE-61: adminflagga. Medvetet UTAN `nullable = false`, samma mönster/skäl
+     * som `defaultMinQuantityFilter` ovan - kolumnen skärps till NOT NULL
+     * DEFAULT false i schema.sql i stället. Ingen befintlig användare blir
+     * admin av migreringen.
+     */
+    @Column(name = "is_admin")
+    private Boolean admin;
+
     protected UserEntity() {
     }
 
@@ -101,5 +110,13 @@ public class UserEntity {
 
     void setOwnRatingFromScale(Boolean ownRatingFromScale) {
         this.ownRatingFromScale = ownRatingFromScale;
+    }
+
+    Boolean getAdmin() {
+        return admin;
+    }
+
+    void setAdmin(Boolean admin) {
+        this.admin = admin;
     }
 }

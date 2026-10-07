@@ -264,3 +264,12 @@ CREATE INDEX IF NOT EXISTS wine_tags_wine_id_idx ON wine_tags (wine_id);;
 -- db/migrations/2026-10-07-add-orange-wine-type.sql).
 ALTER TABLE wines DROP CONSTRAINT IF EXISTS wines_wine_type_check;;
 ALTER TABLE wines ADD CONSTRAINT wines_wine_type_check CHECK (wine_type IN ('RED', 'WHITE', 'ROSE', 'ORANGE', 'SPARKLING', 'FORTIFIED'));;
+
+-- WINE-61: adminflagga. Samma mönster som own_rating_from_scale ovan: kolumnen
+-- läggs till NULLABLE (Hibernate/UserEntity), backfillas till false och
+-- skärps här. Ingen befintlig användare blir admin av detta - det första
+-- admin-kontot sätts manuellt med SQL (se db/migrations/2026-10-07-add-user-is-admin.sql).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin boolean;;
+UPDATE users SET is_admin = false WHERE is_admin IS NULL;;
+ALTER TABLE users ALTER COLUMN is_admin SET DEFAULT false;;
+ALTER TABLE users ALTER COLUMN is_admin SET NOT NULL;;

@@ -31,6 +31,16 @@ public class JpaUserRepository implements UserRepository {
         return jpaRepository.findByUsername(username).map(JpaUserRepository::toDomain);
     }
 
+    @Override
+    public java.util.List<User> findAll() {
+        return jpaRepository.findAll().stream().map(JpaUserRepository::toDomain).toList();
+    }
+
+    @Override
+    public void deleteById(UserId id) {
+        jpaRepository.deleteById(id.value());
+    }
+
     /** Används av acceptanstesterna för att nollställa tillstånd mellan scenarier. */
     public void deleteAll() {
         jpaRepository.deleteAll();
@@ -44,6 +54,7 @@ public class JpaUserRepository implements UserRepository {
         entity.setCreatedAt(user.createdAt());
         entity.setDefaultMinQuantityFilter(user.defaultMinQuantityFilter());
         entity.setOwnRatingFromScale(user.ownRatingFromScale());
+        entity.setAdmin(user.admin());
         return entity;
     }
 
@@ -54,6 +65,7 @@ public class JpaUserRepository implements UserRepository {
                 entity.getHashedPassword(),
                 entity.getCreatedAt(),
                 entity.getDefaultMinQuantityFilter() != null ? entity.getDefaultMinQuantityFilter() : 0,
-                Boolean.TRUE.equals(entity.getOwnRatingFromScale()));
+                Boolean.TRUE.equals(entity.getOwnRatingFromScale()),
+                Boolean.TRUE.equals(entity.getAdmin()));
     }
 }

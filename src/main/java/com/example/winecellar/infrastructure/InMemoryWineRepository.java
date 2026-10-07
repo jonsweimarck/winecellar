@@ -56,6 +56,12 @@ public class InMemoryWineRepository implements WineRepository {
         wines.remove(id.value());
     }
 
+    @Override
+    public void deleteAllByOwner(UserId owner) {
+        java.util.Objects.requireNonNull(owner);
+        wines.values().removeIf(wine -> owner.equals(wine.owner()));
+    }
+
     /**
      * Enkel skiftlägesokänslig delsträngsmatchning - ingen böjningsform-
      * medvetenhet eller rankning som JpaWineRepositorys riktiga

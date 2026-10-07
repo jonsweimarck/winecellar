@@ -7,6 +7,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -80,7 +84,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http, @Value("${winecellar.remember-me.key}") String rememberMeKey) throws Exception {
+            HttpSecurity http, @Value("${winecellar.remember-me.key}") String rememberMeKey,
+            SessionRegistry sessionRegistry) throws Exception {
         http
                 .authorizeHttpRequests(requests -> requests
                         // Statiska resurser måste vara öppna: de behövs av
@@ -91,7 +96,18 @@ public class SecurityConfig {
                         // renderats helt ostylad (WINE-39).
                         .requestMatchers("/css/**", "/js/**").permitAll()
                         .requestMatchers("/registrera").permitAll()
+                        // WINE-61: adminsidan och dess POST:ar - server-side
+                        // behörighet (utloggad -> /login, inloggad icke-admin -> 403).
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
+                // WINE-61: håller reda på pågående sessioner så att en raderad
+                // användares sessioner kan upphöras direkt (AdminController).
+                // Obegränsat antal samtidiga sessioner (-1) - ingen ändring av
+                // beteendet för vanliga användare.
+                .sessionManagement(session -> session
+                        .maximumSessions(-1)
+                        .sessionRegistry(sessionRegistry)
+                        .expiredUrl("/login"))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .permitAll())
@@ -116,6 +132,17 @@ public class SecurityConfig {
     }
 
     @Bean
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    /** Behövs för att registret ska få veta när en session tar slut (WINE-61). */
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
+
+    @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
@@ -125,7 +152,7 @@ public class SecurityConfig {
         return username -> userRepository.findByUsername(username)
                 .map(user -> User.withUsername(user.username())
                         .password(user.hashedPassword())
-                        .authorities(List.of())
+                        .authorities(user.admin() ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN")) : List.of())
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException(username));
     }

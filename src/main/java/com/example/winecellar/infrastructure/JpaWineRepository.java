@@ -5,6 +5,7 @@ import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.Wine.WineId;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,6 +44,17 @@ public class JpaWineRepository implements WineRepository {
     @Override
     public void deleteById(WineId id) {
         jpaRepository.deleteById(id.value());
+    }
+
+    /**
+     * Via entiteterna (inte en bulk-DELETE) så att Hibernate själv raderar
+     * taggraderna i wine_tags (@ElementCollection) före varje vin.
+     */
+    @Override
+    @Transactional
+    public void deleteAllByOwner(UserId owner) {
+        java.util.Objects.requireNonNull(owner);
+        jpaRepository.deleteAll(jpaRepository.findByOwnerId(owner.value()));
     }
 
     @Override

@@ -71,6 +71,17 @@ public class JpaConversationRepository implements ConversationRepository {
         }
     }
 
+    /** Meddelanden före konversationer, samma ordning/skäl som {@link #deleteByIdAndOwner}. */
+    @Override
+    @Transactional
+    public void deleteAllByOwner(UserId owner) {
+        java.util.Objects.requireNonNull(owner);
+        for (ConversationEntity conversation : conversationJpaRepository.findByOwnerIdOrderByCreatedAtDesc(owner.value())) {
+            chatMessageJpaRepository.deleteByConversationId(conversation.getId());
+            conversationJpaRepository.delete(conversation);
+        }
+    }
+
     @Override
     public int countByOwner(UserId owner) {
         return Math.toIntExact(owner == null

@@ -28,7 +28,7 @@ public class RegistrationService {
             return new RegistrationResult.UsernameTaken();
         }
         User user = userRepository.save(
-                new User(null, username, passwordEncoder.encode(password), Instant.now(), 1, false));
+                new User(null, username, passwordEncoder.encode(password), Instant.now(), 1, false, false));
         return new RegistrationResult.Registered(user);
     }
 }

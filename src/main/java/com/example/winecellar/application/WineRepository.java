@@ -41,5 +41,12 @@ public interface WineRepository {
      * enklare skiftlägesokänslig delsträngsmatchning för tester som inte
      * bryr sig om just den kvaliteten. Se CLAUDE.md.
      */
+    /**
+     * WINE-61 (radering av en användare): tar bort ALLA ägarens viner, inklusive
+     * taggar. {@code owner} får INTE vara null här (null betyder "oscopeat" för
+     * de läsande metoderna - här hade det raderat allas viner).
+     */
+    void deleteAllByOwner(UserId owner);
+
     List<Wine> searchByOwner(String query, UserId owner);
 }
