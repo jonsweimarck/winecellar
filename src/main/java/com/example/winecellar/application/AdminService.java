@@ -1,5 +1,6 @@
 package com.example.winecellar.application;
 
+import java.util.Comparator;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,7 @@ public class AdminService {
             return List.of();
         }
         return userRepository.findAll().stream()
-                .sorted(java.util.Comparator.comparing(User::username, String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(User::username, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 

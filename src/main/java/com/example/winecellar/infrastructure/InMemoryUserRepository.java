@@ -1,5 +1,6 @@
 package com.example.winecellar.infrastructure;
 
+import java.util.Comparator;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
@@ -35,8 +36,8 @@ public class InMemoryUserRepository implements UserRepository {
     }
 
     @Override
-    public java.util.List<User> findAll() {
-        return users.values().stream().sorted(java.util.Comparator.comparing(User::username)).toList();
+    public List<User> findAll() {
+        return users.values().stream().sorted(Comparator.comparing(User::username)).toList();
     }
 
     @Override

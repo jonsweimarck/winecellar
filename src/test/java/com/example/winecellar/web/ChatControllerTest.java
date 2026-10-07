@@ -61,6 +61,18 @@ class ChatControllerTest {
     @MockBean
     private UserRepository userRepository;
 
+    /**
+     * CurrentUser är fail-closed (WINE-61): en autentiserad principal vars användare
+     * saknas i databasen nekas. Testerna loggar in med user(...) utan en riktig
+     * användarpost, så varje användarnamn får som standard en användare med id 1
+     * (enskilda tester kan stubba om specifika namn).
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void defaultUserForAnyPrincipal() {
+        when(userRepository.findByUsername(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation ->
+                Optional.of(new User(new UserId(1L), invocation.getArgument(0), "hash", Instant.now(), 1, false, false)));
+    }
+
     @MockBean
     private WineService wineService;
 

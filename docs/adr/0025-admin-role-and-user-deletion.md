@@ -35,11 +35,18 @@ konto med allt det äger.
   explicit av koden. Bekräftelse sker i en native dialog, inte
   webbläsarens confirm.
 - En admin kan inte radera sig själv (knappen visas inte och servern
-  ignorerar försöket utan fel). Det garanterar att det alltid finns
-  minst en admin kvar efter en radering.
-- En raderad användares inloggning upphör direkt: pågående sessioner
-  upphävs vid raderingen, och en "håll mig inloggad"-cookie slutar
-  fungera eftersom användaren inte längre finns att slå upp.
+  ignorerar försöket utan fel). En admin kan däremot radera en annan
+  admin; samtidig, ömsesidig radering kan i teorin lämna noll admins,
+  vilket återställs med manuell SQL i databasen. Något skydd för "sista
+  admin" utöver självraderingsspärren byggs inte.
+- En raderad användares inloggning upphör direkt. Det bärande skyddet är
+  att uppslaget av den inloggade användaren är fail-closed: finns
+  användaren inte i databasen nekas begäran och webbläsaren skickas till
+  inloggningen, i stället för att tolkas som "ingen ägare" (vilket i
+  lagren under betyder "alla användares data"). Ovanpå det upphävs
+  pågående sessioner vid raderingen (ett register över sessioner) som ett
+  extra skikt, och en "håll mig inloggad"-cookie slutar fungera eftersom
+  användaren inte längre finns att slå upp.
 
 ## Consequences
 
@@ -48,10 +55,10 @@ konto med allt det äger.
   Accepterat som enklast; adminsidan säger det i sitt meddelande.
 - Att ta bort admin-rättighet byggs inte nu. Ett felaktigt utsett
   admin-konto måste raderas, eller ändras direkt i databasen.
-- Appen håller nu ett register över pågående sessioner i minnet (för
-  att kunna upphäva en raderad användares). Det passar en
-  enkelinstansdrift; skulle appen skalas ut till flera instanser måste
-  registret ersättas av något delat.
+- Sessionsregistret ligger i minnet och är bara ett extra skikt; det
+  passar en enkelinstansdrift. Skulle appen skalas ut till flera
+  instanser räcker fail-closed-uppslaget fortfarande för att en raderad
+  användare ska nekas.
 - Raderingen är oåterkallelig och omfattar all användarens data. Ingen
   mjuk radering eller ångrafunktion byggs - samma "tunt domänlager"-linje
   som [0001](0001-thin-domain-layer.md).

@@ -1,5 +1,6 @@
 package com.example.winecellar.infrastructure;
 
+import java.util.Objects;
 import com.example.winecellar.application.ConversationRepository;
 import com.example.winecellar.domain.ChatMessage;
 import com.example.winecellar.domain.ChatMessage.ChatMessageId;
@@ -75,7 +76,7 @@ public class JpaConversationRepository implements ConversationRepository {
     @Override
     @Transactional
     public void deleteAllByOwner(UserId owner) {
-        java.util.Objects.requireNonNull(owner);
+        Objects.requireNonNull(owner);
         for (ConversationEntity conversation : conversationJpaRepository.findByOwnerIdOrderByCreatedAtDesc(owner.value())) {
             chatMessageJpaRepository.deleteByConversationId(conversation.getId());
             conversationJpaRepository.delete(conversation);

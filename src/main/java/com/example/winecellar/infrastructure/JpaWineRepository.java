@@ -1,5 +1,6 @@
 package com.example.winecellar.infrastructure;
 
+import java.util.Objects;
 import com.example.winecellar.application.WineRepository;
 import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
@@ -53,7 +54,7 @@ public class JpaWineRepository implements WineRepository {
     @Override
     @Transactional
     public void deleteAllByOwner(UserId owner) {
-        java.util.Objects.requireNonNull(owner);
+        Objects.requireNonNull(owner);
         jpaRepository.deleteAll(jpaRepository.findByOwnerId(owner.value()));
     }
 

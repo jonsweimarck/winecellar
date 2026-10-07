@@ -66,7 +66,7 @@ public class InMemoryConversationRepository implements ConversationRepository {
 
     @Override
     public void deleteAllByOwner(UserId owner) {
-        java.util.Objects.requireNonNull(owner);
+        Objects.requireNonNull(owner);
         findAllByOwner(owner).forEach(conversation -> deleteByIdAndOwner(conversation.id(), owner));
     }
 

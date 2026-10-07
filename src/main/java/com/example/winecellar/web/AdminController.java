@@ -76,7 +76,8 @@ public class AdminController {
      */
     private void expireSessionsOf(String username) {
         for (Object principal : sessionRegistry.getAllPrincipals()) {
-            if (principal instanceof UserDetails details && details.getUsername().equals(username)) {
+            String name = principal instanceof UserDetails details ? details.getUsername() : principal.toString();
+            if (name.equals(username)) {
                 sessionRegistry.getAllSessions(principal, false).forEach(SessionInformation::expireNow);
             }
         }

@@ -1,5 +1,6 @@
 package com.example.winecellar.infrastructure;
 
+import java.util.List;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
@@ -32,7 +33,7 @@ public class JpaUserRepository implements UserRepository {
     }
 
     @Override
-    public java.util.List<User> findAll() {
+    public List<User> findAll() {
         return jpaRepository.findAll().stream().map(JpaUserRepository::toDomain).toList();
     }
 
