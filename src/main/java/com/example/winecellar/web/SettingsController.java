@@ -67,10 +67,10 @@ public class SettingsController {
             @RequestParam(required = false) String minQuantity,
             Authentication authentication, RedirectAttributes redirectAttributes) {
         int value = parseMinQuantity(minQuantity);
-        userRepository.findByUsername(authentication.getName()).ifPresent(user ->
-                userRepository.save(new User(
-                        user.id(), user.username(), user.hashedPassword(), user.createdAt(),
-                        value, user.ownRatingFromScale(), user.admin())));
+        User user = CurrentUser.find(authentication, userRepository);
+        userRepository.save(new User(
+                user.id(), user.username(), user.hashedPassword(), user.createdAt(),
+                value, user.ownRatingFromScale(), user.admin()));
         redirectAttributes.addFlashAttribute("feedback", "Standardfilter sparat");
         return "redirect:/installningar";
     }
@@ -87,10 +87,10 @@ public class SettingsController {
             @RequestParam(required = false) String ownRatingFromScale,
             Authentication authentication, RedirectAttributes redirectAttributes) {
         boolean value = ownRatingFromScale != null;
-        userRepository.findByUsername(authentication.getName()).ifPresent(user ->
-                userRepository.save(new User(
-                        user.id(), user.username(), user.hashedPassword(), user.createdAt(),
-                        user.defaultMinQuantityFilter(), value, user.admin())));
+        User user = CurrentUser.find(authentication, userRepository);
+        userRepository.save(new User(
+                user.id(), user.username(), user.hashedPassword(), user.createdAt(),
+                user.defaultMinQuantityFilter(), value, user.admin()));
         redirectAttributes.addFlashAttribute("feedback", "Inställning sparad");
         return "redirect:/installningar";
     }

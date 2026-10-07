@@ -921,7 +921,7 @@ Controller-tester som loggar in med `user(...)` utan riktig användarpost
 måste därför stubba `userRepository.findByUsername` (se
 `defaultUserForAnyPrincipal` i `WineControllerTest`). **Fällor:** (1) `new User(...)` har nu sju komponenter - varje kod
 som kopierar en användare (t.ex. `SettingsController`) måste bära vidare
-`admin`, annars degraderas kontot tyst vid nästa sparning. (2) Rättigheter
+`admin`, annars degraderas kontot tyst vid nästa sparning (Settings-POST-vägarna använder numera `CurrentUser.find`, fail-closed, WINE-63; `FailClosedRoutesTest`). (2) Rättigheter
 läses in vid inloggning (sessionen), så "Gör till admin" syns i menyn först
 efter målets nästa inloggning. (3) En session läser inte om
 `UserDetailsService`, så en raderad användares session lever kvar - det
