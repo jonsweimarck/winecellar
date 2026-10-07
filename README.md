@@ -164,7 +164,7 @@ Verktygsraden ovanför listan har:
   Årgång, Antal flaskor, Pris, Inköpsdatum, Eget betyg, Munskänkarnas
   betyg och Vivino-betyg. Viner utan värde för det sorterade fältet
   hamnar alltid sist, oavsett riktning.
-- En hopfällbar filterpanel med vintyp (fem kryssrutor), ett
+- En hopfällbar filterpanel med vintyp (sex kryssrutor), ett
   "Antal flaskor minst"-fält, ursprung (land→region→underregion,
   nästlade kryssrutor) och en flat lista med kryssrutor för taggar
   (döljs helt om ingen tagg finns ännu). Facetter kombineras med OCH
