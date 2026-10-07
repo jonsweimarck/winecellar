@@ -6,6 +6,9 @@ import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
 import java.util.Optional;
 
 @Repository
@@ -38,6 +41,12 @@ public class JpaUserRepository implements UserRepository {
     }
 
     @Override
+    @Transactional
+    public void updateLastLogin(UserId id, Instant at) {
+        jpaRepository.updateLastLogin(id.value(), at);
+    }
+
+    @Override
     public void deleteById(UserId id) {
         jpaRepository.deleteById(id.value());
     }
@@ -56,6 +65,7 @@ public class JpaUserRepository implements UserRepository {
         entity.setDefaultMinQuantityFilter(user.defaultMinQuantityFilter());
         entity.setOwnRatingFromScale(user.ownRatingFromScale());
         entity.setAdmin(user.admin());
+        entity.setLastLoginAt(user.lastLoginAt());
         return entity;
     }
 
@@ -67,6 +77,7 @@ public class JpaUserRepository implements UserRepository {
                 entity.getCreatedAt(),
                 entity.getDefaultMinQuantityFilter() != null ? entity.getDefaultMinQuantityFilter() : 0,
                 Boolean.TRUE.equals(entity.getOwnRatingFromScale()),
-                Boolean.TRUE.equals(entity.getAdmin()));
+                Boolean.TRUE.equals(entity.getAdmin()),
+                entity.getLastLoginAt());
     }
 }

@@ -60,7 +60,7 @@ public class MultiUserSteps {
 
     private UserId userIdFor(String username) {
         return userIdsByUsername.computeIfAbsent(username,
-                name -> userRepository.save(new User(null, name, "irrelevant-i-testet", Instant.now(), 0, false, false)).id());
+                name -> userRepository.save(new User(null, name, "irrelevant-i-testet", Instant.now(), 0, false, false, Instant.now())).id());
     }
 
     @När("{string} öppnar sin vinlista")

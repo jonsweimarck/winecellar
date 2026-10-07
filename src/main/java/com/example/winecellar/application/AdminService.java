@@ -47,7 +47,8 @@ public class AdminService {
         return userRepository.findById(target).map(user -> {
             if (!user.admin()) {
                 userRepository.save(new User(user.id(), user.username(), user.hashedPassword(),
-                        user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale(), true));
+                        user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale(), true,
+                        user.lastLoginAt()));
             }
             return true;
         }).orElse(false);

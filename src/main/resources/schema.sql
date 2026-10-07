@@ -273,3 +273,12 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin boolean;;
 UPDATE users SET is_admin = false WHERE is_admin IS NULL;;
 ALTER TABLE users ALTER COLUMN is_admin SET DEFAULT false;;
 ALTER TABLE users ALTER COLUMN is_admin SET NOT NULL;;
+
+-- WINE-62: senaste lyckade inloggning. Läggs till NULLABLE (Hibernate/
+-- UserEntity), backfillas för befintliga konton till aktuell tid och skärps
+-- här (samma mönster som is_admin ovan). Backfill FÖRE NOT NULL.
+-- Se db/migrations/2026-10-08-add-user-last-login-at.sql.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;;
+UPDATE users SET last_login_at = now() WHERE last_login_at IS NULL;;
+ALTER TABLE users ALTER COLUMN last_login_at SET DEFAULT now();;
+ALTER TABLE users ALTER COLUMN last_login_at SET NOT NULL;;

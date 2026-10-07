@@ -82,7 +82,7 @@ class DeletedUserAccessTest {
 
     @Test
     void skaNekaEnNyregistreradAnvändaresSessionNärKontotRaderats() throws Exception {
-        User registered = new User(GHOST_ID, "nyss", "hash", Instant.now(), 1, false, false);
+        User registered = new User(GHOST_ID, "nyss", "hash", Instant.now(), 1, false, false, Instant.now());
         when(registrationService.register("nyss", "hemligt123"))
                 .thenReturn(new RegistrationResult.Registered(registered));
         when(userRepository.findByUsername("nyss")).thenReturn(Optional.of(registered));
@@ -99,7 +99,7 @@ class DeletedUserAccessTest {
         // Kontot raderas av en admin (användaren finns inte längre i databasen)
         when(userRepository.findByUsername("nyss")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("chef")).thenReturn(Optional.of(
-                new User(new UserId(1L), "chef", "hash", Instant.now(), 1, false, true)));
+                new User(new UserId(1L), "chef", "hash", Instant.now(), 1, false, true, Instant.now())));
         when(userRepository.findById(GHOST_ID)).thenReturn(Optional.of(registered));
         when(adminService.deleteUser(new UserId(1L), GHOST_ID)).thenReturn(true);
         mockMvc.perform(post("/admin/radera").param("userId", "7").with(user("chef").roles("ADMIN")).with(csrf()))
@@ -113,7 +113,7 @@ class DeletedUserAccessTest {
 
     @Test
     void skaNekaEnNyregistreradAnvändaresSessionNärKontotSaknasÄvenUtanUpphävdSession() throws Exception {
-        User registered = new User(GHOST_ID, "nyss", "hash", Instant.now(), 1, false, false);
+        User registered = new User(GHOST_ID, "nyss", "hash", Instant.now(), 1, false, false, Instant.now());
         when(registrationService.register("nyss", "hemligt123"))
                 .thenReturn(new RegistrationResult.Registered(registered));
         when(userRepository.findByUsername("nyss")).thenReturn(Optional.empty());

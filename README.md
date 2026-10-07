@@ -109,7 +109,10 @@ lista. Se [ADR 0013](docs/adr/0013-multi-user-accounts.md).
 `default_min_quantity_filter` (default 1) är vinlistans sparade "Antal
 flaskor minst"-standardval, satt i Inställningar - se "Filtrering,
 sökning och sortering" nedan. `is_admin` (boolean, NOT NULL, default
-false) markerar en admin - se "Admin" under Säkerhet.
+false) markerar en admin - se "Admin" under Säkerhet. `last_login_at`
+(`timestamptz`, NOT NULL) är senaste lyckade inloggning (formulär eller
+"håll mig inloggad"; sätts till `created_at` vid registrering) - visas på
+adminsidan.
 
 ### Chattkonversationer
 
@@ -277,6 +280,13 @@ bekräftelse i en dialog; en admin kan inte radera sig själv. En raderad
 användares pågående inloggning upphör direkt. Åtkomsten kontrolleras
 server-side (`/admin/**` kräver rollen admin), inte bara genom att dölja
 knappar.
+
+Adminlistan visar också när varje konto skapades och när det senast loggade
+in (`users.last_login_at`, WINE-62), i formatet `yyyy-MM-dd HH:mm` i **UTC**
+(inte svensk tid; kolumnetiketterna säger "(UTC)"), utan sekunder. Befintliga
+konton fick migreringstidpunkten som senaste login
+(`db/migrations/2026-10-08-add-user-last-login-at.sql`). Konton som fanns före
+WINE-62 har migreringstidpunkten som senaste login tills de loggar in igen.
 
 Inloggningssidan har en "håll mig inloggad"-kryssruta (hash-baserad
 remember-me, se [ADR 0020](docs/adr/0020-remember-me-hash-based.md)) -

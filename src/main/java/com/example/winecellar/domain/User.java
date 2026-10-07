@@ -29,6 +29,15 @@ import java.time.Instant;
  * `admin` (WINE-61) ger tillgång till adminsidan (`/admin`). Ett nytt konto
  * är aldrig admin (se RegistrationService) - första admin sätts manuellt i
  * databasen, fler görs av en admin via adminsidan.
+ *
+ * `lastLoginAt` (WINE-62) är tidpunkten för senaste lyckade inloggning
+ * (formulärinloggning eller remember-me-återinloggning). Sätts till
+ * `createdAt` vid registrering och uppdateras sedan via en egen riktad
+ * skrivning (`UserRepository.updateLastLogin`) som inte ska skrivas över av
+ * normal läs-ändra-spara. Ett mycket snävt race (SettingsController/
+ * AdminService.makeAdmin läser och sparar hela User) kan i teorin ge ett
+ * något äldre värde - nästa inloggning rättar det. Varje kod som kopierar en
+ * User måste bära vidare fältet.
  */
 public record User(
         UserId id,
@@ -37,7 +46,8 @@ public record User(
         Instant createdAt,
         int defaultMinQuantityFilter,
         boolean ownRatingFromScale,
-        boolean admin
+        boolean admin,
+        Instant lastLoginAt
 ) {
 
     public record UserId(Long value) {

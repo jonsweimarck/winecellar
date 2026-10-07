@@ -38,7 +38,7 @@ public class AdminController {
     @GetMapping("/admin")
     public String admin(Model model, Authentication authentication) {
         UserId actor = CurrentUser.owner(authentication, userRepository);
-        model.addAttribute("users", adminService.listUsers(actor));
+        model.addAttribute("users", adminService.listUsers(actor).stream().map(AdminUserView::of).toList());
         model.addAttribute("currentUserId", actor == null ? null : actor.value());
         return "admin";
     }

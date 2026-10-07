@@ -51,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class FailClosedRoutesTest {
 
     private static final String LOGIN = "http://localhost/login";
-    private static final User FINNS = new User(new UserId(1L), "finns", "hash", Instant.now(), 1, false, false);
+    private static final User FINNS = new User(new UserId(1L), "finns", "hash", Instant.now(), 1, false, false, Instant.now());
 
     @Autowired
     private MockMvc mockMvc;

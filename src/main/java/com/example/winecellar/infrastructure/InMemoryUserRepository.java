@@ -5,6 +5,7 @@ import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,7 +26,8 @@ public class InMemoryUserRepository implements UserRepository {
         User toStore = user.id() != null
                 ? user
                 : new User(new UserId(nextId.getAndIncrement()), user.username(), user.hashedPassword(),
-                        user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale(), user.admin());
+                        user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale(), user.admin(),
+                        user.lastLoginAt());
         users.put(toStore.id().value(), toStore);
         return toStore;
     }
@@ -38,6 +40,13 @@ public class InMemoryUserRepository implements UserRepository {
     @Override
     public List<User> findAll() {
         return users.values().stream().sorted(Comparator.comparing(User::username)).toList();
+    }
+
+    @Override
+    public void updateLastLogin(UserId id, Instant at) {
+        users.computeIfPresent(id.value(), (key, user) -> new User(user.id(), user.username(),
+                user.hashedPassword(), user.createdAt(), user.defaultMinQuantityFilter(),
+                user.ownRatingFromScale(), user.admin(), at));
     }
 
     @Override

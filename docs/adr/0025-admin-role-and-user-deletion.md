@@ -60,6 +60,8 @@ konto med allt det äger.
   passar en enkelinstansdrift. Skulle appen skalas ut till flera
   instanser räcker fail-closed-uppslaget fortfarande för att en raderad
   användare ska nekas.
+- Adminlistan visar även skapad- och senaste-login-tid (WINE-62, UTC,
+  minutprecision); det ändrar inget i rollmodellen ovan.
 - Raderingen är oåterkallelig och omfattar all användarens data. Ingen
   mjuk radering eller ångrafunktion byggs - samma "tunt domänlager"-linje
   som [0001](0001-thin-domain-layer.md).

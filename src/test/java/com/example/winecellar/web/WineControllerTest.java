@@ -121,7 +121,7 @@ class WineControllerTest {
     @org.junit.jupiter.api.BeforeEach
     void defaultUserForAnyPrincipal() {
         when(userRepository.findByUsername(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation ->
-                Optional.of(new User(new UserId(1L), invocation.getArgument(0), "hash", Instant.now(), 1, false, false)));
+                Optional.of(new User(new UserId(1L), invocation.getArgument(0), "hash", Instant.now(), 1, false, false, Instant.now())));
     }
 
     private static final Wine BAROLO = Wine.builder()
@@ -234,7 +234,7 @@ class WineControllerTest {
         @BeforeEach
         void stubbaTestanvändare() {
             User testAnvändare = new User(
-                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false, false);
+                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false, false, Instant.now());
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
         }
 
@@ -415,7 +415,7 @@ class WineControllerTest {
                 @BeforeEach
                 void stubbaTestanvändare() {
                     User testAnvändare = new User(
-                            new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false, false);
+                            new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false, false, Instant.now());
                     when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
                 }
 
@@ -1015,7 +1015,7 @@ class WineControllerTest {
         void skaAnvändaSparadDefaultFörMinQuantity() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false, Instant.now())));
 
             mockMvc.perform(get("/").with(user("testperson")).with(csrf()))
                     .andExpect(status().isOk())
@@ -1033,7 +1033,7 @@ class WineControllerTest {
         void skaLåtaExplicitMinQuantityÅsidosättaSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false, Instant.now())));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -1059,7 +1059,7 @@ class WineControllerTest {
         void skaFallaTillbakaPåSparadDefaultFörOparsbartMinQuantity() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false, Instant.now())));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -1083,7 +1083,7 @@ class WineControllerTest {
         void skaInteVisaBadgeNärMinQuantityMotsvararSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false, Instant.now())));
 
             mockMvc.perform(get("/").with(user("testperson")).with(csrf()))
                     .andExpect(status().isOk())
@@ -1095,7 +1095,7 @@ class WineControllerTest {
         void skaVisaBadgeNärMinQuantityAvvikerFrånSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false, Instant.now())));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -1776,7 +1776,7 @@ class WineControllerTest {
         @DisplayName("ska visa en dropdown med munskänkarnas etiketter när inställningen är påslagen")
         void skaVisaDropdownNärInställningenÄrPåslagen() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false, Instant.now())));
 
             mockMvc.perform(get("/wines/nytt").with(user("testperson")).with(csrf()))
                     .andExpect(status().isOk())
@@ -1799,7 +1799,7 @@ class WineControllerTest {
         @DisplayName("ska erbjuda Orange som val och förvälja det för ett orange vin i vinformuläret")
         void skaErbjudaOchFörväljaOrangeIFormuläret() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false, Instant.now())));
             when(wineService.findById(eq(new WineId(1L)), any()))
                     .thenReturn(Optional.of(BAROLO.toBuilder().wineType(WineType.ORANGE).build()));
 
@@ -1815,7 +1815,7 @@ class WineControllerTest {
         @DisplayName("ska förvälja det sparade värdet i dropdownen när det matchar en av munskänkarnas etiketter")
         void skaFörväljaSparatVärdeIDropdown() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false, Instant.now())));
             when(wineService.findById(eq(new WineId(1L)), any()))
                     .thenReturn(Optional.of(BAROLO.toBuilder().ownRating(Rating.R16.label()).build()));
 
@@ -1851,7 +1851,7 @@ class WineControllerTest {
         @DisplayName("ska visa ett omatchat sparat värde som ett extra, förvalt alternativ i dropdownen")
         void skaVisaOmatchatSparatVärdeSomExtraFörvaltAlternativ() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false, Instant.now())));
             when(wineService.findById(eq(new WineId(1L)), any()))
                     .thenReturn(Optional.of(BAROLO.toBuilder().ownRating("Fantastiskt, dricka nu!").build()));
 
@@ -2035,7 +2035,7 @@ class WineControllerTest {
         @DisplayName("ska spara eget betyg som etikett-text (inte en Rating-konstant) när dropdown-läget är påslaget")
         void skaSparaEgetBetygSomEtikettTextVidTilläggMedDropdownPåslagen() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false, Instant.now())));
 
             mockMvc.perform(post("/wines")
                             .with(user("testperson")).with(csrf())
