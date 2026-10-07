@@ -34,9 +34,9 @@ public class InMemoryWineRepository implements WineRepository {
         return toStore;
     }
 
-    /** null owner = oscopeat (matcha oavsett ägare) - se WineRepository. */
     @Override
     public List<Wine> findAllByOwner(UserId owner) {
+        requireOwner(owner);
         return wines.values().stream()
                 .filter(wine -> ownedBy(wine, owner))
                 .toList();
@@ -44,12 +44,17 @@ public class InMemoryWineRepository implements WineRepository {
 
     @Override
     public Optional<Wine> findByIdAndOwner(WineId id, UserId owner) {
+        requireOwner(owner);
         return Optional.ofNullable(wines.get(id.value()))
                 .filter(wine -> ownedBy(wine, owner));
     }
 
     private static boolean ownedBy(Wine wine, UserId owner) {
-        return owner == null || owner.equals(wine.owner());
+        return owner.equals(wine.owner());
+    }
+
+    private static void requireOwner(UserId owner) {
+        Objects.requireNonNull(owner, "owner must not be null (WINE-64: fail-closed, null means NOT all users)");
     }
 
     @Override
@@ -59,7 +64,7 @@ public class InMemoryWineRepository implements WineRepository {
 
     @Override
     public void deleteAllByOwner(UserId owner) {
-        Objects.requireNonNull(owner);
+        requireOwner(owner);
         wines.values().removeIf(wine -> owner.equals(wine.owner()));
     }
 
@@ -75,6 +80,7 @@ public class InMemoryWineRepository implements WineRepository {
      */
     @Override
     public List<Wine> searchByOwner(String query, UserId owner) {
+        requireOwner(owner);
         String normalizedSearchTerm = stripDiacritics(query.toLowerCase(Locale.ROOT));
         return wines.values().stream()
                 .filter(wine -> ownedBy(wine, owner))

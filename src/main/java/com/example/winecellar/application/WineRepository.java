@@ -8,14 +8,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * WINE-13: alla läsmetoder tar ett `owner`-argument, nullable - `null`
- * betyder "oscopeat" (returnera/matcha oavsett ägare), inte "matcha bara
- * viner utan ägare". Ursprungligen till för de hårdkodade admin/readonly-
- * kontona (som saknade UserId och medvetet var oscopeade under
- * övergången till WINE-15, se WineController.currentOwner(...)) - de är
- * borttagna sedan WINE-15, men själva null-konventionen behölls (kostar
- * inget, och en framtida "adminvy över alla användare" skulle kunna
- * återanvända den).
+ * Alla metoder som tar ett `owner`-argument är FAIL-CLOSED (WINE-64):
+ * `null` kastar NullPointerException i stället för att betyda "alla
+ * användares data" (den gamla WINE-13-konventionen, borttagen som en
+ * latent dataläckagefälla).
  */
 public interface WineRepository {
 
@@ -35,8 +31,7 @@ public interface WineRepository {
 
     /**
      * WINE-61 (radering av en användare): tar bort ALLA ägarens viner, inklusive
-     * taggar. {@code owner} får INTE vara null här (null betyder "oscopeat" för
-     * de läsande metoderna - här hade det raderat allas viner).
+     * taggar. {@code owner} får inte vara null (som för alla owner-metoder).
      */
     void deleteAllByOwner(UserId owner);
 

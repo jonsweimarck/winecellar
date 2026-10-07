@@ -906,7 +906,13 @@ agerande är admin (no-op/tom lista annars) och raderar i FK-ordning i en
 transaktion: `ConversationRepository.deleteAllByOwner` (meddelanden före
 konversationer) -> `WineRepository.deleteAllByOwner` (via entiteterna, så
 Hibernate tar `wine_tags`) -> `UserRepository.deleteById`. `deleteAllByOwner`
-tar INTE null som "oscopeat" (kastar) - ett null hade raderat allas data.
+tar INTE null (kastar) - ett null hade raderat allas data. Sedan WINE-64
+gäller det ALLA owner-metoder i `WineRepository`/`ConversationRepository`
+(både in-memory- och JPA-adaptrarna): den gamla WINE-13-konventionen "null =
+oscopeat = alla användares data" är borttagen, ett null-owner kastar
+`NullPointerException`. Tester måste ha en riktig ägare (`StepSupport.OWNER`
+i in-memory-scenarier) och städar per ägare - det finns medvetet ingen
+oscopead väg på produktionsporten.
 En admin kan inte radera sig själv (servern ignorerar det; knappen visas
 inte), men kan radera en annan admin - "minst en admin finns alltid"
 garanteras INTE (ömsesidig radering kan ge noll admins; återställ med
@@ -914,9 +920,10 @@ manuell SQL `UPDATE users SET is_admin = true ...`).
 **`CurrentUser` är FAIL-CLOSED:** `owner`/`find` kastar
 `AuthenticationCredentialsNotFoundException` (-> 302 till /login) om
 användaren inte finns i databasen, i stället för det gamla `.orElse(null)`.
-Ett null-ägarargument betyder "oscopeat" (ALLA användares viner) i
-service-/repositorylagret, så en tyst null från `CurrentUser` var ett
-dataläckage. Nya anropsplatser får aldrig själva falla tillbaka på null.
+Före WINE-64 betydde ett null-ägarargument "oscopeat" (ALLA användares
+viner) i service-/repositorylagret, så en tyst null från `CurrentUser` var
+ett dataläckage; nu kastar repositoryna i stället (djupförsvar), men nya
+anropsplatser får aldrig själva falla tillbaka på null.
 Settings-POST-vägarna använder numera `CurrentUser.find` (fail-closed, WINE-63; `FailClosedRoutesTest`), och `WineController.interpretLabel` slår upp användaren FÖRE det betalda LLM-anropet. Regel: ingen extern tjänst eller skrivning före första `CurrentUser`-uppslaget.
 Controller-tester som loggar in med `user(...)` utan riktig användarpost
 måste därför stubba `userRepository.findByUsername` (se

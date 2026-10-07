@@ -35,21 +35,16 @@ public class JpaConversationRepository implements ConversationRepository {
         return toDomain(conversationJpaRepository.save(entity));
     }
 
-    /** null owner = oscopeat (matcha oavsett ägare) - se WineRepository/ConversationRepository. */
     @Override
     public Optional<Conversation> findByIdAndOwner(ConversationId id, UserId owner) {
-        Optional<ConversationEntity> entity = owner == null
-                ? conversationJpaRepository.findById(id.value())
-                : conversationJpaRepository.findByIdAndOwnerId(id.value(), owner.value());
-        return entity.map(JpaConversationRepository::toDomain);
+        requireOwner(owner);
+        return conversationJpaRepository.findByIdAndOwnerId(id.value(), owner.value()).map(JpaConversationRepository::toDomain);
     }
 
     @Override
     public List<Conversation> findAllByOwner(UserId owner) {
-        List<ConversationEntity> entities = owner == null
-                ? conversationJpaRepository.findAll()
-                : conversationJpaRepository.findByOwnerIdOrderByCreatedAtDesc(owner.value());
-        return entities.stream()
+        requireOwner(owner);
+        return conversationJpaRepository.findByOwnerIdOrderByCreatedAtDesc(owner.value()).stream()
                 .map(JpaConversationRepository::toDomain)
                 .toList();
     }
@@ -63,9 +58,9 @@ public class JpaConversationRepository implements ConversationRepository {
     @Override
     @Transactional
     public void deleteByIdAndOwner(ConversationId id, UserId owner) {
-        Optional<ConversationEntity> entity = owner == null
-                ? conversationJpaRepository.findById(id.value())
-                : conversationJpaRepository.findByIdAndOwnerId(id.value(), owner.value());
+        requireOwner(owner);
+        Optional<ConversationEntity> entity =
+                conversationJpaRepository.findByIdAndOwnerId(id.value(), owner.value());
         if (entity.isPresent()) {
             chatMessageJpaRepository.deleteByConversationId(id.value());
             conversationJpaRepository.deleteById(id.value());
@@ -76,7 +71,7 @@ public class JpaConversationRepository implements ConversationRepository {
     @Override
     @Transactional
     public void deleteAllByOwner(UserId owner) {
-        Objects.requireNonNull(owner);
+        requireOwner(owner);
         for (ConversationEntity conversation : conversationJpaRepository.findByOwnerIdOrderByCreatedAtDesc(owner.value())) {
             chatMessageJpaRepository.deleteByConversationId(conversation.getId());
             conversationJpaRepository.delete(conversation);
@@ -85,9 +80,8 @@ public class JpaConversationRepository implements ConversationRepository {
 
     @Override
     public int countByOwner(UserId owner) {
-        return Math.toIntExact(owner == null
-                ? conversationJpaRepository.count()
-                : conversationJpaRepository.countByOwnerId(owner.value()));
+        requireOwner(owner);
+        return Math.toIntExact(conversationJpaRepository.countByOwnerId(owner.value()));
     }
 
     @Override
@@ -110,6 +104,10 @@ public class JpaConversationRepository implements ConversationRepository {
     @Override
     public int countMessages(ConversationId conversationId) {
         return Math.toIntExact(chatMessageJpaRepository.countByConversationId(conversationId.value()));
+    }
+
+    private static void requireOwner(UserId owner) {
+        Objects.requireNonNull(owner, "owner must not be null (WINE-64: fail-closed, null means NOT all users)");
     }
 
     /** Används av acceptanstesterna för att nollställa tillstånd mellan scenarier. */

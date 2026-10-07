@@ -28,18 +28,14 @@ public class JpaWineRepository implements WineRepository {
 
     @Override
     public List<Wine> findAllByOwner(UserId owner) {
-        List<WineEntity> entities = owner == null
-                ? jpaRepository.findAll()
-                : jpaRepository.findByOwnerId(owner.value());
-        return entities.stream().map(JpaWineRepository::toDomain).toList();
+        requireOwner(owner);
+        return jpaRepository.findByOwnerId(owner.value()).stream().map(JpaWineRepository::toDomain).toList();
     }
 
     @Override
     public Optional<Wine> findByIdAndOwner(WineId id, UserId owner) {
-        Optional<WineEntity> entity = owner == null
-                ? jpaRepository.findById(id.value())
-                : jpaRepository.findByIdAndOwnerId(id.value(), owner.value());
-        return entity.map(JpaWineRepository::toDomain);
+        requireOwner(owner);
+        return jpaRepository.findByIdAndOwnerId(id.value(), owner.value()).map(JpaWineRepository::toDomain);
     }
 
     @Override
@@ -54,15 +50,20 @@ public class JpaWineRepository implements WineRepository {
     @Override
     @Transactional
     public void deleteAllByOwner(UserId owner) {
-        Objects.requireNonNull(owner);
+        requireOwner(owner);
         jpaRepository.deleteAll(jpaRepository.findByOwnerId(owner.value()));
     }
 
     @Override
     public List<Wine> searchByOwner(String query, UserId owner) {
-        return jpaRepository.searchByOwner(query, owner == null ? null : owner.value()).stream()
+        requireOwner(owner);
+        return jpaRepository.searchByOwner(query, owner.value()).stream()
                 .map(JpaWineRepository::toDomain)
                 .toList();
+    }
+
+    private static void requireOwner(UserId owner) {
+        Objects.requireNonNull(owner, "owner must not be null (WINE-64: fail-closed, null means NOT all users)");
     }
 
     /** Används av acceptanstesterna för att nollställa tillstånd mellan scenarier. */

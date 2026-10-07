@@ -30,10 +30,8 @@ interface WineJpaRepository extends JpaRepository<WineEntity, Long> {
      * försöker hydrera owner-relationen från samma radresultat). Samma
      * fälla återkommer för varje framtida nytt mappat fält på WineEntity.
      *
-     * `:ownerId IS NULL OR owner_id = :ownerId` (WINE-13) - ett null
-     * ownerId betyder oscopeat, inte "matcha bara ägarlösa viner". Se
-     * WineRepository för null-konventionens (numera historiska)
-     * bakgrund i de borttagna admin/readonly-kontona.
+     * Ägarvillkoret är alltid obligatoriskt (WINE-64) - JpaWineRepository
+     * kastar redan innan anropet om owner är null.
      */
     @Query(value = """
             SELECT id, name, wine_type, producer, country, region, subregion, grapes, vintage,
@@ -43,7 +41,7 @@ interface WineJpaRepository extends JpaRepository<WineEntity, Long> {
                    owner_id
             FROM wines
             WHERE search_vector @@ plainto_tsquery('swedish_unaccent', :query)
-              AND (:ownerId IS NULL OR owner_id = :ownerId)
+              AND owner_id = :ownerId
             ORDER BY ts_rank(search_vector, plainto_tsquery('swedish_unaccent', :query)) DESC
             """, nativeQuery = true)
     List<WineEntity> searchByOwner(@Param("query") String query, @Param("ownerId") Long ownerId);

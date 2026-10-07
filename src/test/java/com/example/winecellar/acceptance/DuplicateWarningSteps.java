@@ -24,19 +24,19 @@ public class DuplicateWarningSteps {
 
     @Givet("att vinet {string} med producent {string} och årgång {int} finns med {int} flaskor")
     public void attVinetMedProducentOchÅrgångFinnsMedFlaskor(String name, String producer, int vintage, int bottles) {
-        wineService.save(Wine.builder()
+        wineService.save(Wine.builder().owner(StepSupport.OWNER)
                 .name(name).producer(producer).vintage(vintage).quantity(bottles)
                 .build());
     }
 
     @När("jag försöker lägga till ett vin med namn {string}, producent {string} och årgång {int}")
     public void jagFörsökerLäggaTillEttVinMedNamnProducentOchÅrgång(String name, String producer, int vintage) {
-        attempt(Wine.builder().name(name).producer(producer).vintage(vintage).build());
+        attempt(Wine.builder().owner(StepSupport.OWNER).name(name).producer(producer).vintage(vintage).build());
     }
 
     @När("jag försöker lägga till ett vin med bara namnet {string}")
     public void jagFörsökerLäggaTillEttVinMedBaraNamnet(String name) {
-        attempt(Wine.builder().name(name).build());
+        attempt(Wine.builder().owner(StepSupport.OWNER).name(name).build());
     }
 
     @När("jag ändrar årgången till {int} och försöker lägga till vinet igen")
@@ -45,7 +45,7 @@ public class DuplicateWarningSteps {
     }
 
     private void attempt(Wine candidate) {
-        lastCheck = wineService.checkForDuplicate(candidate, null);
+        lastCheck = wineService.checkForDuplicate(candidate, StepSupport.OWNER);
         if (lastCheck instanceof DuplicateCheck.NoDuplicate) {
             wineService.save(candidate);
             pendingCandidate = null;
@@ -82,7 +82,7 @@ public class DuplicateWarningSteps {
     }
 
     private void increaseQuantityOfMatch() {
-        wineService.increaseQuantity(existingFromLastCheck().id(), null);
+        wineService.increaseQuantity(existingFromLastCheck().id(), StepSupport.OWNER);
         pendingCandidate = null;
     }
 
@@ -109,11 +109,11 @@ public class DuplicateWarningSteps {
 
     @Så("källaren ska innehålla totalt {int} vin")
     public void skaKällarenInnehållaTotaltVin(int count) {
-        assertThat(wineService.listWines(null)).hasSize(count);
+        assertThat(wineService.listWines(StepSupport.OWNER)).hasSize(count);
     }
 
     @Så("källaren ska innehålla totalt {int} viner")
     public void skaKällarenInnehållaTotaltViner(int count) {
-        assertThat(wineService.listWines(null)).hasSize(count);
+        assertThat(wineService.listWines(StepSupport.OWNER)).hasSize(count);
     }
 }

@@ -32,7 +32,7 @@ public class EditWineSteps {
     @När("jag ökar antalet flaskor för {string} med {int}")
     public void jagÖkarAntaletFlaskorFörMed(String name, int amount) {
         Wine wine = StepSupport.findWine(wineService, name);
-        wineService.increaseQuantityBy(wine.id(), null, amount);
+        wineService.increaseQuantityBy(wine.id(), StepSupport.OWNER, amount);
     }
 
     @Så("ska vinet {string} visas med {int} flaskor")

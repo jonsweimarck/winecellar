@@ -1,6 +1,7 @@
 package com.example.winecellar.acceptance;
 
 import com.example.winecellar.application.WineService;
+import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.domain.WineType;
 
@@ -12,6 +13,9 @@ import com.example.winecellar.domain.WineType;
  */
 final class StepSupport {
 
+    /** WINE-64: repositoryna kastar vid null-ägare, så även de rena in-memory-scenarierna behöver en riktig ägare. */
+    static final UserId OWNER = new UserId(1L);
+
     private StepSupport() {
     }
 
@@ -22,12 +26,16 @@ final class StepSupport {
     static Wine wineWithNameAndQuantity(String name, int quantity) {
         return Wine.builder()
                 .name(name).wineType(WineType.RED).producer("Okänd producent").country("Okänt land")
-                .vintage(2020).quantity(quantity).location("Okänd plats")
+                .vintage(2020).quantity(quantity).location("Okänd plats").owner(OWNER)
                 .build();
     }
 
     static Wine findWine(WineService wineService, String name) {
-        return wineService.listWines(null).stream()
+        return findWine(wineService, OWNER, name);
+    }
+
+    static Wine findWine(WineService wineService, UserId owner, String name) {
+        return wineService.listWines(owner).stream()
                 .filter(wine -> wine.name().equals(name))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Inget vin med namnet " + name + " hittades"));

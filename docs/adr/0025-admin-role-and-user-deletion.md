@@ -43,7 +43,8 @@ konto med allt det äger.
   att uppslaget av den inloggade användaren är fail-closed: finns
   användaren inte i databasen nekas begäran och webbläsaren skickas till
   inloggningen, i stället för att tolkas som "ingen ägare" (vilket i
-  lagren under betyder "alla användares data"). Ovanpå det upphävs
+  lagren under tidigare betydde "alla användares data" - sedan WINE-64
+  kastar repositoryna i stället vid en saknad ägare, som djupförsvar). Ovanpå det upphävs
   pågående sessioner vid raderingen (ett register över sessioner) som ett
   extra skikt, och en "håll mig inloggad"-cookie slutar fungera eftersom
   användaren inte längre finns att slå upp.

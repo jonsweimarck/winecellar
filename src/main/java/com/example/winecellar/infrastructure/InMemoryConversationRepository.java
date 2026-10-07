@@ -37,15 +37,16 @@ public class InMemoryConversationRepository implements ConversationRepository {
         return toStore;
     }
 
-    /** null owner = oscopeat (matcha oavsett ägare) - se WineRepository/ConversationRepository. */
     @Override
     public Optional<Conversation> findByIdAndOwner(ConversationId id, UserId owner) {
+        requireOwner(owner);
         return Optional.ofNullable(conversations.get(id.value()))
                 .filter(conversation -> ownedBy(conversation, owner));
     }
 
     @Override
     public List<Conversation> findAllByOwner(UserId owner) {
+        requireOwner(owner);
         return conversations.values().stream()
                 .filter(conversation -> ownedBy(conversation, owner))
                 .sorted(Comparator.comparing(Conversation::createdAt).reversed())
@@ -53,7 +54,11 @@ public class InMemoryConversationRepository implements ConversationRepository {
     }
 
     private static boolean ownedBy(Conversation conversation, UserId owner) {
-        return owner == null || owner.equals(conversation.owner());
+        return owner.equals(conversation.owner());
+    }
+
+    private static void requireOwner(UserId owner) {
+        Objects.requireNonNull(owner, "owner must not be null (WINE-64: fail-closed, null means NOT all users)");
     }
 
     @Override
@@ -66,7 +71,7 @@ public class InMemoryConversationRepository implements ConversationRepository {
 
     @Override
     public void deleteAllByOwner(UserId owner) {
-        Objects.requireNonNull(owner);
+        requireOwner(owner);
         findAllByOwner(owner).forEach(conversation -> deleteByIdAndOwner(conversation.id(), owner));
     }
 
