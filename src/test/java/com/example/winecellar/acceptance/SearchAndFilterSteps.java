@@ -56,6 +56,7 @@ public class SearchAndFilterSteps {
     public void attKällarenInnehållerFöljandeViner(DataTable table) {
         for (Map<String, String> row : table.asMaps()) {
             Wine.Builder wine = Wine.builder()
+                    .owner(StepSupport.OWNER)
                     .name(row.get("namn"))
                     .wineType(wineTypeOrDefault(row))
                     .producer(stringOrDefault(row, "producent", "Okänd producent"))
@@ -99,12 +100,12 @@ public class SearchAndFilterSteps {
         result = wineService.search(SearchCriteria.builder()
                 .sortField(SortField.fromLabel(fieldLabel))
                 .sortDirection(direction)
-                .build(), null);
+                .build(), StepSupport.OWNER);
     }
 
     @När("jag visar vinlistan utan filter")
     public void jagVisarVinlistanUtanFilter() {
-        result = wineService.search(SearchCriteria.builder().build(), null);
+        result = wineService.search(SearchCriteria.builder().build(), StepSupport.OWNER);
     }
 
     @När("jag filtrerar vinlistan på:")
@@ -134,12 +135,12 @@ public class SearchAndFilterSteps {
         if (criteriaRow.containsKey("vinnamn")) {
             builder.names(new HashSet<>(commaList(criteriaRow.get("vinnamn"))));
         }
-        result = wineService.search(builder.build(), null);
+        result = wineService.search(builder.build(), StepSupport.OWNER);
     }
 
     @När("jag söker efter {string}")
     public void jagSökerEfter(String searchTerm) {
-        result = wineService.search(SearchCriteria.builder().searchTerm(searchTerm).build(), null);
+        result = wineService.search(SearchCriteria.builder().searchTerm(searchTerm).build(), StepSupport.OWNER);
     }
 
     @När("jag söker efter {string} och filtrerar vinlistan på:")
@@ -151,7 +152,7 @@ public class SearchAndFilterSteps {
                     .map(SearchAndFilterSteps::wineTypeFromSwedish)
                     .collect(Collectors.toSet()));
         }
-        result = wineService.search(builder.build(), null);
+        result = wineService.search(builder.build(), StepSupport.OWNER);
     }
 
     @Så("visas vinerna i ordningen {string}")

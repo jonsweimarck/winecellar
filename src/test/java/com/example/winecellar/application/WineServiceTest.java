@@ -1,5 +1,6 @@
 package com.example.winecellar.application;
 
+import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
 import com.example.winecellar.infrastructure.InMemoryWineRepository;
 import org.junit.jupiter.api.Test;
@@ -24,14 +25,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class WineServiceTest {
 
+    private static final UserId OWNER = new UserId(1L);
+
     @Test
     void namnfacettenSkaMatchaEttLagratVinnamnMedAvslutandeSkräpMellanslag() {
         WineService wineService = new WineService(new InMemoryWineRepository());
-        wineService.save(Wine.builder().name("Etna Bianco ").quantity(1).build());
-        wineService.save(Wine.builder().name("Chablis").quantity(1).build());
+        wineService.save(Wine.builder().owner(OWNER).name("Etna Bianco ").quantity(1).build());
+        wineService.save(Wine.builder().owner(OWNER).name("Chablis").quantity(1).build());
 
         List<Wine> result = wineService.search(
-                SearchCriteria.builder().names(Set.of("Etna Bianco")).build(), null);
+                SearchCriteria.builder().names(Set.of("Etna Bianco")).build(), OWNER);
 
         assertThat(result).extracting(wine -> wine.name().trim()).containsExactly("Etna Bianco");
     }
@@ -39,10 +42,10 @@ class WineServiceTest {
     @Test
     void namnfacettenSkaMatchaÄvenNärDetEfterfrågadeNamnetSjälvtHarOmgivandeMellanslag() {
         WineService wineService = new WineService(new InMemoryWineRepository());
-        wineService.save(Wine.builder().name("Etna Bianco").quantity(1).build());
+        wineService.save(Wine.builder().owner(OWNER).name("Etna Bianco").quantity(1).build());
 
         List<Wine> result = wineService.search(
-                SearchCriteria.builder().names(Set.of("  Etna Bianco  ")).build(), null);
+                SearchCriteria.builder().names(Set.of("  Etna Bianco  ")).build(), OWNER);
 
         assertThat(result).extracting(Wine::name).containsExactly("Etna Bianco");
     }

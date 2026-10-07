@@ -36,13 +36,14 @@ public class AddWineSteps {
 
     @Givet("att källaren är tom")
     public void attKällarenÄrTom() {
-        assertThat(wineService.listWines(null)).isEmpty();
+        assertThat(wineService.listWines(StepSupport.OWNER)).isEmpty();
     }
 
     @När("jag lägger till ett vin med följande uppgifter:")
     public void jagLäggerTillEttVinMedFöljandeUppgifter(DataTable dataTable) {
         Map<String, String> data = dataTable.asMap(String.class, String.class);
         Wine newWine = Wine.builder()
+                .owner(StepSupport.OWNER)
                 .name(data.get("namn"))
                 .wineType(wineTypeFromSwedish(data.get("typ")))
                 .producer(data.get("producent"))
@@ -61,12 +62,12 @@ public class AddWineSteps {
 
     @När("jag lägger till ett vin med bara namnet {string}")
     public void jagLäggerTillEttVinMedBaraNamnet(String name) {
-        wineService.save(Wine.builder().name(name).build());
+        wineService.save(Wine.builder().name(name).owner(StepSupport.OWNER).build());
     }
 
     @Så("ska källaren innehålla {int} vin")
     public void skaKällarenInnehålla(int count) {
-        assertThat(wineService.listWines(null)).hasSize(count);
+        assertThat(wineService.listWines(StepSupport.OWNER)).hasSize(count);
     }
 
     @Och("vinet {string} ska visas med {int} flaskor i {string}")

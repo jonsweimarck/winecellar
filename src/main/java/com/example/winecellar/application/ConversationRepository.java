@@ -14,7 +14,7 @@ import java.util.Optional;
  * en konversation och aldrig ändras/hämtas fristående (samma princip som
  * `Wine`s bild ligger i samma rad snarare än en egen tabell, se
  * ADR 0004, fast för en förälder/barn-relation istället för ett fält).
- * Ägarskap scopas på samma sätt som {@link WineRepository}.
+ * Ägarskap scopas på samma sätt som {@link WineRepository} - null-owner kastar (WINE-64).
  */
 public interface ConversationRepository {
 
@@ -30,8 +30,7 @@ public interface ConversationRepository {
 
     /**
      * WINE-61 (radering av en användare): tar bort ALLA ägarens konversationer
-     * med meddelanden. {@code owner} får INTE vara null här (till skillnad från
-     * de läsande metoderna betyder null inte "oscopeat" - det hade raderat allas).
+     * med meddelanden. {@code owner} får inte vara null (gäller alla owner-metoder, WINE-64).
      */
     void deleteAllByOwner(UserId owner);
 

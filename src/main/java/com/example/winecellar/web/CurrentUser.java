@@ -11,9 +11,9 @@ import org.springframework.security.core.Authentication;
  * användaren inte (längre) i databasen - t.ex. ett konto som raderats av en
  * admin medan hens session lever kvar - kastas ett autentiseringsfel, som
  * Spring Security översätter till en omdirigering till /login. Det får
- * ALDRIG falla tillbaka på `null`: ett `null`-ägarargument betyder
- * "oscopeat" i repository-/servicelagret (se WineRepository) och hade gett
- * åtkomst till ALLA användares viner.
+ * ALDRIG falla tillbaka på `null`: ett `null`-ägarargument kastar
+ * numera i repository-lagret (WINE-64, djupförsvar), men en tyst null
+ * härifrån vore ändå ett fel.
  */
 final class CurrentUser {
 

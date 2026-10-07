@@ -91,7 +91,7 @@ class WineListResponsiveIT extends SharedPostgres {
 
     @AfterEach
     void tömKällaren() {
-        wineService.listWines(null).forEach(vin -> wineService.removeWine(vin.id(), null));
+        wineService.listWines(testkontoId).forEach(vin -> wineService.removeWine(vin.id(), testkontoId));
     }
 
     @Test

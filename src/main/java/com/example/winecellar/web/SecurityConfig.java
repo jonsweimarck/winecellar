@@ -45,7 +45,7 @@ import java.util.List;
  * övriga rutter kräver bara inloggning och varje användares vinlista är
  * fortsatt privat. De ~30 vinerna som fanns innan `owner_id`
  * (WINE-10) migrerades till ett riktigt konto i WINE-17 innan det här
- * kunde göras säkert - annars hade admin-kontots oscopeade vy försvunnit
+ * kunde göras säkert - annars hade de gamla hårdkodade kontonas vy försvunnit
  * innan någon annan väg in till samma data fanns.
  *
  * **"Håll mig inloggad" (WINE-40, se ADR 0020) använder Spring Securitys

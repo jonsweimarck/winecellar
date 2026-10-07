@@ -51,13 +51,9 @@ import java.util.TreeSet;
 public record Wine(
         WineId id,
         /**
-         * WINE-13: vinets ägare. Java-typen är fortfarande nullable
-         * (`WineService`/`WineRepository` tolkar `null` som "oscopeat",
-         * inte som "ägs av ingen") - men sedan WINE-15/WINE-17 har alla
-         * rader i databasen faktiskt en ägare (`owner_id` är `NOT NULL`
-         * i schema.sql), eftersom de enda kontona som tidigare kunde
-         * lämna ett vin utan ägare (de hårdkodade admin/readonly-kontona)
-         * är borttagna. Se CLAUDE.md.
+         * WINE-13: vinets ägare. Null är ogiltigt för ett sparat vin: `owner_id`
+         * är `NOT NULL` i schema.sql och databasen avvisar null (och in-memory-adaptern kastar)
+         * (WINE-64). Se CLAUDE.md.
          */
         UserId owner,
         String name,

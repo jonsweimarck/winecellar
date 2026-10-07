@@ -30,7 +30,7 @@ public class ListWinesSteps {
 
     @När("jag visar vinlistan")
     public void jagVisarVinlistan() {
-        shownList = wineService.listWines(null);
+        shownList = wineService.listWines(StepSupport.OWNER);
     }
 
     @Så("ska listan innehålla {string} och {string}")

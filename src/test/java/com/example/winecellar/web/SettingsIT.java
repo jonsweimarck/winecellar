@@ -71,13 +71,14 @@ class SettingsIT extends SharedPostgres {
     }
 
     /**
-     * `wineService.listWines(null)` returnerar SAMTLIGA viner, oavsett
-     * ägare (se CLAUDE.md) - samma städmönster som `WineListResponsiveIT`
-     * använder, eftersom alla IT-klasser delar en Postgres-container.
+     * Städar bara testkontots egna viner (WINE-64: ett null-ägarargument kastar numera).
+     * Samma städmönster som `WineListResponsiveIT`, eftersom alla IT-klasser
+     * delar en Postgres-container.
      */
     @AfterEach
     void tömKällaren() {
-        wineService.listWines(null).forEach(vin -> wineService.removeWine(vin.id(), null));
+        userRepository.findByUsername(TESTKONTO_ANVÄNDARNAMN).map(com.example.winecellar.domain.User::id).ifPresent(owner ->
+                wineService.listWines(owner).forEach(vin -> wineService.removeWine(vin.id(), owner)));
     }
 
     @Test

@@ -149,7 +149,7 @@ public class PersistenceSteps {
 
     @Så("ska vinet {string} fortfarande ha vintypen {string}")
     public void skaVinetFortfarandeHaVintypen(String name, String type) {
-        assertThat(StepSupport.findWine(wineService, name).wineType()).isEqualTo(WineType.valueOf(type));
+        assertThat(StepSupport.findWine(wineService, ägare, name).wineType()).isEqualTo(WineType.valueOf(type));
     }
 
     @När("applikationen startas om")
@@ -159,22 +159,22 @@ public class PersistenceSteps {
 
     @När("jag söker efter {string} mot databasen")
     public void jagSökerEfterMotDatabasen(String sökord) {
-        sökresultat = wineRepository.searchByOwner(sökord, null);
+        sökresultat = wineRepository.searchByOwner(sökord, ägare);
     }
 
     @Så("ska vinet {string} fortfarande finnas i källaren")
     public void skaVinetFortfarandeFinnasIKällaren(String name) {
-        assertThat(wineService.listWines(null)).anySatisfy(wine -> assertThat(wine.name()).isEqualTo(name));
+        assertThat(wineService.listWines(ägare)).anySatisfy(wine -> assertThat(wine.name()).isEqualTo(name));
     }
 
     @Så("ska vinet {string} fortfarande ha eget betyg {string}")
     public void skaVinetFortfarandeHaEgetBetyg(String name, String ownRating) {
-        assertThat(StepSupport.findWine(wineService, name).ownRating()).isEqualTo(ownRating);
+        assertThat(StepSupport.findWine(wineService, ägare, name).ownRating()).isEqualTo(ownRating);
     }
 
     @Så("ska vinet {string} fortfarande ha taggarna {string}")
     public void skaVinetFortfarandeHaTaggarna(String name, String tags) {
-        assertThat(StepSupport.findWine(wineService, name).tags())
+        assertThat(StepSupport.findWine(wineService, ägare, name).tags())
                 .containsExactlyInAnyOrder(tags.split(",\\s*"));
     }
 
