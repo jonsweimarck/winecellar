@@ -3,6 +3,7 @@ package com.example.winecellar.application;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,14 @@ public interface UserRepository {
 
     /** WINE-61: adminsidans lista över alla användare. */
     List<User> findAll();
+
+    /**
+     * WINE-62: sätter BARA senaste inloggningstidpunkt (riktad uppdatering,
+     * inte läs-ändra-spara av hela User - annars kunde samtidiga
+     * inställningsändringar eller adminflaggan skrivas över). No-op om
+     * användaren inte finns.
+     */
+    void updateLastLogin(UserId id, Instant at);
 
     /** WINE-61: scopas inte - anropande kod (AdminService) kontrollerar behörigheten. */
     void deleteById(UserId id);

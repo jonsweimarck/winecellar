@@ -66,7 +66,7 @@ public class AdminSteps {
         registerUser(username);
         User user = userRepository.findByUsername(username).orElseThrow();
         userRepository.save(new User(user.id(), user.username(), user.hashedPassword(), user.createdAt(),
-                user.defaultMinQuantityFilter(), user.ownRatingFromScale(), true));
+                user.defaultMinQuantityFilter(), user.ownRatingFromScale(), true, user.lastLoginAt()));
     }
 
     @Och("att {string} är en vanlig användare")

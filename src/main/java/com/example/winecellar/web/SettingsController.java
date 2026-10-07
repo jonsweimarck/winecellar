@@ -70,7 +70,7 @@ public class SettingsController {
         User user = CurrentUser.find(authentication, userRepository);
         userRepository.save(new User(
                 user.id(), user.username(), user.hashedPassword(), user.createdAt(),
-                value, user.ownRatingFromScale(), user.admin()));
+                value, user.ownRatingFromScale(), user.admin(), user.lastLoginAt()));
         redirectAttributes.addFlashAttribute("feedback", "Standardfilter sparat");
         return "redirect:/installningar";
     }
@@ -90,7 +90,7 @@ public class SettingsController {
         User user = CurrentUser.find(authentication, userRepository);
         userRepository.save(new User(
                 user.id(), user.username(), user.hashedPassword(), user.createdAt(),
-                user.defaultMinQuantityFilter(), value, user.admin()));
+                user.defaultMinQuantityFilter(), value, user.admin(), user.lastLoginAt()));
         redirectAttributes.addFlashAttribute("feedback", "Inställning sparad");
         return "redirect:/installningar";
     }

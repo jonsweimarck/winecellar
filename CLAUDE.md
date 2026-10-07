@@ -893,6 +893,8 @@ kontra enstaka strukturerad extraktion).
 
 ## Flera användare - nuläge
 
+**Senaste login (WINE-62).** `User.lastLoginAt` (`users.last_login_at`, nullable i `UserEntity`, NOT NULL DEFAULT now() i `schema.sql` efter backfill av befintliga rader till now(); fristående `db/migrations/2026-10-08-add-user-last-login-at.sql`). Sätts av `LastLoginRecorder` (`web`, lyssnar på `InteractiveAuthenticationSuccessEvent` - publiceras av både formulärinloggning och remember-me-återinloggning, INTE av registreringens manuella auto-inloggning; där sätts värdet till `createdAt` i `RegistrationService`). Uppdateras via den riktade `UserRepository.updateLastLogin` (aldrig läs-ändra-spara), fel fångas och loggas så en inloggning aldrig fälls. Fällor: varje kopia av en `User` (`SettingsController`, `AdminService`, InMemory-repot) måste bära vidare fältet; `LastLoginRecorder` är en `@Component` som `@WebMvcTest` inte laddar - `@Import` den (se `LastLoginRecorderTest`). Adminsidan visar "Skapad"/"Senaste login" som `yyyy-MM-dd HH:mm` i UTC (formateras i `AdminUserView`, inte lokal tid), rubrikerna säger "(UTC)". Remember-me kan inte testas i Cucumber-kontexten (ingen nyckel konfigurerad) - täcks av `LastLoginRecorderTest`.
+
 **Admin (WINE-61, se [ADR 0025](docs/adr/0025-admin-role-and-user-deletion.md)).**
 `User.admin` (`users.is_admin`, nullable i `UserEntity` + skärpt till NOT
 NULL DEFAULT false i `schema.sql`, samma mönster som
@@ -927,7 +929,7 @@ anropsplatser får aldrig själva falla tillbaka på null.
 Settings-POST-vägarna använder numera `CurrentUser.find` (fail-closed, WINE-63; `FailClosedRoutesTest`), och `WineController.interpretLabel` slår upp användaren FÖRE det betalda LLM-anropet. Regel: ingen extern tjänst eller skrivning före första `CurrentUser`-uppslaget.
 Controller-tester som loggar in med `user(...)` utan riktig användarpost
 måste därför stubba `userRepository.findByUsername` (se
-`defaultUserForAnyPrincipal` i `WineControllerTest`). **Fällor:** (1) `new User(...)` har nu sju komponenter - varje kod
+`defaultUserForAnyPrincipal` i `WineControllerTest`). **Fällor:** (1) `new User(...)` har nu åtta komponenter (sist `lastLoginAt`, WINE-62) - varje kod
 som kopierar en användare (t.ex. `SettingsController`) måste bära vidare
 `admin`, annars degraderas kontot tyst vid nästa sparning. (2) Rättigheter
 läses in vid inloggning (sessionen), så "Gör till admin" syns i menyn först

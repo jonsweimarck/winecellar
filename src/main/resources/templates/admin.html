@@ -13,6 +13,7 @@
         .anvandarnamn { flex: 1; min-width: 8rem; overflow-wrap: anywhere; }
         .adminmarke { margin-left: 0.5rem; font-size: 0.75rem; color: var(--text-dampad); }
         .anvandarrad form { margin: 0; }
+        .tider { display: flex; flex-direction: column; font-size: 0.8rem; color: var(--text-dampad); }
         dialog p { margin: 0 0 1rem; }
     </style>
 </head>
@@ -32,12 +33,16 @@
                 <span th:text="${u.username}"></span>
                 <span class="adminmarke" th:if="${u.admin}">Admin</span>
             </span>
+            <span class="tider">
+                <span>Skapad (UTC): <time class="skapad" th:text="${u.createdAt}"></time></span>
+                <span>Senaste login (UTC): <time class="senaste-login" th:text="${u.lastLoginAt}"></time></span>
+            </span>
             <form method="post" th:action="@{/admin/gor-till-admin}" th:unless="${u.admin}">
-                <input type="hidden" name="userId" th:value="${u.id.value}">
+                <input type="hidden" name="userId" th:value="${u.id}">
                 <button type="submit" class="knapp-sekundar">Gör till admin</button>
             </form>
-            <button type="button" class="knapp-farlig oppna-radera-dialog" th:unless="${u.id.value == currentUserId}"
-                    th:data-user-id="${u.id.value}" th:data-username="${u.username}">Radera</button>
+            <button type="button" class="knapp-farlig oppna-radera-dialog" th:unless="${u.id == currentUserId}"
+                    th:data-user-id="${u.id}" th:data-username="${u.username}">Radera</button>
         </div>
     </div>
 

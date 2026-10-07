@@ -61,6 +61,14 @@ public class UserEntity {
     @Column(name = "is_admin")
     private Boolean admin;
 
+    /**
+     * WINE-62: senaste lyckade inloggning. Medvetet UTAN `nullable = false`,
+     * samma mönster/skäl som `admin` ovan - kolumnen skärps till NOT NULL
+     * (backfill av befintliga rader till now()) i schema.sql i stället.
+     */
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
     protected UserEntity() {
     }
 
@@ -118,5 +126,13 @@ public class UserEntity {
 
     void setAdmin(Boolean admin) {
         this.admin = admin;
+    }
+
+    Instant getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    void setLastLoginAt(Instant lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
     }
 }

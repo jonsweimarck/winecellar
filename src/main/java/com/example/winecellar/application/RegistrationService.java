@@ -27,8 +27,11 @@ public class RegistrationService {
         if (userRepository.findByUsername(username).isPresent()) {
             return new RegistrationResult.UsernameTaken();
         }
+        // Auto-inloggningen direkt efter registrering publicerar ingen
+        // inloggningshändelse - senaste login = skapad vid registrering.
+        Instant now = Instant.now();
         User user = userRepository.save(
-                new User(null, username, passwordEncoder.encode(password), Instant.now(), 1, false, false));
+                new User(null, username, passwordEncoder.encode(password), now, 1, false, false, now));
         return new RegistrationResult.Registered(user);
     }
 }

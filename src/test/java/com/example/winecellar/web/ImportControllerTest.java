@@ -99,7 +99,7 @@ class ImportControllerTest {
     @BeforeEach
     void stubbaInloggadAnvändare() {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false, false, Instant.now())));
     }
 
     private void stubbaDubblettkontroll() {
