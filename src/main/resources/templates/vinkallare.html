@@ -455,6 +455,7 @@
                     <label class="kryssrad"><input type="checkbox" name="wineType" value="RED" th:checked="${selectedWineTypes.contains('RED')}"> Rött</label>
                     <label class="kryssrad"><input type="checkbox" name="wineType" value="WHITE" th:checked="${selectedWineTypes.contains('WHITE')}"> Vitt</label>
                     <label class="kryssrad"><input type="checkbox" name="wineType" value="ROSE" th:checked="${selectedWineTypes.contains('ROSE')}"> Rosé</label>
+                    <label class="kryssrad"><input type="checkbox" name="wineType" value="ORANGE" th:checked="${selectedWineTypes.contains('ORANGE')}"> Orange</label>
                     <label class="kryssrad"><input type="checkbox" name="wineType" value="SPARKLING" th:checked="${selectedWineTypes.contains('SPARKLING')}"> Mousserande</label>
                     <label class="kryssrad"><input type="checkbox" name="wineType" value="FORTIFIED" th:checked="${selectedWineTypes.contains('FORTIFIED')}"> Starkvin</label>
                 </fieldset>
@@ -630,7 +631,7 @@
                             <span th:if="${vin.region != null}" th:text="${vin.region}"></span>
                             <span th:if="${vin.subregion != null}" th:text="${vin.subregion}"></span>
                         </p>
-                        <p class="vk-typ" th:if="${vin.wineType != null}">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
+                        <p class="vk-typ" th:if="${vin.wineType != null}">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'ORANGE'">Orange</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
                         <p th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
                         <div class="chips" th:if="${!vin.tags.isEmpty()}">
                             <span class="chip" th:each="t : ${vin.tags}" th:text="${t}"></span>
@@ -723,7 +724,7 @@
                             <span th:if="${vin.region != null}" th:text="${vin.region}"></span>
                             <span th:if="${vin.subregion != null}" th:text="${vin.subregion}"></span>
                         </p>
-                        <p class="vinkort-typ" th:if="${vin.wineType != null}">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
+                        <p class="vinkort-typ" th:if="${vin.wineType != null}">(<span th:switch="${vin.wineType.name()}"><span th:case="'RED'">Rött</span><span th:case="'WHITE'">Vitt</span><span th:case="'ROSE'">Rosé</span><span th:case="'ORANGE'">Orange</span><span th:case="'SPARKLING'">Mousserande</span><span th:case="'FORTIFIED'">Starkvin</span></span>)</p>
                         <p class="vinkort-druvor" th:if="${vin.grapes != null}" th:text="${vin.grapes}"></p>
                         <div class="chips" th:if="${!vin.tags.isEmpty()}">
                             <span class="chip" th:each="t : ${vin.tags}" th:text="${t}"></span>

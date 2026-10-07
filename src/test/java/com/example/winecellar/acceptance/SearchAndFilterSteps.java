@@ -39,6 +39,7 @@ public class SearchAndFilterSteps {
             "Rött", WineType.RED,
             "Vitt", WineType.WHITE,
             "Rosé", WineType.ROSE,
+            "Orange", WineType.ORANGE,
             "Mousserande", WineType.SPARKLING,
             "Starkvin", WineType.FORTIFIED
     );

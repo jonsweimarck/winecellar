@@ -69,7 +69,7 @@ class WineRowWriterTest {
     }
 
     @Test
-    void skaÅterläsaAllaFemVintyperKorrekt() {
+    void skaÅterläsaAllaVintyperInklusiveOrangeKorrekt() {
         for (WineType type : WineType.values()) {
             Wine original = minimalWine().toBuilder().wineType(type).build();
 

@@ -114,7 +114,7 @@ dem:
 
 ## Domänmodell - nuläge
 
-- **`WineType`** (enum: RED, WHITE, ROSE, SPARKLING, FORTIFIED) och
+- **`WineType`** (enum: RED, WHITE, ROSE, ORANGE, SPARKLING, FORTIFIED) och
   **`Rating`** (`domain/Rating.java`, enum med exakt de 29 värdena från
   källfilens `Listor`-flik) är medvetet begränsade till fasta, slutna
   mängder - både som Java-enum och som Hibernate-genererad

@@ -257,3 +257,10 @@ CREATE TABLE IF NOT EXISTS wine_tags (
     tag text NOT NULL
 );;
 CREATE INDEX IF NOT EXISTS wine_tags_wine_id_idx ON wine_tags (wine_id);;
+
+-- WINE-57: Orange som ny vintyp. Hibernates ddl-auto: update uppdaterar inte
+-- en redan existerande CHECK-constraint, så den byts här explicit.
+-- Idempotent: drop IF EXISTS + add vid varje appstart (se även
+-- db/migrations/2026-10-07-add-orange-wine-type.sql).
+ALTER TABLE wines DROP CONSTRAINT IF EXISTS wines_wine_type_check;;
+ALTER TABLE wines ADD CONSTRAINT wines_wine_type_check CHECK (wine_type IN ('RED', 'WHITE', 'ROSE', 'ORANGE', 'SPARKLING', 'FORTIFIED'));;

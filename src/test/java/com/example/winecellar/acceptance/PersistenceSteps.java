@@ -7,6 +7,7 @@ import com.example.winecellar.domain.ChatMessage;
 import com.example.winecellar.domain.Conversation;
 import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
+import com.example.winecellar.domain.WineType;
 import com.example.winecellar.infrastructure.JpaConversationRepository;
 import com.example.winecellar.infrastructure.JpaWineRepository;
 import io.cucumber.java.Before;
@@ -137,6 +138,18 @@ public class PersistenceSteps {
         wineService.save(StepSupport.wineWithName(name).toBuilder()
                 .tags(new HashSet<>(List.of(tags.split(",\\s*"))))
                 .owner(ägare).build());
+    }
+
+    @Givet("att vinet {string} av vintypen {string} är sparat i källaren")
+    public void attVinetAvVintypenÄrSparatIKällaren(String name, String type) {
+        wineService.save(StepSupport.wineWithName(name).toBuilder()
+                .wineType(WineType.valueOf(type))
+                .owner(ägare).build());
+    }
+
+    @Så("ska vinet {string} fortfarande ha vintypen {string}")
+    public void skaVinetFortfarandeHaVintypen(String name, String type) {
+        assertThat(StepSupport.findWine(wineService, name).wineType()).isEqualTo(WineType.valueOf(type));
     }
 
     @När("applikationen startas om")

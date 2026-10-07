@@ -769,6 +769,7 @@ class WineControllerTest {
                             containsString("name=\"wineType\" value=\"RED\""),
                             containsString("name=\"wineType\" value=\"WHITE\""),
                             containsString("name=\"wineType\" value=\"ROSE\""),
+                            containsString("name=\"wineType\" value=\"ORANGE\""),
                             containsString("name=\"wineType\" value=\"SPARKLING\""),
                             containsString("name=\"wineType\" value=\"FORTIFIED\""),
                             containsString("Rött"),

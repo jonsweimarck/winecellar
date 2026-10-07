@@ -49,7 +49,7 @@ Tabell `wines`:
 |---|---|---|
 | id | `bigserial` PK | |
 | owner_id | `bigint` FK → `users.id`, **NOT NULL** | Se "Flera användare" nedan |
-| wine_type | `text` + `CHECK`, nullable | Enum: RED, WHITE, ROSE, SPARKLING, FORTIFIED |
+| wine_type | `text` + `CHECK`, nullable | Enum: RED, WHITE, ROSE, ORANGE, SPARKLING, FORTIFIED |
 | country | `text`, nullable | |
 | region | `text`, nullable | |
 | subregion | `text`, nullable | |

@@ -14,6 +14,16 @@ Egenskap: Filtrera vinlistan
     Så ska vinlistan innehålla "Barolo"
     Och vinlistan ska inte innehålla "Chablis"
 
+  Scenario: Filtrera på vintypen Orange
+    Givet att källaren innehåller följande viner:
+      | namn         | vintyp |
+      | Skinnkontakt | Orange |
+      | Barolo       | Rött   |
+    När jag filtrerar vinlistan på:
+      | vintyp | Orange |
+    Så ska vinlistan innehålla "Skinnkontakt"
+    Och vinlistan ska inte innehålla "Barolo"
+
   Scenario: Flera valda vintyper är en "eller"-filtrering inom samma facett
     Givet att källaren innehåller följande viner:
       | namn      | vintyp      |

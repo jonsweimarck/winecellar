@@ -50,6 +50,7 @@ public final class WineRowWriter {
             WineType.RED, "Rött",
             WineType.WHITE, "Vitt",
             WineType.ROSE, "Rosé",
+            WineType.ORANGE, "Orange",
             WineType.SPARKLING, "Mousserande",
             WineType.FORTIFIED, "Starkvin"
     );
