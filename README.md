@@ -285,7 +285,8 @@ Adminlistan visar också när varje konto skapades och när det senast loggade
 in (`users.last_login_at`, WINE-62), i formatet `yyyy-MM-dd HH:mm` i **UTC**
 (inte svensk tid; kolumnetiketterna säger "(UTC)"), utan sekunder. Befintliga
 konton fick migreringstidpunkten som senaste login
-(`db/migrations/2026-10-08-add-user-last-login-at.sql`).
+(`db/migrations/2026-10-08-add-user-last-login-at.sql`). Konton som fanns före
+WINE-62 har migreringstidpunkten som senaste login tills de loggar in igen.
 
 Inloggningssidan har en "håll mig inloggad"-kryssruta (hash-baserad
 remember-me, se [ADR 0020](docs/adr/0020-remember-me-hash-based.md)) -

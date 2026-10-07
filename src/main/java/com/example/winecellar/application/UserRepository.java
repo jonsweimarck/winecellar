@@ -23,10 +23,12 @@ public interface UserRepository {
     List<User> findAll();
 
     /**
-     * WINE-62: sätter BARA senaste inloggningstidpunkt (riktad uppdatering,
-     * inte läs-ändra-spara av hela User - annars kunde samtidiga
-     * inställningsändringar eller adminflaggan skrivas över). No-op om
-     * användaren inte finns.
+     * WINE-62: sätter BARA senaste inloggningstidpunkt via en egen riktad
+     * skrivning, så att den inte skriver över t.ex. inställningar eller
+     * adminflaggan. Ett mycket snävt race finns åt andra hållet:
+     * SettingsController/AdminService.makeAdmin läser och sparar hela User och
+     * kan i teorin ge ett något äldre värde - nästa inloggning rättar det.
+     * No-op om användaren inte finns.
      */
     void updateLastLogin(UserId id, Instant at);
 

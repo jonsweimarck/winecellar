@@ -893,7 +893,22 @@ kontra enstaka strukturerad extraktion).
 
 ## Flera användare - nuläge
 
-**Senaste login (WINE-62).** `User.lastLoginAt` (`users.last_login_at`, nullable i `UserEntity`, NOT NULL DEFAULT now() i `schema.sql` efter backfill av befintliga rader till now(); fristående `db/migrations/2026-10-08-add-user-last-login-at.sql`). Sätts av `LastLoginRecorder` (`web`, lyssnar på `InteractiveAuthenticationSuccessEvent` - publiceras av både formulärinloggning och remember-me-återinloggning, INTE av registreringens manuella auto-inloggning; där sätts värdet till `createdAt` i `RegistrationService`). Uppdateras via den riktade `UserRepository.updateLastLogin` (aldrig läs-ändra-spara), fel fångas och loggas så en inloggning aldrig fälls. Fällor: varje kopia av en `User` (`SettingsController`, `AdminService`, InMemory-repot) måste bära vidare fältet; `LastLoginRecorder` är en `@Component` som `@WebMvcTest` inte laddar - `@Import` den (se `LastLoginRecorderTest`). Adminsidan visar "Skapad"/"Senaste login" som `yyyy-MM-dd HH:mm` i UTC (formateras i `AdminUserView`, inte lokal tid), rubrikerna säger "(UTC)". Remember-me kan inte testas i Cucumber-kontexten (ingen nyckel konfigurerad) - täcks av `LastLoginRecorderTest`.
+**Senaste login (WINE-62).** `User.lastLoginAt` = `users.last_login_at`
+(nullable i `UserEntity`, NOT NULL DEFAULT now() i `schema.sql` efter backfill;
+fristående `db/migrations/2026-10-08-add-user-last-login-at.sql`).
+- Sätts av `LastLoginRecorder` (`web`) på `InteractiveAuthenticationSuccessEvent`:
+  publiceras vid formulär- OCH remember-me-inloggning, INTE vid registreringens
+  manuella auto-inloggning (där sätts värdet till `createdAt` i `RegistrationService`).
+- Skrivs via riktade `UserRepository.updateLastLogin`; fel fångas och loggas,
+  en inloggning fälls aldrig. Snävt race: `SettingsController`/
+  `AdminService.makeAdmin` läser och sparar hela `User` och kan i teorin ge ett
+  något äldre värde - nästa inloggning rättar det.
+- Fällor: varje kopia av en `User` måste bära vidare fältet;
+  `LastLoginRecorder` är en `@Component` som `@WebMvcTest` inte laddar - `@Import`
+  den (`LastLoginRecorderTest`, som också täcker remember-me; Cucumber-kontexten
+  saknar remember-me-nyckel).
+- Adminsidan visar Skapad/Senaste login som `yyyy-MM-dd HH:mm` i UTC
+  (`AdminUserView`), rubrikerna säger "(UTC)".
 
 **Admin (WINE-61, se [ADR 0025](docs/adr/0025-admin-role-and-user-deletion.md)).**
 `User.admin` (`users.is_admin`, nullable i `UserEntity` + skärpt till NOT

@@ -32,9 +32,12 @@ import java.time.Instant;
  *
  * `lastLoginAt` (WINE-62) är tidpunkten för senaste lyckade inloggning
  * (formulärinloggning eller remember-me-återinloggning). Sätts till
- * `createdAt` vid registrering och uppdateras sedan bara via
- * `UserRepository.updateLastLogin` - aldrig genom att läsa-ändra-spara en
- * hel User. Varje kod som kopierar en User måste bära vidare fältet.
+ * `createdAt` vid registrering och uppdateras sedan via en egen riktad
+ * skrivning (`UserRepository.updateLastLogin`) som inte ska skrivas över av
+ * normal läs-ändra-spara. Ett mycket snävt race (SettingsController/
+ * AdminService.makeAdmin läser och sparar hela User) kan i teorin ge ett
+ * något äldre värde - nästa inloggning rättar det. Varje kod som kopierar en
+ * User måste bära vidare fältet.
  */
 public record User(
         UserId id,
@@ -44,7 +47,7 @@ public record User(
         int defaultMinQuantityFilter,
         boolean ownRatingFromScale,
         boolean admin,
-    Instant lastLoginAt
+        Instant lastLoginAt
 ) {
 
     public record UserId(Long value) {

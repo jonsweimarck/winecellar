@@ -5,7 +5,7 @@ Egenskap: Senaste inloggning
 
   # Körs mot en riktig Postgres (Testcontainers) och den riktiga
   # säkerhetskedjan (POST /login) - inte InMemory-dubbletter. Remember-me-
-  # återinloggning testas i AdminControllerTest (kräver en konfigurerad nyckel).
+  # återinloggning testas i LastLoginRecorderTest (kräver en konfigurerad nyckel).
 
   Scenario: Ett nytt konto har senaste login satt från början
     Givet att ett konto med användarnamnet "nyanvandare" redan finns
