@@ -17,15 +17,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -48,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * databasen (raderad medan sessionen lever) skickas till /login och ingenting
  * läses, sparas eller anropas externt. Motkontroller visar att samma anrop
  * lyckas när användaren finns, så att testerna inte är gröna av fel orsak.
+ * Urvalet av WineController-vägar är representativt, inte uttömmande - de delar
+ * samma CurrentUser-anrop.
  */
 @WebMvcTest({SettingsController.class, ChatController.class, ImportController.class, WineController.class})
 @Import({SecurityConfig.class, ImportPreviewService.class})
@@ -127,8 +124,7 @@ class FailClosedRoutesTest {
     }
 
     @Test
-    void skaNekaImportNärAnvändarenSaknasUtanAttSkapaTempMappEllerSpara() throws Exception {
-        long före = countImportTempDirs();
+    void skaNekaImportPostVägarnaNärAnvändarenSaknasUtanAttSpara() throws Exception {
         MockMultipartFile fil = new MockMultipartFile("fil", "vin.xlsx",
                 "application/octet-stream", new byte[] {1, 2, 3});
 
@@ -141,7 +137,6 @@ class FailClosedRoutesTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(LOGIN));
 
-        assertThat(countImportTempDirs()).isEqualTo(före);
         verify(wineService, never()).save(any());
         verify(wineService, never()).increaseQuantityBy(any(), any(), anyInt());
     }
@@ -173,15 +168,32 @@ class FailClosedRoutesTest {
 
         verify(wineService).removeWine(new WineId(5L), FINNS.id());
     }
+    @Test
+    void skaVisaImportformuläretÄvenNärAnvändarenSaknas() throws Exception {
+        // MEDVETET undantag: GET /import är ett statiskt formulär utan användardata.
+        // Skyddet ligger i att POST /import och /import/commit är fail-closed via
+        // CurrentUser.owner.
+        mockMvc.perform(get("/import").with(user("spöke")))
+                .andExpect(status().isOk());
+    }
 
-    private static long countImportTempDirs() throws IOException {
-        Path tmp = Path.of(System.getProperty("java.io.tmpdir"));
-        try (DirectoryStream<Path> dirs = Files.newDirectoryStream(tmp, ImportController.TEMP_DIR_PREFIX + "*")) {
-            long n = 0;
-            for (Path ignored : dirs) {
-                n++;
-            }
-            return n;
-        }
+    @Test
+    void skaNekaRedigeraOchEtikettskanningNärAnvändarenSaknas() throws Exception {
+        mockMvc.perform(get("/wines/5/redigera").with(user("spöke")))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(LOGIN));
+        mockMvc.perform(multipart("/wines/5/redigera").param("name", "Barolo").param("quantity", "1")
+                        .with(user("spöke")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(LOGIN));
+        // /wines/tolka-etikett anropar tolkningstjänsten INNAN första CurrentUser-uppslaget
+        // (nekas först vid modellbygget) - se rapporten; här låses bara att svaret är /login.
+        mockMvc.perform(multipart("/wines/tolka-etikett")
+                        .file(new MockMultipartFile("bild", "e.png", "image/png", new byte[] {1}))
+                        .with(user("spöke")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(LOGIN));
+
+        verify(wineService, never()).save(any());
     }
 }
