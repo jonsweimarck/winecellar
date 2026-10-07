@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -23,8 +24,11 @@ public class RegistrationController {
     private final RegistrationService registrationService;
     private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
 
-    public RegistrationController(RegistrationService registrationService) {
+    private final SessionRegistry sessionRegistry;
+
+    public RegistrationController(RegistrationService registrationService, SessionRegistry sessionRegistry) {
         this.registrationService = registrationService;
+        this.sessionRegistry = sessionRegistry;
     }
 
     @GetMapping("/registrera")
@@ -66,9 +70,9 @@ public class RegistrationController {
      * mekanism SecurityContextHolderFilter/SecurityContextRepository
      * annars sköter automatiskt vid en vanlig formLogin-rundtur.
      *
-     * Inga authorities behövs (WINE-15 tog bort hela rollbegreppet -
-     * `SecurityConfig` kräver bara `authenticated()`, ingen route bryr
-     * sig om roller längre).
+     * Inga authorities behövs: ett nytt konto är aldrig admin (se ADR 0025).
+     * Det finns en enda adminroll; `SecurityConfig` kräver rollen för
+     * `/admin/**`, medan övriga rutter bara kräver inloggning.
      */
     private void loggaInAutomatiskt(String username, HttpServletRequest request, HttpServletResponse response) {
         var authentication = new UsernamePasswordAuthenticationToken(username, null, List.of());
@@ -76,5 +80,8 @@ public class RegistrationController {
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, request, response);
+        // Manuell inloggning går förbi SessionAuthenticationStrategy - registrera
+        // sessionen själv så att den kan upphävas om kontot raderas (WINE-61).
+        sessionRegistry.registerNewSession(request.getSession().getId(), username);
     }
 }

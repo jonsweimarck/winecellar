@@ -46,6 +46,15 @@
                 </svg>
                 <span>Inställningar</span>
             </a>
+            <!-- WINE-61: bara för admin. Menyvalet är bekvämlighet - själva
+                 behörigheten sätts server-side i SecurityConfig. -->
+            <a th:if="${#authorization.expression('hasRole(''ADMIN'')')}" th:href="@{/admin}">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                <span>Admin</span>
+            </a>
         </div>
     </details>
 </div>

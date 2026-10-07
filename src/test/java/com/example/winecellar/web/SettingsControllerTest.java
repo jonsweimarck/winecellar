@@ -47,6 +47,18 @@ class SettingsControllerTest {
     @MockBean
     private UserRepository userRepository;
 
+    /**
+     * CurrentUser är fail-closed (WINE-61): en autentiserad principal vars användare
+     * saknas i databasen nekas. Testerna loggar in med user(...) utan en riktig
+     * användarpost, så varje användarnamn får som standard en användare med id 1
+     * (enskilda tester kan stubba om specifika namn).
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void defaultUserForAnyPrincipal() {
+        when(userRepository.findByUsername(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation ->
+                Optional.of(new User(new UserId(1L), invocation.getArgument(0), "hash", Instant.now(), 1, false, false)));
+    }
+
     private static final UserId MIN_ANVÄNDARE_ID = new UserId(1L);
 
     @Test
@@ -69,7 +81,7 @@ class SettingsControllerTest {
     @Test
     void skaVisaSparatStandardvärdeFörAntalFlaskorFilter() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -86,7 +98,7 @@ class SettingsControllerTest {
     @Test
     void skaInteVisaEnSparaKnappFörAntalFlaskorFilter() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 2, false, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -96,7 +108,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaNyttStandardvärdeOchOmdirigeraTillbaka() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -112,7 +124,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaEttOmFältetLämnasTomt() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -133,7 +145,7 @@ class SettingsControllerTest {
     @Test
     void skaSparaEttOmFältetInteGårAttTolkaSomEttTal() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 3, false, false)));
 
         mockMvc.perform(post("/installningar/antal-flaskor-filter")
                         .with(user("testperson")).with(csrf())
@@ -164,7 +176,7 @@ class SettingsControllerTest {
     @Test
     void skaVisaKryssrutaFörEgetBetygFrånSkala() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -176,7 +188,7 @@ class SettingsControllerTest {
     @Test
     void skaVisaKryssrutanIkryssadNärInställningenÄrPå() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true, false)));
 
         mockMvc.perform(get("/installningar").with(user("testperson")))
                 .andExpect(status().isOk())
@@ -186,7 +198,7 @@ class SettingsControllerTest {
     @Test
     void skaSättaOwnRatingFromScaleTillSantNärRutanKryssasI() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, false, false)));
 
         mockMvc.perform(post("/installningar/eget-betyg-skala")
                         .with(user("testperson")).with(csrf())
@@ -207,7 +219,7 @@ class SettingsControllerTest {
     @Test
     void skaSättaOwnRatingFromScaleTillFalsktNärRutanLämnasOkryssad() throws Exception {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true)));
+                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 1, true, false)));
 
         mockMvc.perform(post("/installningar/eget-betyg-skala")
                         .with(user("testperson")).with(csrf()))

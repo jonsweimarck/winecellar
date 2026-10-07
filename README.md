@@ -108,7 +108,8 @@ Tabell `users` (`id`, `username` unik, `hashed_password`, `created_at`,
 lista. Se [ADR 0013](docs/adr/0013-multi-user-accounts.md).
 `default_min_quantity_filter` (default 1) är vinlistans sparade "Antal
 flaskor minst"-standardval, satt i Inställningar - se "Filtrering,
-sökning och sortering" nedan.
+sökning och sortering" nedan. `is_admin` (boolean, NOT NULL, default
+false) markerar en admin - se "Admin" under Säkerhet.
 
 ### Chattkonversationer
 
@@ -249,12 +250,33 @@ Hela appen kräver inloggning - formulärbaserad, med session, se
 ursprungliga HTTP Basic-modellen i
 [ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md)). Vem som helst
 kan registrera ett eget konto på `/registrera` - varje konto får en
-helt privat, egen vinlista, ingen delning och ingen rollindelning
+helt privat, egen vinlista, ingen delning och ingen rollindelning för vanliga användare - det finns
+bara en enda adminroll, se "Admin" nedan
 (de tidigare hårdkodade `admin`/`readonly`-kontona och
 `WINECELLAR_ADMIN_PASSWORD` är borttagna).
 
 CSRF är påslaget (htmx-formulären skickar token via en
 `htmx:configRequest`-lyssnare, se `vinkallare.html`).
+
+### Admin
+
+En användare kan vara admin (`users.is_admin`, se
+[ADR 0025](docs/adr/0025-admin-role-and-user-deletion.md)). Nya konton är
+aldrig admin och ingen befintlig användare blir det av migreringen - det
+första admin-kontot sätts manuellt i databasen:
+
+```sql
+UPDATE users SET is_admin = true WHERE username = '<användarnamn>';
+```
+
+En admin får menyvalet "Admin" i hamburgarmenyn (efter nästa inloggning)
+som leder till `/admin`: en lista över alla användarnamn med knapparna
+"Gör till admin" och "Radera". Radering tar bort användaren och alla
+hens viner (med taggar), konversationer och meddelanden, efter en
+bekräftelse i en dialog; en admin kan inte radera sig själv. En raderad
+användares pågående inloggning upphör direkt. Åtkomsten kontrolleras
+server-side (`/admin/**` kräver rollen admin), inte bara genom att dölja
+knappar.
 
 Inloggningssidan har en "håll mig inloggad"-kryssruta (hash-baserad
 remember-me, se [ADR 0020](docs/adr/0020-remember-me-hash-based.md)) -

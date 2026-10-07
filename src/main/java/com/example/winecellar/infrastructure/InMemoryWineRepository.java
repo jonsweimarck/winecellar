@@ -1,5 +1,6 @@
 package com.example.winecellar.infrastructure;
 
+import java.util.Objects;
 import com.example.winecellar.application.WineRepository;
 import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.Wine;
@@ -54,6 +55,12 @@ public class InMemoryWineRepository implements WineRepository {
     @Override
     public void deleteById(WineId id) {
         wines.remove(id.value());
+    }
+
+    @Override
+    public void deleteAllByOwner(UserId owner) {
+        Objects.requireNonNull(owner);
+        wines.values().removeIf(wine -> owner.equals(wine.owner()));
     }
 
     /**

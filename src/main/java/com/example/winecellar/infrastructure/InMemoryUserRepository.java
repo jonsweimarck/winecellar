@@ -1,9 +1,11 @@
 package com.example.winecellar.infrastructure;
 
+import java.util.Comparator;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,7 +25,7 @@ public class InMemoryUserRepository implements UserRepository {
         User toStore = user.id() != null
                 ? user
                 : new User(new UserId(nextId.getAndIncrement()), user.username(), user.hashedPassword(),
-                        user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale());
+                        user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale(), user.admin());
         users.put(toStore.id().value(), toStore);
         return toStore;
     }
@@ -31,6 +33,16 @@ public class InMemoryUserRepository implements UserRepository {
     @Override
     public Optional<User> findById(UserId id) {
         return Optional.ofNullable(users.get(id.value()));
+    }
+
+    @Override
+    public List<User> findAll() {
+        return users.values().stream().sorted(Comparator.comparing(User::username)).toList();
+    }
+
+    @Override
+    public void deleteById(UserId id) {
+        users.remove(id.value());
     }
 
     @Override

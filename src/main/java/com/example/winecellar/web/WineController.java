@@ -102,7 +102,7 @@ public class WineController {
             @RequestHeader(value = "HX-Request", required = false) String hxRequest,
             HttpServletRequest request,
             Model model, Authentication authentication) {
-        Optional<User> currentUser = CurrentUser.find(authentication, userRepository);
+        User currentUser = CurrentUser.find(authentication, userRepository);
         RememberedFilter filter = resolveFilter(
                 request, reset, search, sort, direction, wineType, country, region, subregion, tag, name);
         populateWineListModel(
@@ -230,7 +230,7 @@ public class WineController {
      * deleteWine) - kvar som en egen metod ändå, inte inlinead i
      * wineCellar, ifall en framtida anropsplats tillkommer.
      *
-     * Tar emot ett redan uppslaget {@code Optional<User>} istället för
+     * Tar emot ett redan uppslaget {@code User} istället för
      * {@link Authentication} eftersom {@link #wineCellar} redan behöver
      * slå upp användarens hela post (id OCH sparat minQuantity-
      * standardval) innan den anropar hit (WINE-41-granskning).
@@ -239,14 +239,14 @@ public class WineController {
             Model model, String search, SortField sort, SortDirection direction,
             Set<String> wineType, Set<String> country, Set<String> region, Set<String> subregion, Set<String> tag,
             Set<String> name,
-            String minQuantity, Optional<User> currentUser) {
+            String minQuantity, User currentUser) {
         Set<String> selectedWineTypes = emptyIfNull(wineType);
         Set<String> selectedCountries = emptyIfNull(country);
         Set<String> selectedRegions = emptyIfNull(region);
         Set<String> selectedSubregions = emptyIfNull(subregion);
         Set<String> selectedTags = emptyIfNull(tag);
         Set<String> selectedNames = emptyIfNull(name);
-        UserId owner = currentUser.map(User::id).orElse(null);
+        UserId owner = currentUser.id();
 
         /*
          * WINE-41: en explicit minQuantity-queryparameter (bokmärke, delad
@@ -257,7 +257,7 @@ public class WineController {
          * (default 1 för ett nytt konto, se User.defaultMinQuantityFilter).
          */
         Integer explicitMinQuantity = parseIntegerOrNull(minQuantity);
-        int savedMinQuantity = currentUser.map(User::defaultMinQuantityFilter).orElse(1);
+        int savedMinQuantity = currentUser.defaultMinQuantityFilter();
         int effectiveMinQuantity = explicitMinQuantity != null ? explicitMinQuantity : savedMinQuantity;
         boolean minQuantityFilterActive = effectiveMinQuantity != savedMinQuantity;
 

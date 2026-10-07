@@ -34,6 +34,13 @@ public interface WineRepository {
     void deleteById(WineId id);
 
     /**
+     * WINE-61 (radering av en användare): tar bort ALLA ägarens viner, inklusive
+     * taggar. {@code owner} får INTE vara null här (null betyder "oscopeat" för
+     * de läsande metoderna - här hade det raderat allas viner).
+     */
+    void deleteAllByOwner(UserId owner);
+
+    /**
      * Fritextsökning över namn, producent, tasting notes, Systembolagets
      * beskrivning och Munskänkarnas bedömning. Implementationerna behöver
      * INTE bete sig identiskt - JpaWineRepository använder Postgres

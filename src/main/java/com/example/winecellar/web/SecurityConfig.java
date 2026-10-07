@@ -7,6 +7,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -29,14 +33,17 @@ import java.util.List;
  * `thymeleaf-extras-springsecurity6` injicerar automatiskt CSRF-fältet i
  * varje `th:action`-formulär (login.html, registrera.html, vin-formular.html).
  *
- * **Inga roller längre (WINE-15, se ADR 0013).** De hårdkodade
+ * **Ingen rollindelning för vanliga användare (WINE-15, se ADR 0013); en enda
+ * adminroll sedan WINE-61 (se ADR 0025).** De hårdkodade
  * `admin`/`readonly`-kontona (och `WINECELLAR_ADMIN_PASSWORD`) är borttagna -
  * `UserDetailsService` läser numera bara från `UserRepository`
  * (databasen, WINE-10/WINE-11). Alla inloggade användare har samma
  * rättigheter, bara till sin egen data (scopead sedan WINE-13) - det
  * fanns inget kvar att skilja ADMIN från READONLY på, så hela
- * roll-uppdelningen i `authorizeHttpRequests` togs bort samtidigt
- * (bara `authenticated()`). De ~30 vinerna som fanns innan `owner_id`
+ * roll-uppdelningen i `authorizeHttpRequests` togs bort samtidigt.
+ * Sedan WINE-61 kräver `/admin/**` rollen ADMIN (`hasRole("ADMIN")`);
+ * övriga rutter kräver bara inloggning och varje användares vinlista är
+ * fortsatt privat. De ~30 vinerna som fanns innan `owner_id`
  * (WINE-10) migrerades till ett riktigt konto i WINE-17 innan det här
  * kunde göras säkert - annars hade admin-kontots oscopeade vy försvunnit
  * innan någon annan väg in till samma data fanns.
@@ -80,7 +87,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http, @Value("${winecellar.remember-me.key}") String rememberMeKey) throws Exception {
+            HttpSecurity http, @Value("${winecellar.remember-me.key}") String rememberMeKey,
+            SessionRegistry sessionRegistry) throws Exception {
         http
                 .authorizeHttpRequests(requests -> requests
                         // Statiska resurser måste vara öppna: de behövs av
@@ -91,7 +99,18 @@ public class SecurityConfig {
                         // renderats helt ostylad (WINE-39).
                         .requestMatchers("/css/**", "/js/**").permitAll()
                         .requestMatchers("/registrera").permitAll()
+                        // WINE-61: adminsidan och dess POST:ar - server-side
+                        // behörighet (utloggad -> /login, inloggad icke-admin -> 403).
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
+                // WINE-61: håller reda på pågående sessioner så att en raderad
+                // användares sessioner kan upphöras direkt (AdminController).
+                // Obegränsat antal samtidiga sessioner (-1) - ingen ändring av
+                // beteendet för vanliga användare.
+                .sessionManagement(session -> session
+                        .maximumSessions(-1)
+                        .sessionRegistry(sessionRegistry)
+                        .expiredUrl("/login"))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .permitAll())
@@ -116,6 +135,17 @@ public class SecurityConfig {
     }
 
     @Bean
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    /** Behövs för att registret ska få veta när en session tar slut (WINE-61). */
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
+
+    @Bean
     public PasswordEncoder passwordEncoder() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
@@ -125,7 +155,7 @@ public class SecurityConfig {
         return username -> userRepository.findByUsername(username)
                 .map(user -> User.withUsername(user.username())
                         .password(user.hashedPassword())
-                        .authorities(List.of())
+                        .authorities(user.admin() ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN")) : List.of())
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException(username));
     }

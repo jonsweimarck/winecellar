@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <style>
+        body { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
+        .anvandarrad { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+            padding: 0.8rem 1rem; border-top: 1px solid var(--ram-svag); }
+        .anvandarrad:first-child { border-top: none; }
+        .anvandarnamn { flex: 1; min-width: 8rem; overflow-wrap: anywhere; }
+        .adminmarke { margin-left: 0.5rem; font-size: 0.75rem; color: var(--text-dampad); }
+        .anvandarrad form { margin: 0; }
+        dialog p { margin: 0 0 1rem; }
+    </style>
+</head>
+<body>
+    <div th:replace="~{fragments/topprad :: topprad('Admin', '/')}"></div>
+
+    <p class="toast" th:if="${feedback != null}" role="status">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>
+        <span th:text="${feedback}"></span>
+    </p>
+
+    <p class="sektionsrubrik">Användare</p>
+    <div class="kort">
+        <div class="anvandarrad" th:each="u : ${users}">
+            <span class="anvandarnamn">
+                <span th:text="${u.username}"></span>
+                <span class="adminmarke" th:if="${u.admin}">Admin</span>
+            </span>
+            <form method="post" th:action="@{/admin/gor-till-admin}" th:unless="${u.admin}">
+                <input type="hidden" name="userId" th:value="${u.id.value}">
+                <button type="submit" class="knapp-sekundar">Gör till admin</button>
+            </form>
+            <button type="button" class="knapp-farlig oppna-radera-dialog" th:unless="${u.id.value == currentUserId}"
+                    th:data-user-id="${u.id.value}" th:data-username="${u.username}">Radera</button>
+        </div>
+    </div>
+
+    <!-- Bekräftelse via <dialog>, INTE window.confirm() - samma skäl och
+         mönster som "Farlig zon" i vin-formular.html (WINE-44). En enda
+         dialog delas av alla rader; skriptet fyller i vilken användare det
+         gäller. -->
+    <dialog id="radera-dialog">
+        <form method="post" th:action="@{/admin/radera}">
+            <input type="hidden" name="userId" id="radera-user-id">
+            <p>Radera <strong id="radera-username"></strong> och alla hens viner, taggar och chattkonversationer
+                permanent? Det går inte att ångra.</p>
+            <div class="atgardsrad">
+                <button type="submit" class="knapp-farlig">Ja, radera användaren</button>
+                <button type="button" id="stang-radera-dialog" class="knapp-sekundar">Avbryt</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script>
+        (function () {
+            var dialogruta = document.getElementById('radera-dialog');
+            document.querySelectorAll('.oppna-radera-dialog').forEach(function (knapp) {
+                knapp.addEventListener('click', function () {
+                    document.getElementById('radera-user-id').value = knapp.dataset.userId;
+                    document.getElementById('radera-username').textContent = knapp.dataset.username;
+                    dialogruta.showModal();
+                });
+            });
+            document.getElementById('stang-radera-dialog').addEventListener('click', function () {
+                dialogruta.close();
+            });
+        })();
+    </script>
+</body>
+</html>

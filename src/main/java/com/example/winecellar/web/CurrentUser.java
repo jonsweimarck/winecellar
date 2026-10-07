@@ -3,21 +3,17 @@ package com.example.winecellar.web;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 
-import java.util.Optional;
-
 /**
- * WINE-22: extraherad ur `WineController.currentOwner(...)` när
- * `ExportController` fick samma behov - andra verkliga anropsplatsen,
- * inte en förhandsabstraktion.
- *
- * `null` betyder oscopeat, inte "ägs av ingen" - ursprungligen till för
- * de hårdkodade admin/readonly-kontona (som inte fanns i users-tabellen
- * och medvetet var oscopeade under övergången till WINE-15). Sedan
- * WINE-15 (admin/readonly borttagna) hittar `userRepository` alltid en
- * träff för en riktigt inloggad `Authentication` - `.orElse(null)` är
- * kvar som ett ofarligt, numera i praktiken oanvänt skyddsnät.
+ * Slår upp den inloggade användarens post. FAIL-CLOSED (WINE-61): finns
+ * användaren inte (längre) i databasen - t.ex. ett konto som raderats av en
+ * admin medan hens session lever kvar - kastas ett autentiseringsfel, som
+ * Spring Security översätter till en omdirigering till /login. Det får
+ * ALDRIG falla tillbaka på `null`: ett `null`-ägarargument betyder
+ * "oscopeat" i repository-/servicelagret (se WineRepository) och hade gett
+ * åtkomst till ALLA användares viner.
  */
 final class CurrentUser {
 
@@ -25,45 +21,27 @@ final class CurrentUser {
     }
 
     static UserId owner(Authentication authentication, UserRepository userRepository) {
+        return find(authentication, userRepository).id();
+    }
+
+    /**
+     * Hämtar den inloggade användarens hela {@link User}-post EN gång - en
+     * anropsplats som behöver både ägar-id:t och t.ex. det sparade
+     * standardfiltret slipper två separata uppslagningar per request.
+     */
+    static User find(Authentication authentication, UserRepository userRepository) {
         return userRepository.findByUsername(authentication.getName())
-                .map(user -> user.id())
-                .orElse(null);
+                .orElseThrow(() -> new AuthenticationCredentialsNotFoundException(
+                        "Användaren finns inte längre: " + authentication.getName()));
     }
 
-    /**
-     * WINE-41: hämtar den inloggade användarens hela {@link User}-post EN
-     * gång - en anropsplats som behöver både ägar-id:t och det sparade
-     * standardfiltret (t.ex. `WineController.populateWineListModel`) slapp
-     * annars två separata `findByUsername`-uppslagningar per request.
-     */
-    static Optional<User> find(Authentication authentication, UserRepository userRepository) {
-        return userRepository.findByUsername(authentication.getName());
-    }
-
-    /**
-     * WINE-41: vinlistans sparade "Antal flaskor minst"-standardval för
-     * den inloggade användaren - GET /:s fallback när requesten saknar en
-     * explicit `minQuantity`-queryparameter. `1` (samma default som ett
-     * nytt konto får, se RegistrationService) om användaren av någon
-     * anledning inte skulle hittas - i praktiken bara det ofarliga
-     * skyddsnätet som redan gäller för owner(...).
-     */
+    /** Vinlistans sparade "Antal flaskor minst"-standardval för den inloggade användaren. */
     static int defaultMinQuantityFilter(Authentication authentication, UserRepository userRepository) {
-        return userRepository.findByUsername(authentication.getName())
-                .map(User::defaultMinQuantityFilter)
-                .orElse(1);
+        return find(authentication, userRepository).defaultMinQuantityFilter();
     }
 
-    /**
-     * WINE-50: styr om vinformuläret visar "Eget betyg" som en dropdown
-     * (munskänkarnas 29 etiketter) eller ett fritextfält - `false` (samma
-     * default som ett nytt konto får, se RegistrationService) om
-     * användaren av någon anledning inte skulle hittas, samma ofarliga
-     * skyddsnät som `defaultMinQuantityFilter` ovan.
-     */
+    /** Styr om vinformuläret visar "Eget betyg" som dropdown eller fritext (WINE-50). */
     static boolean ownRatingFromScale(Authentication authentication, UserRepository userRepository) {
-        return userRepository.findByUsername(authentication.getName())
-                .map(User::ownRatingFromScale)
-                .orElse(false);
+        return find(authentication, userRepository).ownRatingFromScale();
     }
 }

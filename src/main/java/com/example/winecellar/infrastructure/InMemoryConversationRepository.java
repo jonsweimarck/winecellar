@@ -10,6 +10,7 @@ import com.example.winecellar.domain.User.UserId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -61,6 +62,12 @@ public class InMemoryConversationRepository implements ConversationRepository {
             conversations.remove(id.value());
             messages.values().removeIf(message -> message.conversationId().equals(id));
         });
+    }
+
+    @Override
+    public void deleteAllByOwner(UserId owner) {
+        Objects.requireNonNull(owner);
+        findAllByOwner(owner).forEach(conversation -> deleteByIdAndOwner(conversation.id(), owner));
     }
 
     @Override

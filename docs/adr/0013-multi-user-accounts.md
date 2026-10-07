@@ -89,6 +89,8 @@ behörighetsnivåer som idag.
 - Säkerhetskonfigurationen skrivs om i grunden - ingen roll-uppdelning
   kvar, bara ett generellt krav på inloggning för alla skyddade delar
   av appen.
+  (Förfinat i WINE-61: en enda adminroll för kontoförvaltning, se
+  [0025](0025-admin-role-and-user-deletion.md); vinlistorna är fortsatt privata.)
 - Den tidigare adminlösenords-miljövariabeln blir överflödig och tas
   bort - var specifik för det gamla, enda administratörskontot.
 - Skydd mot obehöriga tvärsideförfrågningar återinförs globalt -

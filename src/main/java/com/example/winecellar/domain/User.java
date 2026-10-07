@@ -25,6 +25,10 @@ import java.time.Instant;
  * munskänkarnas 29 fasta etiketter. Oavsett vilket sparas alltid bara den
  * rena textsträngen i `Wine.ownRating()` - inställningen styr bara
  * FORMULÄRET, inte vad som faktiskt lagras (se Wine.java).
+ *
+ * `admin` (WINE-61) ger tillgång till adminsidan (`/admin`). Ett nytt konto
+ * är aldrig admin (se RegistrationService) - första admin sätts manuellt i
+ * databasen, fler görs av en admin via adminsidan.
  */
 public record User(
         UserId id,
@@ -32,7 +36,8 @@ public record User(
         String hashedPassword,
         Instant createdAt,
         int defaultMinQuantityFilter,
-        boolean ownRatingFromScale
+        boolean ownRatingFromScale,
+        boolean admin
 ) {
 
     public record UserId(Long value) {

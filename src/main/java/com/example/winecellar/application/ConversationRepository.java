@@ -28,6 +28,13 @@ public interface ConversationRepository {
     /** No-op om konversationen inte finns/inte ägs av {@code owner}. */
     void deleteByIdAndOwner(ConversationId id, UserId owner);
 
+    /**
+     * WINE-61 (radering av en användare): tar bort ALLA ägarens konversationer
+     * med meddelanden. {@code owner} får INTE vara null här (till skillnad från
+     * de läsande metoderna betyder null inte "oscopeat" - det hade raderat allas).
+     */
+    void deleteAllByOwner(UserId owner);
+
     int countByOwner(UserId owner);
 
     ChatMessage addMessage(ChatMessage message);

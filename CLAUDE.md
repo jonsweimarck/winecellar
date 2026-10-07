@@ -583,13 +583,15 @@ tidigare HTTP Basic-modellen helt, se
 
 - Öppen självregistrering på `/registrera` - vem som helst kan skapa
   ett konto. Varje användares vinlista är helt privat (`owner_id` på
-  `wines`, `NOT NULL`) - ingen delning, ingen rollindelning. De tidigare
+  `wines`, `NOT NULL`) - ingen delning. Det finns en enda adminroll (WINE-61, ADR 0025) - se
+  "Flera användare - nuläge". De tidigare
   hårdkodade `admin`/`readonly`-kontona och `WINECELLAR_ADMIN_PASSWORD`
   är helt borttagna.
 - `UserDetailsService` läser bara från `UserRepository` (databasen).
   `authorizeHttpRequests` är `.requestMatchers("/registrera").
-  permitAll()` + `.anyRequest().authenticated()` - ingen `hasRole`
-  någonstans.
+  permitAll()` + `.requestMatchers("/admin/**").hasRole("ADMIN")` +
+  `.anyRequest().authenticated()` - `/admin/**` är den enda rollspärrade
+  delen (en enda adminroll, ADR 0025); övriga rutter kräver bara inloggning.
 - **CSRF är påslaget.** `thymeleaf-extras-springsecurity6` injicerar
   automatiskt CSRF-token i varje `th:action`-formulär; `vinkallare.html`
   har en `htmx:configRequest`-lyssnare som lägger till CSRF-headern på
@@ -890,6 +892,51 @@ kontra enstaka strukturerad extraktion).
      mellanslaget, texten gör det inte).
 
 ## Flera användare - nuläge
+
+**Admin (WINE-61, se [ADR 0025](docs/adr/0025-admin-role-and-user-deletion.md)).**
+`User.admin` (`users.is_admin`, nullable i `UserEntity` + skärpt till NOT
+NULL DEFAULT false i `schema.sql`, samma mönster som
+`own_rating_from_scale`; fristående `db/migrations/2026-10-07-add-user-is-admin.sql`).
+Ingen blir admin av migreringen eller av registrering - första admin sätts
+manuellt (`UPDATE users SET is_admin = true WHERE username = '...'`).
+`SecurityConfig.userDetailsService` ger `ROLE_ADMIN` åt admin, och
+`/admin/**` kräver `hasRole("ADMIN")` (utloggad -> /login, icke-admin ->
+403). `AdminService` (application) kontrollerar OCKSÅ själv att den
+agerande är admin (no-op/tom lista annars) och raderar i FK-ordning i en
+transaktion: `ConversationRepository.deleteAllByOwner` (meddelanden före
+konversationer) -> `WineRepository.deleteAllByOwner` (via entiteterna, så
+Hibernate tar `wine_tags`) -> `UserRepository.deleteById`. `deleteAllByOwner`
+tar INTE null som "oscopeat" (kastar) - ett null hade raderat allas data.
+En admin kan inte radera sig själv (servern ignorerar det; knappen visas
+inte), men kan radera en annan admin - "minst en admin finns alltid"
+garanteras INTE (ömsesidig radering kan ge noll admins; återställ med
+manuell SQL `UPDATE users SET is_admin = true ...`).
+**`CurrentUser` är FAIL-CLOSED:** `owner`/`find` kastar
+`AuthenticationCredentialsNotFoundException` (-> 302 till /login) om
+användaren inte finns i databasen, i stället för det gamla `.orElse(null)`.
+Ett null-ägarargument betyder "oscopeat" (ALLA användares viner) i
+service-/repositorylagret, så en tyst null från `CurrentUser` var ett
+dataläckage. Nya anropsplatser får aldrig själva falla tillbaka på null.
+Controller-tester som loggar in med `user(...)` utan riktig användarpost
+måste därför stubba `userRepository.findByUsername` (se
+`defaultUserForAnyPrincipal` i `WineControllerTest`). **Fällor:** (1) `new User(...)` har nu sju komponenter - varje kod
+som kopierar en användare (t.ex. `SettingsController`) måste bära vidare
+`admin`, annars degraderas kontot tyst vid nästa sparning. (2) Rättigheter
+läses in vid inloggning (sessionen), så "Gör till admin" syns i menyn först
+efter målets nästa inloggning. (3) En session läser inte om
+`UserDetailsService`, så en raderad användares session lever kvar - det
+bärande skyddet är det fail-closed `CurrentUser` ovan
+(`DeletedUserAccessTest`, även för en nyregistrerad+raderad användare vars
+manuella auto-inloggning går förbi SessionAuthenticationStrategy; den
+registrerar nu sin session i registret själv). Som extra skikt finns ett
+`SessionRegistry` (bean i `SecurityConfig`, `maximumSessions(-1)`,
+`HttpSessionEventPublisher`) som `AdminController` använder för att
+upphäva raderad användares sessioner; remember-me-cookien faller på att
+`UserDetailsService` inte hittar användaren (båda verifierade i
+`AdminControllerTest`). Registret är i minnet - passar enkelinstansdrift.
+(4) Admin-raderingsscenarierna (`admin-funktionalitet.feature`/`AdminSteps`)
+körs mot riktig Postgres (Spring-bönor), inte InMemory-dubbletterna, för
+att bevisa FK-ordningen.
 
 Se [ADR 0013](docs/adr/0013-multi-user-accounts.md). `User`/
 `User.UserId` (`domain/`) + `UserRepository`-port (JPA + InMemory-

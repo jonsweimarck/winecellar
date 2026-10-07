@@ -112,6 +112,18 @@ class WineControllerTest {
     @MockBean
     private UserRepository userRepository;
 
+    /**
+     * CurrentUser är fail-closed (WINE-61): en autentiserad principal vars användare
+     * saknas i databasen nekas. Testerna loggar in med user(...) utan en riktig
+     * användarpost, så varje användarnamn får som standard en användare med id 1
+     * (enskilda tester kan stubba om specifika namn).
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void defaultUserForAnyPrincipal() {
+        when(userRepository.findByUsername(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation ->
+                Optional.of(new User(new UserId(1L), invocation.getArgument(0), "hash", Instant.now(), 1, false, false)));
+    }
+
     private static final Wine BAROLO = Wine.builder()
             .id(new WineId(1L)).name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
             .vintage(2018).quantity(3).location("Låda 1")
@@ -222,7 +234,7 @@ class WineControllerTest {
         @BeforeEach
         void stubbaTestanvändare() {
             User testAnvändare = new User(
-                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false);
+                    new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false, false);
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
         }
 
@@ -403,7 +415,7 @@ class WineControllerTest {
                 @BeforeEach
                 void stubbaTestanvändare() {
                     User testAnvändare = new User(
-                            new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false);
+                            new UserId(1L), "testperson", passwordEncoder.encode("hemligt123"), Instant.now(), 0, false, false);
                     when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(testAnvändare));
                 }
 
@@ -464,6 +476,21 @@ class WineControllerTest {
                             not(containsString("name=\"search\"")),
                             not(containsString("id=\"sort\""))
                     )));
+        }
+
+        /** WINE-61: "Admin" i hamburgarmenyn syns bara för en admin. */
+        @Test
+        @DisplayName("ska visa Admin i hamburgarmenyn för en admin men inte för en vanlig användare")
+        void skaVisaAdminMenyvalBaraFörAdmin() throws Exception {
+            when(wineService.listWines(any())).thenReturn(List.of(BAROLO));
+            when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
+
+            mockMvc.perform(get("/").with(user("anna").roles("ADMIN")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("href=\"/admin\"")));
+            mockMvc.perform(get("/").with(user("anna")).with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(not(containsString("href=\"/admin\""))));
         }
 
         /**
@@ -735,7 +762,7 @@ class WineControllerTest {
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         @Test
@@ -752,7 +779,7 @@ class WineControllerTest {
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.OWN_RATING).sortDirection(SortDirection.DESCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         @Test
@@ -927,7 +954,7 @@ class WineControllerTest {
                     .wineTypes(Set.of(WineType.RED, WineType.WHITE))
                     .countries(Set.of("Italien"))
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         @Test
@@ -944,7 +971,7 @@ class WineControllerTest {
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .tags(Set.of("Favorit", "Vardag"))
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         @Test
@@ -980,7 +1007,7 @@ class WineControllerTest {
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         @Test
@@ -988,7 +1015,7 @@ class WineControllerTest {
         void skaAnvändaSparadDefaultFörMinQuantity() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
 
             mockMvc.perform(get("/").with(user("testperson")).with(csrf()))
                     .andExpect(status().isOk())
@@ -1006,7 +1033,7 @@ class WineControllerTest {
         void skaLåtaExplicitMinQuantityÅsidosättaSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -1032,7 +1059,7 @@ class WineControllerTest {
         void skaFallaTillbakaPåSparadDefaultFörOparsbartMinQuantity() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -1056,7 +1083,7 @@ class WineControllerTest {
         void skaInteVisaBadgeNärMinQuantityMotsvararSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
 
             mockMvc.perform(get("/").with(user("testperson")).with(csrf()))
                     .andExpect(status().isOk())
@@ -1068,7 +1095,7 @@ class WineControllerTest {
         void skaVisaBadgeNärMinQuantityAvvikerFrånSparadDefault() throws Exception {
             when(wineService.search(any(), any())).thenReturn(List.of(BAROLO));
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 2, false, false)));
 
             mockMvc.perform(get("/")
                             .with(user("testperson")).with(csrf())
@@ -1094,7 +1121,7 @@ class WineControllerTest {
                     .searchTerm("barolo")
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         @Test
@@ -1332,7 +1359,7 @@ class WineControllerTest {
                     .sortField(SortField.PRICE).sortDirection(SortDirection.DESCENDING)
                     .wineTypes(Set.of(WineType.RED))
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1361,7 +1388,7 @@ class WineControllerTest {
                     .sortField(SortField.VINTAGE).sortDirection(SortDirection.DESCENDING)
                     .countries(Set.of("Italien"))
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1394,7 +1421,7 @@ class WineControllerTest {
             verify(wineService, times(2)).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1430,7 +1457,7 @@ class WineControllerTest {
                     .sortField(SortField.PRICE).sortDirection(SortDirection.DESCENDING)
                     .wineTypes(Set.of(WineType.RED))
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
 
             // Det nya sökordet ska i sin tur ha blivit det ihågkomna värdet -
             // en TREDJE, bar request (utan sökparameter) ska fortfarande visa "andra".
@@ -1443,7 +1470,7 @@ class WineControllerTest {
                     .sortField(SortField.PRICE).sortDirection(SortDirection.DESCENDING)
                     .wineTypes(Set.of(WineType.RED))
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1471,7 +1498,7 @@ class WineControllerTest {
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1507,7 +1534,7 @@ class WineControllerTest {
                     .sortField(SortField.NAME).sortDirection(SortDirection.DESCENDING)
                     .wineTypes(Set.of(WineType.RED))
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1545,7 +1572,7 @@ class WineControllerTest {
             verify(wineService, times(2)).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1580,7 +1607,7 @@ class WineControllerTest {
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .names(Set.of("Barolo", "Chablis"))
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1612,7 +1639,7 @@ class WineControllerTest {
             verify(wineService).search(SearchCriteria.builder()
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
 
         /**
@@ -1647,7 +1674,7 @@ class WineControllerTest {
                     .searchTerm("Chablis")
                     .sortField(SortField.NAME).sortDirection(SortDirection.ASCENDING)
                     .minQuantity(1)
-                    .build(), null);
+                    .build(), new UserId(1L));
         }
     }
 
@@ -1749,7 +1776,7 @@ class WineControllerTest {
         @DisplayName("ska visa en dropdown med munskänkarnas etiketter när inställningen är påslagen")
         void skaVisaDropdownNärInställningenÄrPåslagen() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
 
             mockMvc.perform(get("/wines/nytt").with(user("testperson")).with(csrf()))
                     .andExpect(status().isOk())
@@ -1772,7 +1799,7 @@ class WineControllerTest {
         @DisplayName("ska erbjuda Orange som val och förvälja det för ett orange vin i vinformuläret")
         void skaErbjudaOchFörväljaOrangeIFormuläret() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
             when(wineService.findById(eq(new WineId(1L)), any()))
                     .thenReturn(Optional.of(BAROLO.toBuilder().wineType(WineType.ORANGE).build()));
 
@@ -1788,7 +1815,7 @@ class WineControllerTest {
         @DisplayName("ska förvälja det sparade värdet i dropdownen när det matchar en av munskänkarnas etiketter")
         void skaFörväljaSparatVärdeIDropdown() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
             when(wineService.findById(eq(new WineId(1L)), any()))
                     .thenReturn(Optional.of(BAROLO.toBuilder().ownRating(Rating.R16.label()).build()));
 
@@ -1824,7 +1851,7 @@ class WineControllerTest {
         @DisplayName("ska visa ett omatchat sparat värde som ett extra, förvalt alternativ i dropdownen")
         void skaVisaOmatchatSparatVärdeSomExtraFörvaltAlternativ() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
             when(wineService.findById(eq(new WineId(1L)), any()))
                     .thenReturn(Optional.of(BAROLO.toBuilder().ownRating("Fantastiskt, dricka nu!").build()));
 
@@ -1965,7 +1992,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).save(Wine.builder()
+            verify(wineService).save(Wine.builder().owner(new UserId(1L))
                     .name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
                     .vintage(2018).quantity(3).location("Låda 1")
                     .build());
@@ -1991,7 +2018,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).save(Wine.builder()
+            verify(wineService).save(Wine.builder().owner(new UserId(1L))
                     .name("Barolo").quantity(3)
                     .ownRating("Riktigt gott, testa igen om ett år")
                     .build());
@@ -2008,7 +2035,7 @@ class WineControllerTest {
         @DisplayName("ska spara eget betyg som etikett-text (inte en Rating-konstant) när dropdown-läget är påslaget")
         void skaSparaEgetBetygSomEtikettTextVidTilläggMedDropdownPåslagen() throws Exception {
             when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true)));
+                    new User(new UserId(1L), "testperson", "hash", Instant.now(), 1, true, false)));
 
             mockMvc.perform(post("/wines")
                             .with(user("testperson")).with(csrf())
@@ -2018,7 +2045,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).save(Wine.builder()
+            verify(wineService).save(Wine.builder().owner(new UserId(1L))
                     .name("Barolo").quantity(3)
                     .owner(new UserId(1L))
                     .ownRating(Rating.R16.label())
@@ -2053,7 +2080,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).save(Wine.builder()
+            verify(wineService).save(Wine.builder().owner(new UserId(1L))
                     .name("Chianti Classico")
                     .quantity(1)
                     .build());
@@ -2077,7 +2104,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).save(Wine.builder()
+            verify(wineService).save(Wine.builder().owner(new UserId(1L))
                     .name("Chianti Classico")
                     .quantity(1)
                     .build());
@@ -2101,7 +2128,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).save(Wine.builder()
+            verify(wineService).save(Wine.builder().owner(new UserId(1L))
                     .name("Barolo").quantity(3)
                     .tags(Set.of("Favorit", "Festvin"))
                     .build());
@@ -2124,7 +2151,7 @@ class WineControllerTest {
                             .param("location", "Låda 1"))
                     .andExpect(status().is3xxRedirection());
 
-            verify(wineService).save(Wine.builder()
+            verify(wineService).save(Wine.builder().owner(new UserId(1L))
                     .name("Barolo").wineType(WineType.RED).producer("Pio Cesare").country("Italien")
                     .vintage(2018).quantity(3).location("Låda 1")
                     .image(bilddata).imageMimeType("image/jpeg")
@@ -2186,7 +2213,7 @@ class WineControllerTest {
                     .andExpect(redirectedUrl("/"));
 
             verify(wineService, never()).checkForDuplicate(any(), any());
-            verify(wineService).save(Wine.builder().name("Barolo").quantity(1).build());
+            verify(wineService).save(Wine.builder().owner(new UserId(1L)).name("Barolo").quantity(1).build());
         }
     }
 
@@ -2201,7 +2228,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).increaseQuantity(new WineId(1L), null);
+            verify(wineService).increaseQuantity(new WineId(1L), new UserId(1L));
         }
 
         @Test
@@ -2234,7 +2261,7 @@ class WineControllerTest {
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/"));
 
-            verify(wineService).removeWine(new WineId(1L), null);
+            verify(wineService).removeWine(new WineId(1L), new UserId(1L));
         }
 
         /**
