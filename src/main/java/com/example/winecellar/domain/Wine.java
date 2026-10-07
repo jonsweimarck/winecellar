@@ -52,7 +52,7 @@ public record Wine(
         WineId id,
         /**
          * WINE-13: vinets ägare. Null är ogiltigt för ett sparat vin: `owner_id`
-         * är `NOT NULL` i schema.sql och repositoryna kräver en riktig ägare
+         * är `NOT NULL` i schema.sql och databasen avvisar null (och in-memory-adaptern kastar)
          * (WINE-64). Se CLAUDE.md.
          */
         UserId owner,

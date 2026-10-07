@@ -29,6 +29,7 @@ public class InMemoryConversationRepository implements ConversationRepository {
 
     @Override
     public Conversation save(Conversation conversation) {
+        Objects.requireNonNull(conversation.owner(), "owner must not be null");
         Conversation toStore = conversation.id() != null
                 ? conversation
                 : new Conversation(new ConversationId(nextConversationId.getAndIncrement()),

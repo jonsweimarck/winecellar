@@ -76,4 +76,12 @@ class InMemoryRepositoriesFailClosedTest {
         assertThatThrownBy(() -> repository.save(Wine.builder().name("Barolo").quantity(1).build()))
                 .isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    void conversationRepositorySaveSkaKastaVidNullOwner() {
+        InMemoryConversationRepository repository = new InMemoryConversationRepository();
+
+        assertThatThrownBy(() -> repository.save(new Conversation(null, null, "Fråga", Instant.now())))
+                .isInstanceOf(NullPointerException.class);
+    }
 }
