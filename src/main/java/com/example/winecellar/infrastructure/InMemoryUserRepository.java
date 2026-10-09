@@ -27,7 +27,7 @@ public class InMemoryUserRepository implements UserRepository {
                 ? user
                 : new User(new UserId(nextId.getAndIncrement()), user.username(), user.hashedPassword(),
                         user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale(), user.admin(),
-                        user.lastLoginAt());
+                        user.lastLoginAt(), user.emailVerified());
         users.put(toStore.id().value(), toStore);
         return toStore;
     }
@@ -46,7 +46,7 @@ public class InMemoryUserRepository implements UserRepository {
     public void updateLastLogin(UserId id, Instant at) {
         users.computeIfPresent(id.value(), (key, user) -> new User(user.id(), user.username(),
                 user.hashedPassword(), user.createdAt(), user.defaultMinQuantityFilter(),
-                user.ownRatingFromScale(), user.admin(), at));
+                user.ownRatingFromScale(), user.admin(), at, user.emailVerified()));
     }
 
     @Override
@@ -57,7 +57,7 @@ public class InMemoryUserRepository implements UserRepository {
     @Override
     public Optional<User> findByUsername(String username) {
         return users.values().stream()
-                .filter(user -> user.username().equals(username))
+                .filter(user -> user.username().equalsIgnoreCase(username))
                 .findFirst();
     }
 }

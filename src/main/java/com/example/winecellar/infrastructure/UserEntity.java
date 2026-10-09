@@ -69,6 +69,14 @@ public class UserEntity {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    /**
+     * WINE-59: e-postadressen verifierad. Medvetet UTAN `nullable = false`, samma
+     * mönster/skäl som `admin` ovan - kolumnen skärps till NOT NULL (backfill av
+     * befintliga konton till true) i schema.sql i stället.
+     */
+    @Column(name = "email_verified")
+    private Boolean emailVerified;
+
     protected UserEntity() {
     }
 
@@ -134,5 +142,13 @@ public class UserEntity {
 
     void setLastLoginAt(Instant lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    Boolean getEmailVerified() {
+        return emailVerified;
+    }
+
+    void setEmailVerified(Boolean emailVerified) {
+        this.emailVerified = emailVerified;
     }
 }

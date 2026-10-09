@@ -1,6 +1,6 @@
 package com.example.winecellar.infrastructure;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.domain.Conversation;
 import com.example.winecellar.domain.User.UserId;
@@ -30,7 +30,7 @@ class JpaRepositoriesFailClosedIT extends SharedPostgres {
     private JpaConversationRepository conversationRepository;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     @Autowired
     private UserRepository userRepository;
@@ -47,7 +47,7 @@ class JpaRepositoriesFailClosedIT extends SharedPostgres {
     }
 
     private UserId user(String username) {
-        registrationService.register(username, "testlösenord123");
+        testAccounts.register(username, "testlösenord123");
         return userRepository.findByUsername(username).orElseThrow().id();
     }
 

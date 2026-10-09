@@ -32,10 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Testar bara webblagret: RegistrationService är stubbad. Verifierar det
- * som RegistrationSteps (Cucumber, applikationslagret) inte täcker -
- * auto-inloggningen efter registrering (sessionen faktiskt satt) och
- * felrendering.
+ * Testar bara webblagret: RegistrationService är stubbad. Sedan WINE-59
+ * loggas användaren INTE in efter registrering (kontot är overifierat) -
+ * testet verifierar att ingen session sätts, plus felrendering och CSRF.
  */
 @WebMvcTest(RegistrationController.class)
 @Import(SecurityConfig.class)
@@ -55,11 +54,12 @@ class RegistrationControllerTest {
     class NärRegistreringssidanVisas {
 
         @Test
-        @DisplayName("ska formuläret visas utan inloggning")
+        @DisplayName("ska formuläret visas utan inloggning och fråga efter en e-postadress")
         void skaFormuläretVisasUtanInloggning() throws Exception {
             mockMvc.perform(get("/registrera"))
                     .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("name=\"username\"")));
+                    .andExpect(content().string(containsString("name=\"username\"")))
+                    .andExpect(content().string(containsString("E-postadress")));
         }
     }
 
@@ -68,65 +68,75 @@ class RegistrationControllerTest {
     class NärEttKontoRegistreras {
 
         @Test
-        @DisplayName("ska ett lyckat konto logga in användaren direkt (sessionen satt) och omdirigera till startsidan")
-        void skaLoggaInDirektOchOmdirigera() throws Exception {
-            User user = new User(new UserId(1L), "vinälskare", "hashat", Instant.now(), 0, false, false, Instant.now());
-            when(registrationService.register("vinälskare", "hemligt123"))
+        @DisplayName("ska ett lyckat konto INTE logga in användaren utan omdirigera till inloggningen med besked")
+        void skaInteLoggaInUtanOmdirigeraTillInloggningen() throws Exception {
+            User user = new User(new UserId(1L), "anna@example.com", "hashat", Instant.now(), 1, false, false,
+                    Instant.now(), false);
+            when(registrationService.register("anna@example.com"))
                     .thenReturn(new RegistrationResult.Registered(user));
 
             MvcResult result = mockMvc.perform(post("/registrera")
                             .with(csrf())
-                            .param("username", "vinälskare")
-                            .param("password", "hemligt123")
-                            .param("confirmPassword", "hemligt123"))
+                            .param("username", "anna@example.com"))
                     .andExpect(status().is3xxRedirection())
-                    .andExpect(redirectedUrl("/"))
+                    .andExpect(redirectedUrl("/login?registered"))
                     .andReturn();
 
-            assertThat(result.getRequest().getSession().getAttribute(SPRING_SECURITY_CONTEXT_KEY)).isNotNull();
+            assertThat(result.getRequest().getSession(false) == null
+                    || result.getRequest().getSession().getAttribute(SPRING_SECURITY_CONTEXT_KEY) == null).isTrue();
+        }
+
+        @Test
+        @DisplayName("ska nekas med besked om att användarnamnet måste vara en e-postadress")
+        void skaNekasOmInteEpost() throws Exception {
+            when(registrationService.register("inte-en-epost"))
+                    .thenReturn(new RegistrationResult.InvalidEmail());
+
+            mockMvc.perform(post("/registrera")
+                            .with(csrf())
+                            .param("username", "inte-en-epost"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("måste vara en e-postadress")));
         }
 
         @Test
         @DisplayName("ska nekas om användarnamnet är upptaget, utan att omdirigera")
         void skaNekasOmAnvändarnamnetÄrUpptaget() throws Exception {
-            when(registrationService.register("vinälskare", "hemligt123"))
+            when(registrationService.register("anna@example.com"))
                     .thenReturn(new RegistrationResult.UsernameTaken());
 
             mockMvc.perform(post("/registrera")
                             .with(csrf())
-                            .param("username", "vinälskare")
-                            .param("password", "hemligt123")
-                            .param("confirmPassword", "hemligt123"))
+                            .param("username", "anna@example.com"))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("upptaget")));
         }
 
         @Test
-        @DisplayName("ska nekas om lösenorden inte matchar, utan att nå RegistrationService")
-        void skaNekasOmLösenordenInteMatchar() throws Exception {
-            mockMvc.perform(post("/registrera")
-                            .with(csrf())
-                            .param("username", "vinälskare")
-                            .param("password", "hemligt123")
-                            .param("confirmPassword", "annat"))
-                    .andExpect(status().isOk())
-                    .andExpect(content().string(containsString("matchar inte")));
-
-            verify(registrationService, never()).register(any(), any());
-        }
-
-        @Test
-        @DisplayName("ska nekas om lösenordet saknas, utan att nå RegistrationService")
-        void skaNekasOmLösenordetSaknas() throws Exception {
-            mockMvc.perform(post("/registrera")
-                            .with(csrf())
-                            .param("username", "vinälskare")
-                            .param("password", "")
-                            .param("confirmPassword", ""))
+        @DisplayName("ska nekas om e-postadressen saknas, utan att nå RegistrationService")
+        void skaNekasOmAdressenSaknas() throws Exception {
+            mockMvc.perform(post("/registrera").with(csrf()).param("username", ""))
                     .andExpect(status().isOk())
                     .andExpect(content().string(containsString("Fyll i")));
 
-            verify(registrationService, never()).register(any(), any());
+            verify(registrationService, never()).register(any());
+        }
+
+        @Test
+        @DisplayName("ska formuläret INTE fråga efter något lösenord")
+        void skaInteFrågaEfterLösenord() throws Exception {
+            mockMvc.perform(get("/registrera"))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(containsString("name=\"password\""))));
+        }
+
+        @Test
+        @DisplayName("ska avvisa en POST utan CSRF-token")
+        void skaKrävaCsrf() throws Exception {
+            mockMvc.perform(post("/registrera")
+                            .param("username", "anna@example.com"))
+                    .andExpect(status().isForbidden());
+
+            verify(registrationService, never()).register(any());
         }
     }
 }

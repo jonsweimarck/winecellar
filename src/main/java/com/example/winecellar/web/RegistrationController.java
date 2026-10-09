@@ -2,33 +2,24 @@ package com.example.winecellar.web;
 
 import com.example.winecellar.application.RegistrationResult;
 import com.example.winecellar.application.RegistrationService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.session.SessionRegistry;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import java.util.List;
-
+/**
+ * Registrering (WINE-11, se ADR 0013). Sedan WINE-59 (ADR 0026) är
+ * användarnamnet en e-postadress och formuläret frågar BARA efter den; lösenordet väljs
+ * först när länken i verifieringsmailet öppnas. Användaren loggas inte in automatiskt.
+ */
 @Controller
 public class RegistrationController {
 
     private final RegistrationService registrationService;
-    private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
 
-    private final SessionRegistry sessionRegistry;
-
-    public RegistrationController(RegistrationService registrationService, SessionRegistry sessionRegistry) {
+    public RegistrationController(RegistrationService registrationService) {
         this.registrationService = registrationService;
-        this.sessionRegistry = sessionRegistry;
     }
 
     @GetMapping("/registrera")
@@ -39,49 +30,24 @@ public class RegistrationController {
     @PostMapping("/registrera")
     public String register(
             @RequestParam String username,
-            @RequestParam String password,
-            @RequestParam String confirmPassword,
-            Model model, HttpServletRequest request, HttpServletResponse response) {
+            Model model) {
         model.addAttribute("username", username);
 
-        if (username == null || username.isBlank() || password == null || password.isBlank()) {
-            model.addAttribute("error", "Fyll i användarnamn och lösenord.");
-            return "registrera";
-        }
-        if (!password.equals(confirmPassword)) {
-            model.addAttribute("error", "Lösenorden matchar inte.");
+        if (username == null || username.isBlank()) {
+            model.addAttribute("error", "Fyll i din e-postadress.");
             return "registrera";
         }
 
-        RegistrationResult result = registrationService.register(username, password);
+        RegistrationResult result = registrationService.register(username);
+        if (result instanceof RegistrationResult.InvalidEmail) {
+            model.addAttribute("error", "Användarnamnet måste vara en e-postadress.");
+            return "registrera";
+        }
         if (result instanceof RegistrationResult.UsernameTaken) {
             model.addAttribute("error", "Användarnamnet är upptaget.");
             return "registrera";
         }
-
-        loggaInAutomatiskt(username, request, response);
-        return "redirect:/";
-    }
-
-    /**
-     * Loggar in den nyregistrerade användaren direkt, utan ett separat
-     * inloggningssteg - bygger en redan-autentiserad Authentication
-     * (3-argumentskonstruktorn) och sparar den i sessionen via samma
-     * mekanism SecurityContextHolderFilter/SecurityContextRepository
-     * annars sköter automatiskt vid en vanlig formLogin-rundtur.
-     *
-     * Inga authorities behövs: ett nytt konto är aldrig admin (se ADR 0025).
-     * Det finns en enda adminroll; `SecurityConfig` kräver rollen för
-     * `/admin/**`, medan övriga rutter bara kräver inloggning.
-     */
-    private void loggaInAutomatiskt(String username, HttpServletRequest request, HttpServletResponse response) {
-        var authentication = new UsernamePasswordAuthenticationToken(username, null, List.of());
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authentication);
-        SecurityContextHolder.setContext(context);
-        securityContextRepository.saveContext(context, request, response);
-        // Manuell inloggning går förbi SessionAuthenticationStrategy - registrera
-        // sessionen själv så att den kan upphävas om kontot raderas (WINE-61).
-        sessionRegistry.registerNewSession(request.getSession().getId(), username);
+        // Post-Redirect-Get: informationen visas på inloggningssidan.
+        return "redirect:/login?registered";
     }
 }

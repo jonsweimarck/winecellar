@@ -7,6 +7,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.authentication.AccountExpiredException;
+import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
@@ -98,7 +103,9 @@ public class SecurityConfig {
                         // omdirigeras till /login - inloggningssidan hade då
                         // renderats helt ostylad (WINE-39).
                         .requestMatchers("/css/**", "/js/**").permitAll()
-                        .requestMatchers("/registrera").permitAll()
+                        // WINE-59: registrering, e-postverifiering och glömt lösenord är anonyma sidor.
+                        .requestMatchers("/registrera", "/verifiera", "/verifiera/**",
+                                "/glomt-losenord", "/aterstall-losenord").permitAll()
                         // WINE-61: adminsidan och dess POST:ar - server-side
                         // behörighet (utloggad -> /login, inloggad icke-admin -> 403).
                         .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -152,11 +159,48 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(UserRepository userRepository) {
-        return username -> userRepository.findByUsername(username)
+        // WINE-59: trimmas på samma sätt som registreringen normaliserar (skiftläge hanteras av uppslaget).
+        return username -> userRepository.findByUsername(username == null ? "" : username.trim())
                 .map(user -> User.withUsername(user.username())
                         .password(user.hashedPassword())
                         .authorities(user.admin() ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN")) : List.of())
+                        // WINE-59: overifierat konto = inaktiverat (nekas inloggning, även via remember-me). Ett
+                        // overifierat konto har dessutom aldrig ett användbart lösenord (ADR 0026), och alla
+                        // inloggningsfel ger samma /login?error - inget avslöjar att ett konto är overifierat.
+                        .disabled(!user.emailVerified())
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException(username));
+    }
+
+    /**
+     * WINE-59: "enabled" kontrolleras EFTER lösenordsjämförelsen (post-check) i stället för före
+     * (Spring Securitys standard). Annars avvisas ett overifierat (disabled) konto utan någon
+     * bcrypt-jämförelse och svarar märkbart snabbare än ett verifierat konto med fel lösenord -
+     * svarstiden hade avslöjat kontostatus. Alla fel ger ändå samma /login?error (ingen egen
+     * failure-handler). Ett overifierat konto har dessutom aldrig ett lösenord som kan matcha.
+     */
+    @Bean
+    public DaoAuthenticationProvider daoAuthenticationProvider(
+            UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
+        provider.setPreAuthenticationChecks(details -> {
+            if (!details.isAccountNonLocked()) {
+                throw new LockedException("Kontot är låst");
+            }
+            if (!details.isAccountNonExpired()) {
+                throw new AccountExpiredException("Kontot har gått ut");
+            }
+        });
+        provider.setPostAuthenticationChecks(details -> {
+            if (!details.isCredentialsNonExpired()) {
+                throw new CredentialsExpiredException("Lösenordet har gått ut");
+            }
+            if (!details.isEnabled()) {
+                throw new DisabledException("E-postadressen är inte verifierad");
+            }
+        });
+        return provider;
     }
 }

@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.AdminService;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.domain.User;
@@ -63,7 +64,7 @@ class LastLoginRecorderTest {
     void stubBob() {
         Instant old = Instant.parse("2020-01-01T10:00:00Z");
         when(userRepository.findByUsername("bob")).thenReturn(Optional.of(
-                new User(BOB_ID, "bob", passwordEncoder.encode("hemligt123"), old, 1, false, true, old)));
+                TestUsers.verifiedUser(BOB_ID, "bob", passwordEncoder.encode("hemligt123"), old, 1, false, true, old)));
     }
 
     @Test

@@ -18,8 +18,8 @@
              vinformuläret. -->
         <form method="post" th:action="@{/login}">
             <div class="kort">
-                <label class="falt"><span>Användarnamn</span>
-                    <input type="text" id="username" name="username" autocomplete="username" autofocus="autofocus">
+                <label class="falt"><span>E-postadress / användarnamn</span>
+                    <input type="text" id="username" name="username" autocomplete="email" inputmode="email" autofocus="autofocus">
                 </label>
                 <label class="falt"><span>Lösenord</span>
                     <input type="password" id="password" name="password" autocomplete="current-password">
@@ -36,9 +36,15 @@
             </div>
         </form>
 
-        <p class="fel" th:if="${param.error}">Fel användarnamn eller lösenord.</p>
+        <p class="fel" th:if="${param.error}">Fel användarnamn eller lösenord. Har du inte verifierat din
+            e-postadress än? <a th:href="@{/verifiera/ny}">Begär en ny verifieringslänk</a>.</p>
+        <p class="info" th:if="${param.registered}">Vi har skickat ett mail med en verifieringslänk - öppna den för att bekräfta
+            adressen och välja ett lösenord. Länken gäller i 24 timmar.</p>
+        <p class="info" th:if="${param.verified}">Din e-postadress är verifierad och ditt lösenord är sparat. Du kan nu logga in.</p>
+        <p class="info" th:if="${param.reset}">Ditt lösenord är ändrat. Logga in med det nya lösenordet.</p>
         <p class="info" th:if="${param.logout}">Du är utloggad.</p>
 
+        <p class="lank"><a th:href="@{/glomt-losenord}">Glömt ditt lösenord?</a></p>
         <p class="lank"><a th:href="@{/registrera}">Inget konto än? Registrera dig</a></p>
     </main>
 </body>
