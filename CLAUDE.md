@@ -72,7 +72,13 @@ dem:
   litar på, `POSTGRESQL_ADDON_HOST`) men `prod`-profilen ändå inte är
   aktiv - ett billigt säkerhetsnät mot just den här
   fail-insecure-fällan, inte en fix i sig; profilen aktiveras
-  fortfarande inte automatiskt).
+  fortfarande inte automatiskt). **Sedan WINE-59 (ADR 0026) krävs även
+  `WINECELLAR_BASE_URL` (appens publika HTTPS-adress, byggs in i
+  länkarna i verifierings-/återställningsmail - saknas den pekar mailen på
+  localhost) och SMTP-variablerna `WINECELLAR_MAIL_HOST`/`_PORT`/
+  `_USERNAME`/`_PASSWORD`/`_FROM`** (se "E-postverifiering och glömt
+  lösenord - nuläge"; saknas `WINECELLAR_MAIL_HOST` startar appen ändå men
+  inga mail skickas, så inga nya konton kan aktiveras).
 
 ## Namngivning
 
@@ -582,7 +588,8 @@ tidigare HTTP Basic-modellen helt, se
 [ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md), Superseded).
 
 - Öppen självregistrering på `/registrera` - vem som helst kan skapa
-  ett konto. Varje användares vinlista är helt privat (`owner_id` på
+  ett konto (med en e-postadress som användarnamn, som måste verifieras via
+  mail innan inloggning - sedan WINE-59, se nästa avsnitt). Varje användares vinlista är helt privat (`owner_id` på
   `wines`, `NOT NULL`) - ingen delning. Det finns en enda adminroll (WINE-61, ADR 0025) - se
   "Flera användare - nuläge". De tidigare
   hårdkodade `admin`/`readonly`-kontona och `WINECELLAR_ADMIN_PASSWORD`
@@ -622,6 +629,67 @@ tidigare HTTP Basic-modellen helt, se
   kopierad cookie-sträng förblir giltig till sin egen utgångstid
   oavsett; bara ett lösenordsbyte eller en nyckelrotation
   ogiltigförklarar redan utfärdade cookies i efterhand.
+
+## E-postverifiering och glömt lösenord - nuläge
+
+Se [ADR 0026](docs/adr/0026-email-username-verification-and-password-reset.md)
+(WINE-59). Användarnamnet är en e-postadress; kontot är overifierat tills
+användaren öppnat verifieringslänken.
+
+- **Flöde:** `RegistrationService` (register/verifyEmail/resendVerification) och
+  `PasswordResetService` (requestReset/checkToken/resetPassword) i `application`,
+  tokens i `TokenService` + `UserTokenRepository` (tabell `user_tokens`, JPA +
+  InMemory), webb: `RegistrationController`, `EmailVerificationController`
+  (`/verifiera`, `/verifiera/ny`), `PasswordResetController`
+  (`/glomt-losenord`, `/aterstall-losenord`). Alla fem rutter är `permitAll`.
+- **Tokens:** 256 bitar `SecureRandom` (`TokenHasher`), bara SHA-256-hashen lagras,
+  konstant-tidsjämförelse, engångsbruk, verifiering 24 h / återställning 1 h
+  (`TokenService`), en ny utfärdning raderar tidigare av samma slag. GET på länken
+  FÖRBRUKAR INTE (visar bara en bekräfta-knapp) - POST gör det, annars förbrukar en
+  mailskanner länken.
+- **E-postvalidering är avsiktligt lös** (`EmailAddress`): ändra den inte till en
+  strikt RFC-regex. Användarnamn sparas trimmade i gemener och
+  `UserRepository.findByUsername` är SKIFTLÄGESOKÄNSLIG. Äldre konton kan ha icke-
+  e-post-namn (eller blandade versaler) - de loggar in som förr men kan inte
+  använda "glömt lösenord". Ingen DB-unikindex på lower(username) (äldre dubbletter
+  som skiljer sig på versaler hade kunnat stoppa uppstarten).
+- **Overifierat konto = `disabled` i `UserDetails`, men kontrollen sker i ett
+  post-check i en egen `DaoAuthenticationProvider`-bean (`SecurityConfig`)** -
+  EFTER lösenordskontrollen, så att "måste verifieras" inte kan fås utan rätt
+  lösenord. Beanen gör att Spring loggar en WARN ("UserDetailsService beans will not
+  be used ...") vid uppstart; den är harmlös, providern får själv sin
+  `UserDetailsService`. Failure-handlern skickar `DisabledException` till
+  `/login?unverified`, övrigt till `/login?error`. Remember-me avvisar disabled-konton
+  via UserDetailsChecker.
+- **Neutralt svar vid glömt lösenord:** samma sida oavsett adress, rate limit
+  (`RequestRateLimiter`, 3 mail/adress/timme, i minnet, även för okända adresser),
+  okända adresser gör motsvarande lätt arbete, och `SmtpMailSender` skickar på en
+  egen tråd så att svarstiden inte avslöjar skillnaden. Lösenordsbyte avslutar
+  sessioner via porten `SessionTerminator` (`RegistrySessionTerminator`, SessionRegistry).
+- **Mail:** porten `MailSender`; `MailConfig` väljer `SmtpMailSender` om
+  `winecellar.mail.host` är satt, annars `LoggingMailSender` (loggar INNEHÅLLET
+  - och därmed tokenlänken - bara om `WINECELLAR_MAIL_LOG_CONTENT=true`; default av,
+  så att tokens aldrig hamnar i produktionsloggar). Boots egen mail-autokonfig används
+  inte (en tom `spring.mail.host` hade ändå aktiverat den). `MailConfig` bär även
+  `Clock`-beanen (UTC) som tjänsterna använder - en `@Configuration` laddas inte av
+  `@WebMvcTest`, så en controller som beror på dem testas med `@MockBean` på tjänsterna.
+- **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (speglad i
+  `schema.sql`) lägger till `users.email_verified`, backfillar ALLA befintliga rader
+  till `true` INNAN `NOT NULL` och skapar `user_tokens`. Backfillen rör bara rader som
+  är NULL, så en omkörning vid varje appstart påverkar aldrig ett medvetet overifierat
+  konto. `EmailVerificationMigrationIT` bygger en scratch-databas med en GAMMAL
+  users-tabell och riktiga rader (en tom Testcontainers-databas bevisar inget om
+  migreringsordning, se Kända fällor). `AdminService.deleteUser` raderar användarens
+  tokens (ingen FK).
+- **Testfällor:** (1) De flesta UI-/persistenstester skapar sina konton med
+  `support/TestAccounts` (ett redan VERIFIERAT konto, direkt via `UserRepository`,
+  fria användarnamn) - inte via `RegistrationService`, som kräver e-postformat och
+  verifiering. (2) Cucumber-kontexten importerar `AcceptanceTestBeans`: en
+  `@Primary` `MutableClock` (flyttbar tid) och `FakeMailSender`. `RegistrationSteps`
+  flyttar klockan 2 h framåt före varje scenario så att rate-limitarna (singleton i
+  minnet) inte läcker mellan scenarier. (3) Ett `@WebMvcTest` av en ny controller som
+  `@Import`ar `SecurityConfig` behöver ingen extra bean för mail - bara `@MockBean` på
+  den tjänst controllern använder.
 
 ## Etikettskanning (LLM) - nuläge
 
@@ -897,8 +965,9 @@ kontra enstaka strukturerad extraktion).
 (nullable i `UserEntity`, NOT NULL DEFAULT now() i `schema.sql` efter backfill;
 fristående `db/migrations/2026-10-08-add-user-last-login-at.sql`).
 - Sätts av `LastLoginRecorder` (`web`) på `InteractiveAuthenticationSuccessEvent`:
-  publiceras vid formulär- OCH remember-me-inloggning, INTE vid registreringens
-  manuella auto-inloggning (där sätts värdet till `createdAt` i `RegistrationService`).
+  publiceras vid formulär- OCH remember-me-inloggning, INTE vid registreringen
+  (där sätts värdet till `createdAt` i `RegistrationService`; sedan WINE-59 loggas
+  man inte in direkt efter registrering).
 - Skrivs via riktade `UserRepository.updateLastLogin`; fel fångas och loggas,
   en inloggning fälls aldrig. Snävt race: `SettingsController`/
   `AdminService.makeAdmin` läser och sparar hela `User` och kan i teorin ge ett
@@ -944,16 +1013,16 @@ anropsplatser får aldrig själva falla tillbaka på null.
 Settings-POST-vägarna använder numera `CurrentUser.find` (fail-closed, WINE-63; `FailClosedRoutesTest`), och `WineController.interpretLabel` slår upp användaren FÖRE det betalda LLM-anropet. Regel: ingen extern tjänst eller skrivning före första `CurrentUser`-uppslaget.
 Controller-tester som loggar in med `user(...)` utan riktig användarpost
 måste därför stubba `userRepository.findByUsername` (se
-`defaultUserForAnyPrincipal` i `WineControllerTest`). **Fällor:** (1) `new User(...)` har nu åtta komponenter (sist `lastLoginAt`, WINE-62) - varje kod
-som kopierar en användare (t.ex. `SettingsController`) måste bära vidare
-`admin`, annars degraderas kontot tyst vid nästa sparning. (2) Rättigheter
+`defaultUserForAnyPrincipal` i `WineControllerTest`). **Fällor:** (1) `new User(...)` har nu nio komponenter (sist `emailVerified`, WINE-59; `lastLoginAt` WINE-62) - varje kod
+som kopierar en användare måste bära vidare `admin` och `emailVerified`, annars
+degraderas kontot tyst vid nästa sparning. Använd `user.withAdmin(..)`/`withHashedPassword(..)`/
+`withEmailVerified(..)`/m.fl. i stället för en ny konstruktor. Den åttaargumentiga
+konstruktorn är BARA för tester (skapar ett verifierat konto) - använd den aldrig i produktionskod. (2) Rättigheter
 läses in vid inloggning (sessionen), så "Gör till admin" syns i menyn först
 efter målets nästa inloggning. (3) En session läser inte om
 `UserDetailsService`, så en raderad användares session lever kvar - det
 bärande skyddet är det fail-closed `CurrentUser` ovan
-(`DeletedUserAccessTest`, även för en nyregistrerad+raderad användare vars
-manuella auto-inloggning går förbi SessionAuthenticationStrategy; den
-registrerar nu sin session i registret själv). Som extra skikt finns ett
+(`DeletedUserAccessTest`, som loggar in via den riktiga `/login`-kedjan). Som extra skikt finns ett
 `SessionRegistry` (bean i `SecurityConfig`, `maximumSessions(-1)`,
 `HttpSessionEventPublisher`) som `AdminController` använder för att
 upphäva raderad användares sessioner; remember-me-cookien faller på att

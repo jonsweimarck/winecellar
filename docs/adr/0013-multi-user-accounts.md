@@ -11,6 +11,12 @@ YouTrack) - att fastslå vokabulär och vägval här, före kod, gör att en
 session som senare plockar upp en enskild story inte behöver
 återupptäcka avvägningarna ur koden.
 
+**Uppdatering (WINE-59, 2026-10-09):** registrering och inloggning är
+ändrade av [0026](0026-email-username-verification-and-password-reset.md) -
+användarnamnet är en e-postadress, kontot måste verifieras via mail innan
+inloggning och användaren loggas inte längre in direkt efter registrering.
+Övriga delar av beslutet nedan gäller oförändrat.
+
 ## Context
 
 Appen har hittills haft en enda delad vinsamling, skyddad av två

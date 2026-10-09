@@ -7,6 +7,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authentication.AccountExpiredException;
+import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.authentication.LockedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
@@ -98,7 +106,9 @@ public class SecurityConfig {
                         // omdirigeras till /login - inloggningssidan hade då
                         // renderats helt ostylad (WINE-39).
                         .requestMatchers("/css/**", "/js/**").permitAll()
-                        .requestMatchers("/registrera").permitAll()
+                        // WINE-59: registrering, e-postverifiering och glömt lösenord är anonyma sidor.
+                        .requestMatchers("/registrera", "/verifiera", "/verifiera/**",
+                                "/glomt-losenord", "/aterstall-losenord").permitAll()
                         // WINE-61: adminsidan och dess POST:ar - server-side
                         // behörighet (utloggad -> /login, inloggad icke-admin -> 403).
                         .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -113,6 +123,7 @@ public class SecurityConfig {
                         .expiredUrl("/login"))
                 .formLogin(form -> form
                         .loginPage("/login")
+                        .failureHandler(SecurityConfig::redirectOnLoginFailure)
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
@@ -156,7 +167,47 @@ public class SecurityConfig {
                 .map(user -> User.withUsername(user.username())
                         .password(user.hashedPassword())
                         .authorities(user.admin() ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN")) : List.of())
+                        // WINE-59: overifierat konto = inaktiverat (nekas inloggning, även via remember-me).
+                        .disabled(!user.emailVerified())
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException(username));
+    }
+
+    /**
+     * WINE-59: "enabled" kontrolleras EFTER lösenordskontrollen (post-check) i
+     * stället för före (Spring Securitys standard). Annars hade ett
+     * "ej verifierad"-svar kunnat fås utan att kunna lösenordet, vilket
+     * avslöjar att kontot finns och är overifierat. Med den här ordningen får
+     * bara den som anger RÄTT lösenord veta att adressen måste verifieras.
+     */
+    @Bean
+    public DaoAuthenticationProvider daoAuthenticationProvider(
+            UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
+        provider.setPreAuthenticationChecks(details -> {
+            if (!details.isAccountNonLocked()) {
+                throw new LockedException("Kontot är låst");
+            }
+            if (!details.isAccountNonExpired()) {
+                throw new AccountExpiredException("Kontot har gått ut");
+            }
+        });
+        provider.setPostAuthenticationChecks(details -> {
+            if (!details.isCredentialsNonExpired()) {
+                throw new CredentialsExpiredException("Lösenordet har gått ut");
+            }
+            if (!details.isEnabled()) {
+                throw new DisabledException("E-postadressen är inte verifierad");
+            }
+        });
+        return provider;
+    }
+
+    private static void redirectOnLoginFailure(HttpServletRequest request, HttpServletResponse response,
+                                               AuthenticationException exception) throws java.io.IOException {
+        String target = exception instanceof DisabledException ? "/login?unverified" : "/login?error";
+        response.sendRedirect(request.getContextPath() + target);
     }
 }

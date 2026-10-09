@@ -2,7 +2,7 @@ package com.example.winecellar.acceptance;
 
 import com.example.winecellar.application.AdminService;
 import com.example.winecellar.application.ConversationRepository;
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.ChatMessage;
@@ -42,7 +42,7 @@ public class AdminSteps {
     private AdminService adminService;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     @Autowired
     private UserRepository userRepository;
@@ -174,7 +174,7 @@ public class AdminSteps {
     }
 
     private void registerUser(String username) {
-        registrationService.register(username, PASSWORD);
+        testAccounts.register(username, PASSWORD);
         userIds.put(username, userRepository.findByUsername(username).orElseThrow().id());
     }
 

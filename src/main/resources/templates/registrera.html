@@ -15,9 +15,9 @@
              login.html. -->
         <form method="post" th:action="@{/registrera}">
             <div class="kort">
-                <label class="falt"><span>Användarnamn</span>
+                <label class="falt"><span>E-postadress</span>
                     <input type="text" id="username" name="username" th:value="${username}"
-                           autocomplete="username" autofocus="autofocus">
+                           autocomplete="email" inputmode="email" autofocus="autofocus">
                 </label>
                 <label class="falt"><span>Lösenord</span>
                     <input type="password" id="password" name="password" autocomplete="new-password">

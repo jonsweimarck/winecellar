@@ -1130,3 +1130,31 @@ den ursprungliga WINE-30-buggen, bara med lägre sannolikhet.
   vänds till sin motsats.
 - **ADR 0014 punkt 5 uppdaterad** - beskrev tidigare fallbacken som
   ovillkorlig, vilket inte längre stämmer.
+
+## E-post som användarnamn, verifiering och "glömt lösenord" - WINE-59 (2026-10-09)
+
+Beslutet står i [ADR 0026](adr/0026-email-username-verification-and-password-reset.md);
+nuläget i `CLAUDE.md` ("E-postverifiering och glömt lösenord - nuläge"). Det som
+inte är arkitektur men värt att veta:
+
+- **Cucumber-scenarierna körs mot riktig Postgres och den riktiga
+  säkerhetskedjan (MockMvc), med en flyttbar testklocka och en mail-fake**
+  (`AcceptanceTestBeans`). Tidsregler (24 h / 1 h) testas alltså utan att
+  vänta. Rate-limitarna är singleton i minnet och hade läckt mellan
+  scenarier; i stället för en test-only-nollställning i produktionskoden
+  flyttas klockan 2 h framåt före varje scenario.
+- **Ordningen på "enabled"-kontrollen:** Spring Securitys standard kontrollerar
+  `enabled` FÖRE lösenordet, vilket hade avslöjat "kontot finns men är
+  overifierat" utan att kunna lösenordet. Därför en egen `DaoAuthenticationProvider`
+  med kontrollen som post-check. Bieffekt: en WARN vid uppstart om att
+  `UserDetailsService`-beanen inte används av den globala AuthenticationManager
+  (den används av providern, varningen är kosmetisk).
+- **Befintliga tester:** de ~12 testklasser som registrerade konton via
+  `RegistrationService` byttes till `TestAccounts` (verifierat konto direkt via
+  repositoryt) - annars hade alla behövt e-postformade namn och ett
+  verifieringssteg. `DeletedUserAccessTest` loggar numera in via `/login` i
+  stället för via registreringens (borttagna) auto-inloggning.
+- **Verifiering av migreringen mot gammal data:** `EmailVerificationMigrationIT`
+  bygger en scratch-databas med en users-tabell i det gamla formatet och riktiga
+  rader, kör migreringsfilen (två gånger) och kontrollerar backfill, NOT NULL och
+  att ett nytt overifierat konto inte rörs av omkörningen.

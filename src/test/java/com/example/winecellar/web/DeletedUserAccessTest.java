@@ -2,8 +2,6 @@ package com.example.winecellar.web;
 
 import com.example.winecellar.application.AdminService;
 import com.example.winecellar.application.LabelInterpretationService;
-import com.example.winecellar.application.RegistrationResult;
-import com.example.winecellar.application.RegistrationService;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.User;
@@ -14,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -38,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * varken vinlistan eller exporten läser någon data.
  */
 @WebMvcTest({WineController.class, ExportController.class, SettingsController.class,
-        AdminController.class, RegistrationController.class})
+        AdminController.class})
 @Import(SecurityConfig.class)
 class DeletedUserAccessTest {
 
@@ -53,8 +52,8 @@ class DeletedUserAccessTest {
     @MockBean
     private LabelInterpretationService labelInterpretationService;
 
-    @MockBean
-    private RegistrationService registrationService;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @MockBean
     private AdminService adminService;
@@ -82,14 +81,11 @@ class DeletedUserAccessTest {
 
     @Test
     void skaNekaEnNyregistreradAnvändaresSessionNärKontotRaderats() throws Exception {
-        User registered = new User(GHOST_ID, "nyss", "hash", Instant.now(), 1, false, false, Instant.now());
-        when(registrationService.register("nyss", "hemligt123"))
-                .thenReturn(new RegistrationResult.Registered(registered));
+        User registered = new User(GHOST_ID, "nyss", passwordEncoder.encode("hemligt123"), Instant.now(), 1, false, false, Instant.now());
         when(userRepository.findByUsername("nyss")).thenReturn(Optional.of(registered));
 
-        MvcResult registrering = mockMvc.perform(post("/registrera").with(csrf())
-                        .param("username", "nyss").param("password", "hemligt123")
-                        .param("confirmPassword", "hemligt123"))
+        MvcResult registrering = mockMvc.perform(post("/login").with(csrf())
+                        .param("username", "nyss").param("password", "hemligt123"))
                 .andExpect(redirectedUrl("/"))
                 .andReturn();
         MockHttpSession session = (MockHttpSession) registrering.getRequest().getSession(false);
@@ -113,17 +109,16 @@ class DeletedUserAccessTest {
 
     @Test
     void skaNekaEnNyregistreradAnvändaresSessionNärKontotSaknasÄvenUtanUpphävdSession() throws Exception {
-        User registered = new User(GHOST_ID, "nyss", "hash", Instant.now(), 1, false, false, Instant.now());
-        when(registrationService.register("nyss", "hemligt123"))
-                .thenReturn(new RegistrationResult.Registered(registered));
-        when(userRepository.findByUsername("nyss")).thenReturn(Optional.empty());
+        User registered = new User(GHOST_ID, "nyss", passwordEncoder.encode("hemligt123"), Instant.now(), 1, false, false, Instant.now());
+        when(userRepository.findByUsername("nyss")).thenReturn(Optional.of(registered));
 
-        MvcResult registrering = mockMvc.perform(post("/registrera").with(csrf())
-                        .param("username", "nyss").param("password", "hemligt123")
-                        .param("confirmPassword", "hemligt123"))
+        MvcResult registrering = mockMvc.perform(post("/login").with(csrf())
+                        .param("username", "nyss").param("password", "hemligt123"))
                 .andReturn();
         MockHttpSession session = (MockHttpSession) registrering.getRequest().getSession(false);
 
+        // Kontot försvinner ur databasen medan sessionen lever kvar (utan att sessionen upphävs).
+        when(userRepository.findByUsername("nyss")).thenReturn(Optional.empty());
         mockMvc.perform(get("/").session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("http://localhost/login"));

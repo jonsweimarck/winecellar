@@ -17,6 +17,7 @@ import org.springframework.test.context.ContextConfiguration;
  * de bryr sig inte om denna Spring-kontext, men Cucumber kräver ändå exakt
  * en @CucumberContextConfiguration så fort cucumber-spring finns på classpath.
  */
+@org.springframework.context.annotation.Import(AcceptanceTestBeans.class)
 @CucumberContextConfiguration
 @SpringBootTest
 @ContextConfiguration(initializers = CucumberSpringConfiguration.Initializer.class)

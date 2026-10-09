@@ -1,6 +1,6 @@
 package com.example.winecellar.web;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.Wine;
@@ -39,7 +39,7 @@ class SettingsIT extends SharedPostgres {
     private int port;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     @Autowired
     private UserRepository userRepository;
@@ -67,7 +67,7 @@ class SettingsIT extends SharedPostgres {
 
     @BeforeEach
     void säkerställTestkonto() {
-        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testAccounts.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
     }
 
     /**

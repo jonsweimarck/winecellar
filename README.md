@@ -112,7 +112,13 @@ sökning och sortering" nedan. `is_admin` (boolean, NOT NULL, default
 false) markerar en admin - se "Admin" under Säkerhet. `last_login_at`
 (`timestamptz`, NOT NULL) är senaste lyckade inloggning (formulär eller
 "håll mig inloggad"; sätts till `created_at` vid registrering) - visas på
-adminsidan.
+adminsidan. `email_verified` (boolean, NOT NULL, default false) är om
+användarnamnet (som sedan WINE-59 är en e-postadress) verifierats via mail -
+ett overifierat konto kan inte logga in; alla konton som fanns före WINE-59
+markerades som verifierade av migreringen. Tabell `user_tokens` (`user_id`,
+`purpose` [verifiering/återställning], `token_hash` unik, `expires_at`) håller
+engångstokens för verifierings- och återställningslänkar - bara hashen lagras.
+Se [ADR 0026](docs/adr/0026-email-username-verification-and-password-reset.md).
 
 ### Chattkonversationer
 
@@ -252,7 +258,8 @@ Hela appen kräver inloggning - formulärbaserad, med session, se
 [ADR 0013](docs/adr/0013-multi-user-accounts.md) (ersätter den
 ursprungliga HTTP Basic-modellen i
 [ADR 0009](docs/adr/0009-whole-app-http-basic-auth.md)). Vem som helst
-kan registrera ett eget konto på `/registrera` - varje konto får en
+kan registrera ett eget konto på `/registrera` (med en e-postadress som
+användarnamn, se "E-post, verifiering och glömt lösenord" nedan) - varje konto får en
 helt privat, egen vinlista, ingen delning och ingen rollindelning för vanliga användare - det finns
 bara en enda adminroll, se "Admin" nedan
 (de tidigare hårdkodade `admin`/`readonly`-kontona och
@@ -260,6 +267,41 @@ bara en enda adminroll, se "Admin" nedan
 
 CSRF är påslaget (htmx-formulären skickar token via en
 `htmx:configRequest`-lyssnare, se `vinkallare.html`).
+
+### E-post, verifiering och glömt lösenord
+
+Användarnamnet är en e-postadress (valideras löst: lokal del, @ och en
+domän med punkt; sparas i gemener, unikt oavsett versaler). Ett nytt konto
+är overifierat och kan inte logga in förrän användaren öppnat länken i
+verifieringsmailet (giltig 24 timmar, engångsbruk; en ny länk kan begäras på
+`/verifiera/ny`). Inloggningssidans "Glömt ditt lösenord?" leder till
+`/glomt-losenord`: en återställningslänk (giltig 1 timme, engångsbruk, en ny
+begäran ogiltigförklarar tidigare) mailas bara till ett verifierat konto, men
+svaret är alltid detsamma ("Om adressen finns har ett mail skickats"), och
+antalet mail per adress är begränsat (3 per timme, i minnet). Ett
+lösenordsbyte avslutar användarens övriga sessioner. Se
+[ADR 0026](docs/adr/0026-email-username-verification-and-password-reset.md).
+
+Mail skickas via SMTP, konfigurerat med miljövariabler. Utan
+`WINECELLAR_MAIL_HOST` startar appen ändå men skickar inget mail (en logg-adapter
+tar emot dem) - lokalt: sätt `WINECELLAR_MAIL_LOG_CONTENT=true` för att se mailets
+innehåll, inklusive länken, i loggen (gör aldrig det i produktion).
+
+| Variabel | Betydelse | Default |
+|---|---|---|
+| `WINECELLAR_BASE_URL` | Appens publika HTTPS-adress, byggs in i länkarna i mailen | `http://localhost:8080` |
+| `WINECELLAR_MAIL_HOST` | SMTP-server (tom = inget mail skickas) | tom |
+| `WINECELLAR_MAIL_PORT` | SMTP-port | `587` |
+| `WINECELLAR_MAIL_USERNAME` / `WINECELLAR_MAIL_PASSWORD` | SMTP-inloggning (hoppas över om användarnamn är tomt) | tom |
+| `WINECELLAR_MAIL_FROM` | Avsändaradress | `no-reply@localhost` |
+| `WINECELLAR_MAIL_STARTTLS` | STARTTLS på/av | `true` |
+| `WINECELLAR_MAIL_LOG_CONTENT` | Logga mailets innehåll när SMTP saknas (bara lokalt) | `false` |
+
+**Att sätta i Clever Cloud:** `WINECELLAR_BASE_URL`, `WINECELLAR_MAIL_HOST`,
+`WINECELLAR_MAIL_PORT`, `WINECELLAR_MAIL_USERNAME`, `WINECELLAR_MAIL_PASSWORD` och
+`WINECELLAR_MAIL_FROM` (avsändaradressen måste vara godkänd hos SMTP-leverantören).
+Migreringen `db/migrations/2026-10-09-add-email-verification.sql` körs
+automatiskt av `schema.sql` vid uppstart (kan också köras för hand i förväg).
 
 ### Admin
 

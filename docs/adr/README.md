@@ -46,7 +46,7 @@ WINE-36).
 | [0010](0010-excel-tool-standalone-module.md) | Excel-import/export som ett fristående, separat verktyg | Superseded av [0014](0014-web-based-excel-import-export.md) |
 | [0011](0011-excel-image-roundtrip-dual-mechanism.md) | Excel-bildrundtripp via två oberoende mekanismer | Deprecated (WINE-32) |
 | [0012](0012-label-scanning-llm-integration.md) | Etikettskanning via en extern LLM-tjänst, port/adapter + direkt REST-anrop | Accepted |
-| [0013](0013-multi-user-accounts.md) | Flera användare med egna, privata vinlistor | Accepted |
+| [0013](0013-multi-user-accounts.md) | Flera användare med egna, privata vinlistor | Accepted (registrering/inloggning ändrad av [0026](0026-email-username-verification-and-password-reset.md)) |
 | [0014](0014-web-based-excel-import-export.md) | Webbaserad Excel-import/export, scopead till inloggad användare | Accepted |
 | [0015](0015-bulk-import-images-lossy-jpeg.md) | Bulkimportens bilder skalas ned och komprimeras - ingen bit-exakt rundtripp | Accepted |
 | [0016](0016-quantity-also-mandatory.md) | Antal flaskor blir obligatoriskt, precis som namnet | Accepted |
@@ -59,3 +59,4 @@ WINE-36).
 | [0023](0023-session-scoped-filter-memory.md) | Vinlistans filtrering minns sig själv för sessionen, inte per konto | Accepted |
 | [0024](0024-chat-wine-mention-links.md) | AI-chattens svar länkar till nämnda viner i vinlistan | Accepted |
 | [0025](0025-admin-role-and-user-deletion.md) | En enkel adminroll som kan förvalta konton, inklusive radera användare | Accepted |
+| [0026](0026-email-username-verification-and-password-reset.md) | E-postadress som användarnamn, verifiering via mail och "glömt lösenord" | Accepted |

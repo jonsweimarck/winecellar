@@ -32,7 +32,7 @@ public class JpaUserRepository implements UserRepository {
 
     @Override
     public Optional<User> findByUsername(String username) {
-        return jpaRepository.findByUsername(username).map(JpaUserRepository::toDomain);
+        return jpaRepository.findFirstByUsernameIgnoreCaseOrderByIdAsc(username).map(JpaUserRepository::toDomain);
     }
 
     @Override
@@ -66,6 +66,7 @@ public class JpaUserRepository implements UserRepository {
         entity.setOwnRatingFromScale(user.ownRatingFromScale());
         entity.setAdmin(user.admin());
         entity.setLastLoginAt(user.lastLoginAt());
+        entity.setEmailVerified(user.emailVerified());
         return entity;
     }
 
@@ -78,6 +79,8 @@ public class JpaUserRepository implements UserRepository {
                 entity.getDefaultMinQuantityFilter() != null ? entity.getDefaultMinQuantityFilter() : 0,
                 Boolean.TRUE.equals(entity.getOwnRatingFromScale()),
                 Boolean.TRUE.equals(entity.getAdmin()),
-                entity.getLastLoginAt());
+                entity.getLastLoginAt(),
+                // NULL kan bara förekomma före schema.sql hunnit backfilla - befintliga konton räknas som verifierade.
+                !Boolean.FALSE.equals(entity.getEmailVerified()));
     }
 }
