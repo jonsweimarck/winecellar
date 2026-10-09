@@ -131,6 +131,24 @@ public class RegistrationSteps {
         assertThat(lastRegistration).isInstanceOf(RegistrationResult.UsernameTaken.class);
     }
 
+    @Så("blir registreringen godkänd precis som för en ny adress")
+    public void registreringenGodkänd() {
+        assertThat(lastRegistration).isInstanceOf(RegistrationResult.Registered.class);
+    }
+
+    @Och("angriparens verifieringslänk till {string} är ogiltig")
+    public void angriparensLänkÄrOgiltig(String address) {
+        assertThat(registrationService.checkVerificationToken(mailSender.sentTo(address).get(0).token()))
+                .isEqualTo(TokenOutcome.INVALID);
+    }
+
+    @Och("den senaste verifieringslänken till {string} aktiverar kontot")
+    public void senasteLänkenAktiverar(String address) {
+        List<FakeMailSender.Mail> mails = mailSender.sentTo(address);
+        assertThat(registrationService.verifyEmail(mails.get(mails.size() - 1).token()))
+                .isEqualTo(TokenOutcome.SUCCESS);
+    }
+
     @Och("inget konto med användarnamnet {string} har skapats")
     public void ingetKontoHarSkapats(String username) {
         assertThat(userRepository.findByUsername(username)).isEmpty();

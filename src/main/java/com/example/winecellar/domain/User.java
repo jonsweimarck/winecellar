@@ -58,17 +58,6 @@ public record User(
         boolean emailVerified
 ) {
 
-    /**
-     * Bekvämlighetskonstruktor för TESTER: ett redan verifierat konto. Får inte
-     * användas i produktionskod - där ska {@code emailVerified} alltid anges
-     * uttryckligen (eller bäras vidare med {@code withX}), annars kan ett
-     * overifierat konto tyst bli verifierat.
-     */
-    public User(UserId id, String username, String hashedPassword, Instant createdAt,
-                int defaultMinQuantityFilter, boolean ownRatingFromScale, boolean admin, Instant lastLoginAt) {
-        this(id, username, hashedPassword, createdAt, defaultMinQuantityFilter, ownRatingFromScale, admin,
-                lastLoginAt, true);
-    }
 
     public User withHashedPassword(String newHash) {
         return new User(id, username, newHash, createdAt, defaultMinQuantityFilter, ownRatingFromScale, admin,

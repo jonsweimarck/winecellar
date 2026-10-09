@@ -33,8 +33,8 @@ public class InMemoryUserTokenRepository implements UserTokenRepository {
     }
 
     @Override
-    public void deleteById(Long id) {
-        tokens.remove(id);
+    public boolean deleteById(Long id) {
+        return tokens.remove(id) != null;
     }
 
     @Override

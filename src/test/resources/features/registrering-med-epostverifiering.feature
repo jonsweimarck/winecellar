@@ -52,3 +52,18 @@ Egenskap: Registrering med e-postverifiering
     Givet att ett konto med användarnamnet "Anna@Example.com" redan finns
     När jag försöker registrera mig med användarnamnet "anna@example.com" och lösenordet "hemligt123"
     Så avvisas registreringen eftersom användarnamnet är upptaget
+
+  Scenario: Offrets registrering skriver över en förhandsregistrering med angriparens lösenord
+    Givet att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "angripare123"
+    När jag registrerar mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
+    Så blir registreringen godkänd precis som för en ny adress
+    Och angriparens verifieringslänk till "offer@example.com" är ogiltig
+    Och den senaste verifieringslänken till "offer@example.com" aktiverar kontot
+    Och jag kan inte logga in som "offer@example.com" med lösenordet "angripare123"
+    Och jag kan logga in som "offer@example.com" med lösenordet "offerLösen456"
+
+  Scenario: Ett verifierat konto kan inte skrivas över genom ny registrering
+    Givet att ett konto med användarnamnet "Anna@Example.com" redan finns
+    När jag försöker registrera mig med användarnamnet "anna@example.com" och lösenordet "angripare123"
+    Så avvisas registreringen eftersom användarnamnet är upptaget
+    Och jag kan inte logga in som "anna@example.com" med lösenordet "angripare123"

@@ -1,5 +1,6 @@
 package com.example.winecellar.acceptance;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.AdminService;
 import com.example.winecellar.application.ConversationRepository;
 import com.example.winecellar.support.TestAccounts;
@@ -65,7 +66,7 @@ public class AdminSteps {
     public void attÄrAdmin(String username) {
         registerUser(username);
         User user = userRepository.findByUsername(username).orElseThrow();
-        userRepository.save(new User(user.id(), user.username(), user.hashedPassword(), user.createdAt(),
+        userRepository.save(TestUsers.verifiedUser(user.id(), user.username(), user.hashedPassword(), user.createdAt(),
                 user.defaultMinQuantityFilter(), user.ownRatingFromScale(), true, user.lastLoginAt()));
     }
 

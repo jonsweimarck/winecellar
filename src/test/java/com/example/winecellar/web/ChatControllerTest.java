@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.ChatResult;
 import com.example.winecellar.application.ChatService;
 import com.example.winecellar.application.UserRepository;
@@ -70,7 +71,7 @@ class ChatControllerTest {
     @org.junit.jupiter.api.BeforeEach
     void defaultUserForAnyPrincipal() {
         when(userRepository.findByUsername(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation ->
-                Optional.of(new User(new UserId(1L), invocation.getArgument(0), "hash", Instant.now(), 1, false, false, Instant.now())));
+                Optional.of(TestUsers.verifiedUser(new UserId(1L), invocation.getArgument(0), "hash", Instant.now(), 1, false, false, Instant.now())));
     }
 
     @MockBean
@@ -82,7 +83,7 @@ class ChatControllerTest {
 
     private void inloggadAnvändareFinns() {
         when(userRepository.findByUsername("testperson"))
-                .thenReturn(Optional.of(new User(ÄGARE, "testperson", "hash", Instant.now(), 1, false, false, Instant.now())));
+                .thenReturn(Optional.of(TestUsers.verifiedUser(ÄGARE, "testperson", "hash", Instant.now(), 1, false, false, Instant.now())));
         // WINE-56: en tom vinlista som standard - testerna som faktiskt
         // bryr sig om vinnamnslänkning stubbar wineService.listWines(...)
         // själva med sina egna viner.

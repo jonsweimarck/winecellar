@@ -78,7 +78,9 @@ dem:
   localhost) och SMTP-variablerna `WINECELLAR_MAIL_HOST`/`_PORT`/
   `_USERNAME`/`_PASSWORD`/`_FROM`** (se "E-postverifiering och glömt
   lösenord - nuläge"; saknas `WINECELLAR_MAIL_HOST` startar appen ändå men
-  inga mail skickas, så inga nya konton kan aktiveras).
+  inga mail skickas, så inga nya konton kan aktiveras; `MailConfigGuard` (`web`) loggar
+  en varning vid uppstart om Clever Cloud-drift känns igen men någon av dem saknas -
+  samma säkerhetsnät-princip som `RememberMeKeyGuard`).
 
 ## Namngivning
 
@@ -673,6 +675,17 @@ användaren öppnat verifieringslänken.
   inte (en tom `spring.mail.host` hade ändå aktiverat den). `MailConfig` bär även
   `Clock`-beanen (UTC) som tjänsterna använder - en `@Configuration` laddas inte av
   `@WebMvcTest`, så en controller som beror på dem testas med `@MockBean` på tjänsterna.
+- **Granskningsåtgärder (PR #50):** (a) pre-hijacking: `register` för en overifierad adress
+  skriver över lösenordshashen och utfärdar nytt token (samma rate limit, svar som för ny
+  adress); verifierad adress => "upptaget". (b) `RequestRateLimiter` förbrukas först när ett
+  mail ska skickas (efter kontouppslag), okända adresser rör aldrig kartan, kartan har hårt tak
+  (10 000 nycklar; full => nya nycklar nekas tyst). (c) `UserTokenRepository.deleteById` är
+  atomär (returnerar om raden faktiskt raderades) och är engångsgrinden vid verifiering och
+  återställning; `TokenService.issue` är `@Transactional` med unikt index (user_id, purpose).
+  (d) `MailConfigGuard` varnar vid uppstart på Clever Cloud om `WINECELLAR_MAIL_HOST`/
+  `WINECELLAR_BASE_URL` saknas. (e) `SmtpMailSender` fångar Throwable, har en kö på 100.
+  (f) Den åttaargumentiga `User`-konstruktorn är borttagen - tester använder
+  `support/TestUsers.verifiedUser(...)`. (g) `userDetailsService` trimmar användarnamnet.
 - **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (speglad i
   `schema.sql`) lägger till `users.email_verified`, backfillar ALLA befintliga rader
   till `true` INNAN `NOT NULL` och skapar `user_tokens`. Backfillen rör bara rader som
@@ -1016,8 +1029,9 @@ måste därför stubba `userRepository.findByUsername` (se
 `defaultUserForAnyPrincipal` i `WineControllerTest`). **Fällor:** (1) `new User(...)` har nu nio komponenter (sist `emailVerified`, WINE-59; `lastLoginAt` WINE-62) - varje kod
 som kopierar en användare måste bära vidare `admin` och `emailVerified`, annars
 degraderas kontot tyst vid nästa sparning. Använd `user.withAdmin(..)`/`withHashedPassword(..)`/
-`withEmailVerified(..)`/m.fl. i stället för en ny konstruktor. Den åttaargumentiga
-konstruktorn är BARA för tester (skapar ett verifierat konto) - använd den aldrig i produktionskod. (2) Rättigheter
+`withEmailVerified(..)`/m.fl. i stället för en ny konstruktor. Någon åttaargumentig
+"verifierad"-konstruktor finns inte (borttagen i granskningen); tester använder
+`support/TestUsers.verifiedUser(...)`. (2) Rättigheter
 läses in vid inloggning (sessionen), så "Gör till admin" syns i menyn först
 efter målets nästa inloggning. (3) En session läser inte om
 `UserDetailsService`, så en raderad användares session lever kvar - det

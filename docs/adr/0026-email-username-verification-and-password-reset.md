@@ -71,9 +71,26 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
 - Svarstidsutjämningen är "så långt rimligt": ett riktigt utskick sker på
   en egen tråd och okända adresser gör motsvarande lätta arbete, men ingen
   strikt konstant tid garanteras.
-- Registreringen avslöjar fortfarande att en adress redan är upptagen
-  (krävs för att en användare ska förstå varför registreringen avvisas) -
-  till skillnad från "glömt lösenord", som inte gör det.
+- Registreringen avslöjar fortfarande att en adress redan är upptagen,
+  inklusive via svarstid (krävs för att en användare ska förstå varför
+  registreringen avvisas; ingen dummy-hashning görs) - till skillnad från
+  "glömt lösenord", som inte gör det.
+- Skydd mot att någon förhandsregistrerar en annans adress: en ny
+  registrering för en ännu OVERIFIERAD adress skriver över lösenordet och
+  utfärdar ett nytt token (tidigare ogiltigförklaras), och svaret ser ut som
+  för en ny adress. Då fungerar inte angriparens lösenord när den riktige
+  ägaren registrerat om sig. För en verifierad adress gäller "upptaget".
+  Gamla overifierade konton städas inte bort.
+- Mailkvoten per adress förbrukas först när ett mail faktiskt ska skickas,
+  så okända adresser aldrig hamnar i begränsarens karta. En anonym part kan
+  dock förbruka kvoten för en känd adress och därmed tillfälligt hindra
+  mail till den (accepterad störning). Kartan är storleksbegränsad, utgångna
+  poster rensas och när den är full nekas nya adresser tyst. Ingen
+  IP-baserad begränsning görs (en vidarebefordrad klientadress är
+  förfalskningsbar, se [0020](0020-remember-me-hash-based.md)).
+- Inlösen av ett token är atomär (den som raderar raden vinner), utfärdande
+  sker i en transaktion med ett unikt index på användare och slag, så två
+  samtidiga anrop kan inte ge två giltiga tokens eller dubbelinlösen.
 - Ett verifierat konto vars adress senare slutar fungera kan inte
   återställas utan manuell hjälp; ingen byte-av-adress-funktion byggs nu.
 - Alternativ som valdes bort: att låta länken i mailet förbruka tokenet

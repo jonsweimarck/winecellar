@@ -34,6 +34,33 @@ class TokenServiceTest {
     }
 
     @Test
+    void skaBaraLåtaEnAvFleraSamtidigaInlösenLyckas() throws Exception {
+        String raw = service.issue(USER, Purpose.PASSWORD_RESET);
+        var token = service.check(Purpose.PASSWORD_RESET, raw).token();
+        assertThat(service.consume(token)).isTrue();
+        assertThat(service.consume(token)).isFalse();
+
+        String raw2 = service.issue(USER, Purpose.PASSWORD_RESET);
+        var token2 = service.check(Purpose.PASSWORD_RESET, raw2).token();
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(8);
+        try {
+            java.util.List<java.util.concurrent.Future<Boolean>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < 8; i++) {
+                results.add(pool.submit(() -> service.consume(token2)));
+            }
+            int wins = 0;
+            for (var f : results) {
+                if (f.get()) {
+                    wins++;
+                }
+            }
+            assertThat(wins).isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void skaGodkännaGiltigtTokenOchAvvisaOkäntOchTomt() {
         String raw = service.issue(USER, Purpose.PASSWORD_RESET);
         assertThat(service.check(Purpose.PASSWORD_RESET, raw).outcome()).isEqualTo(TokenOutcome.SUCCESS);

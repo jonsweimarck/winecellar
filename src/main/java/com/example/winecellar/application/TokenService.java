@@ -4,6 +4,7 @@ import com.example.winecellar.domain.User.UserId;
 import com.example.winecellar.domain.UserToken;
 import com.example.winecellar.domain.UserToken.Purpose;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -12,7 +13,8 @@ import java.util.Optional;
 /**
  * Utfärdar och löser in engångstokens (WINE-59, se ADR 0026). Verifieringslänk
  * gäller 24 h, återställningslänk 1 h. En ny utfärdning ogiltigförklarar
- * tidigare tokens av samma slag för samma användare. Ett inlöst token raderas.
+ * tidigare tokens av samma slag för samma användare. Ett inlöst token raderas
+ * atomärt - det är raderingen som är engångsgrinden.
  */
 @Service
 public class TokenService {
@@ -31,7 +33,13 @@ public class TokenService {
         this.clock = clock;
     }
 
-    /** @return det RÅA tokenet - lagras aldrig, skickas bara i mailet */
+    /**
+     * @return det RÅA tokenet - lagras aldrig, skickas bara i mailet. Radering av
+     * tidigare och sparande av nytt sker i EN transaktion, och databasen har
+     * ett unikt index på (användare, slag) som sista skydd: två samtidiga
+     * anrop kan aldrig lämna två giltiga tokens (den som förlorar racet får ett fel).
+     */
+    @Transactional
     public String issue(UserId userId, Purpose purpose) {
         tokenRepository.deleteByUserAndPurpose(userId, purpose);
         String raw = TokenHasher.generate();
@@ -59,9 +67,9 @@ public class TokenService {
         return new Redeemed(TokenOutcome.SUCCESS, token);
     }
 
-    /** Förbrukar tokenet (engångsbruk). */
-    public void consume(UserToken token) {
-        tokenRepository.deleteById(token.id());
+    /** Förbrukar tokenet atomärt (engångsbruk). @return false om någon annan hann före. */
+    public boolean consume(UserToken token) {
+        return tokenRepository.deleteById(token.id());
     }
 
     public void revokeAll(UserId userId, Purpose purpose) {

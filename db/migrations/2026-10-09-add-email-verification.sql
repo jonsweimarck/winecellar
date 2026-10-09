@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS user_tokens (
     user_id bigint NOT NULL,
     purpose varchar(255) NOT NULL,
     token_hash varchar(255) NOT NULL UNIQUE,
-    expires_at timestamptz NOT NULL
+    expires_at timestamptz NOT NULL,
+    UNIQUE (user_id, purpose)
 );
 CREATE INDEX IF NOT EXISTS user_tokens_user_id_idx ON user_tokens (user_id);
 

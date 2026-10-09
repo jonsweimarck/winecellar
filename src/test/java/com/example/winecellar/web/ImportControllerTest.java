@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.DuplicateCheck;
 import com.example.winecellar.application.ImportPreviewService;
 import com.example.winecellar.application.UserRepository;
@@ -99,7 +100,7 @@ class ImportControllerTest {
     @BeforeEach
     void stubbaInloggadAnvändare() {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false, false, Instant.now())));
+                TestUsers.verifiedUser(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false, false, Instant.now())));
     }
 
     private void stubbaDubblettkontroll() {

@@ -12,7 +12,12 @@ public interface UserTokenRepository {
 
     Optional<UserToken> findByHash(Purpose purpose, String tokenHash);
 
-    void deleteById(Long id);
+    /**
+     * Atomär: raderar tokenet och returnerar true bara för den ENDA anropare
+     * vars radering faktiskt tog bort raden. Används som själva
+     * engångsgrinden - två samtidiga inlösen kan aldrig båda lyckas.
+     */
+    boolean deleteById(Long id);
 
     /** Tar bort användarens alla tokens av ett visst slag (ny begäran ogiltigförklarar tidigare). */
     void deleteByUserAndPurpose(UserId userId, Purpose purpose);

@@ -34,9 +34,11 @@ public class JpaUserTokenRepository implements UserTokenRepository {
         return jpaRepository.findByPurposeAndTokenHash(purpose.name(), tokenHash).map(JpaUserTokenRepository::toDomain);
     }
 
+    /** Villkorad radering (DELETE ... WHERE id = ?) - antalet påverkade rader avgör vem som "vann". */
     @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
+    @Transactional
+    public boolean deleteById(Long id) {
+        return jpaRepository.deleteByTokenId(id) > 0;
     }
 
     @Override

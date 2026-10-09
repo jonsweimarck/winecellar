@@ -51,7 +51,7 @@ public class PasswordResetService {
      */
     public void requestReset(String username) {
         Optional<String> email = EmailAddress.normalize(username);
-        if (email.isEmpty() || !limiter.tryAcquire(email.get())) {
+        if (email.isEmpty()) {
             return;
         }
         Optional<User> user = userRepository.findByUsername(email.get()).filter(User::emailVerified);
@@ -59,6 +59,10 @@ public class PasswordResetService {
             // Likartat arbete (slump + hash) som för en känd adress, så att svarstiden
             // inte avslöjar skillnaden. Själva utskicket är asynkront i SMTP-adaptern.
             TokenHasher.hash(TokenHasher.generate());
+            return;
+        }
+        // Kvoten förbrukas först när ett mail faktiskt ska skickas (okända adresser rör aldrig kartan).
+        if (!limiter.tryAcquire(email.get())) {
             return;
         }
         String token = tokenService.issue(user.get().id(), Purpose.PASSWORD_RESET);
@@ -82,7 +86,9 @@ public class PasswordResetService {
             return redeemed.outcome();
         }
         Optional<User> user = userRepository.findById(redeemed.token().userId());
-        tokenService.consume(redeemed.token());
+        if (!tokenService.consume(redeemed.token())) {
+            return TokenOutcome.INVALID;
+        }
         if (user.isEmpty()) {
             return TokenOutcome.INVALID;
         }

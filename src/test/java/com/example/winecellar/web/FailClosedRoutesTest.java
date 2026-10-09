@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.ChatService;
 import com.example.winecellar.application.ImportPreviewService;
 import com.example.winecellar.application.LabelInterpretationService;
@@ -51,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class FailClosedRoutesTest {
 
     private static final String LOGIN = "http://localhost/login";
-    private static final User FINNS = new User(new UserId(1L), "finns", "hash", Instant.now(), 1, false, false, Instant.now());
+    private static final User FINNS = TestUsers.verifiedUser(new UserId(1L), "finns", "hash", Instant.now(), 1, false, false, Instant.now());
 
     @Autowired
     private MockMvc mockMvc;

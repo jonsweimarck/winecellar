@@ -163,7 +163,8 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(UserRepository userRepository) {
-        return username -> userRepository.findByUsername(username)
+        // WINE-59: trimmas på samma sätt som registreringen normaliserar (skiftläge hanteras av uppslaget).
+        return username -> userRepository.findByUsername(username == null ? "" : username.trim())
                 .map(user -> User.withUsername(user.username())
                         .password(user.hashedPassword())
                         .authorities(user.admin() ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN")) : List.of())

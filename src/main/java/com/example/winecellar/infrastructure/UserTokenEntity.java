@@ -16,7 +16,7 @@ import java.time.Instant;
  * CHECK-constraint att underhålla).
  */
 @Entity
-@Table(name = "user_tokens")
+@Table(name = "user_tokens", uniqueConstraints = @jakarta.persistence.UniqueConstraint(columnNames = {"user_id", "purpose"}))
 public class UserTokenEntity {
 
     @Id

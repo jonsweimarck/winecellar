@@ -1,5 +1,6 @@
 package com.example.winecellar.acceptance;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.User.UserId;
@@ -60,7 +61,7 @@ public class MultiUserSteps {
 
     private UserId userIdFor(String username) {
         return userIdsByUsername.computeIfAbsent(username,
-                name -> userRepository.save(new User(null, name, "irrelevant-i-testet", Instant.now(), 0, false, false, Instant.now())).id());
+                name -> userRepository.save(TestUsers.verifiedUser(null, name, "irrelevant-i-testet", Instant.now(), 0, false, false, Instant.now())).id());
     }
 
     @När("{string} öppnar sin vinlista")

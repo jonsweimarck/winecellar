@@ -7,7 +7,9 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * SMTP-adapter (WINE-59, se ADR 0026). Skickar ASYNKRONT på en egen tråd:
@@ -22,11 +24,15 @@ public class SmtpMailSender implements MailSender {
 
     private final JavaMailSender javaMailSender;
     private final String from;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "mail-sender");
-        thread.setDaemon(true);
-        return thread;
-    });
+    /** En tråd och en begränsad kö: en hängande SMTP-server kan inte växa minnet obegränsat. */
+    private final ExecutorService executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(100),
+            runnable -> {
+                Thread thread = new Thread(runnable, "mail-sender");
+                thread.setDaemon(true);
+                return thread;
+            },
+            (runnable, pool) -> log.warn("Mailkön är full - ett mail kastades (ingen token i loggen)."));
 
     public SmtpMailSender(JavaMailSender javaMailSender, String from) {
         this.javaMailSender = javaMailSender;
@@ -43,8 +49,10 @@ public class SmtpMailSender implements MailSender {
         executor.submit(() -> {
             try {
                 javaMailSender.send(message);
-            } catch (RuntimeException e) {
-                log.error("Kunde inte skicka mail \"{}\": {}", subject, e.toString());
+            } catch (Throwable t) {
+                // Fångar ALLT (även Error) så att tråden aldrig dör tyst; loggar bara
+                // typ och ämne - aldrig mailets innehåll (som innehåller en tokenlänk).
+                log.error("Kunde inte skicka mail \"{}\": {}", subject, t.getClass().getName());
             }
         });
     }

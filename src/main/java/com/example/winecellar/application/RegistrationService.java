@@ -50,8 +50,21 @@ public class RegistrationService {
         if (email.isEmpty()) {
             return new RegistrationResult.InvalidEmail();
         }
-        if (userRepository.findByUsername(email.get()).isPresent()) {
-            return new RegistrationResult.UsernameTaken();
+        Optional<User> existing = userRepository.findByUsername(email.get());
+        if (existing.isPresent()) {
+            if (existing.get().emailVerified()) {
+                return new RegistrationResult.UsernameTaken();
+            }
+            // Mot "pre-hijacking" (WINE-59, ADR 0026): någon annan kan ha registrerat offrets adress
+            // i förväg med ett lösenord de känner till. Den riktige ägarens nya registrering
+            // skriver därför över lösenordet och utfärdar ett nytt token (de gamla ogiltigförklaras).
+            // Svaret är detsamma som för en ny adress, och samma rate limit som för ny länk gäller.
+            if (resendLimiter.tryAcquire(email.get())) {
+                User updated = userRepository.save(
+                        existing.get().withHashedPassword(passwordEncoder.encode(password)));
+                sendVerificationMail(updated);
+            }
+            return new RegistrationResult.Registered(existing.get());
         }
         // Senaste login = skapad vid registrering (ingen inloggningshändelse publiceras).
         Instant now = clock.instant();
@@ -72,7 +85,9 @@ public class RegistrationService {
         if (redeemed.outcome() != TokenOutcome.SUCCESS) {
             return redeemed.outcome();
         }
-        tokenService.consume(redeemed.token());
+        if (!tokenService.consume(redeemed.token())) {
+            return TokenOutcome.INVALID;
+        }
         userRepository.findById(redeemed.token().userId())
                 .ifPresent(user -> userRepository.save(user.withEmailVerified(true)));
         return TokenOutcome.SUCCESS;
@@ -88,15 +103,16 @@ public class RegistrationService {
         if (email.isEmpty()) {
             return;
         }
-        if (!resendLimiter.tryAcquire(email.get())) {
-            return;
-        }
         Optional<User> user = userRepository.findByUsername(email.get()).filter(u -> !u.emailVerified());
-        if (user.isPresent()) {
-            sendVerificationMail(user.get());
-        } else {
+        if (user.isEmpty()) {
+            // Okända/redan verifierade adresser registreras aldrig i begränsarens karta.
             // Likartat arbete som för en känd adress (se PasswordResetService).
             TokenHasher.hash(TokenHasher.generate());
+            return;
+        }
+        // Kvoten förbrukas först när ett mail faktiskt ska skickas.
+        if (resendLimiter.tryAcquire(email.get())) {
+            sendVerificationMail(user.get());
         }
     }
 
