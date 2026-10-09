@@ -2,6 +2,8 @@ package com.example.winecellar.application;
 
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.UserToken.Purpose;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,6 +23,8 @@ import java.util.Optional;
  */
 @Service
 public class PasswordResetService {
+
+    private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
 
     static final int MAX_RESET_MAILS_PER_ADDRESS = 3;
     static final Duration RESET_MAIL_WINDOW = Duration.ofHours(1);
@@ -71,6 +75,7 @@ public class PasswordResetService {
             token = tokenService.issue(user.get().id(), Purpose.PASSWORD_RESET);
         } catch (DataIntegrityViolationException e) {
             // Annan samtidig begäran hann före (unikt index) - tyst, samma neutrala svar.
+            log.warn("Återställningstoken kunde inte utfärdas (samtidig begäran) för användare {}.", user.get().id());
             return;
         }
         mailSender.send(user.get().username(), "Återställ ditt lösenord - Vinkällaren",

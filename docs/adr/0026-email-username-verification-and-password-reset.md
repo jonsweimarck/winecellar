@@ -75,6 +75,10 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   inklusive via svarstid (krävs för att en användare ska förstå varför
   registreringen avvisas; ingen dummy-hashning görs) - till skillnad från
   "glömt lösenord", som inte gör det.
+- Samma sak gäller "skicka ny verifieringslänk": en känd overifierad adress ger en
+  databasskrivning och ett mail, en okänd bara en hash, så svarstiden kan skilja. Det är
+  medvetet accepterat (samma resonemang som uppräkningen vid registrering) - inget
+  dummyarbete läggs till.
 - Skydd mot att någon förhandsregistrerar en annans adress: en ny
   registrering för en ännu OVERIFIERAD adress skriver över lösenordet och
   utfärdar ett nytt token (tidigare ogiltigförklaras), och svaret ser ut som
@@ -82,7 +86,8 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   ägaren registrerat om sig. För en verifierad adress gäller "upptaget".
   Gamla overifierade konton städas inte bort. Överskrivningen och
   ogiltigförklaringen av gamla länkar sker oberoende av mailkvoten (annars
-  kunde en angripare tömma kvoten först); bara själva utskicket kvoteras.
+  kunde en angripare tömma kvoten först); bara själva utskicket kvoteras, med en
+  egen kvot för omregistrering skild från "skicka ny länk" och glömt lösenord.
   Medvetet val: den som äger brevlådan vinner - ett overifierat konto är
   tomt, så inget går förlorat när lösenordet skrivs över.
 - Mailkvoten per adress förbrukas först när ett mail faktiskt ska skickas,

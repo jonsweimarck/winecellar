@@ -73,5 +73,12 @@ Egenskap: Registrering med e-postverifiering
     Och att jag har begärt en ny verifieringslänk för "offer@example.com" 3 gånger
     När jag registrerar mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
     Så blir registreringen godkänd precis som för en ny adress
-    Och alla tidigare verifieringslänkar till "offer@example.com" är ogiltiga
+    Och alla verifieringslänkar utom den senaste till "offer@example.com" är ogiltiga
+    Och angriparens lösenord "angripare123" fungerar inte för "offer@example.com"
+
+  Scenario: Tömd kvot för "ny länk" hindrar inte omregistrering från att skicka ett ersättningsmail
+    Givet att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "angripare123"
+    Och att jag har begärt en ny verifieringslänk för "offer@example.com" 3 gånger
+    När jag registrerar mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
+    Så har ett ersättningsmail med enda giltiga verifieringslänken skickats till "offer@example.com"
     Och angriparens lösenord "angripare123" fungerar inte för "offer@example.com"

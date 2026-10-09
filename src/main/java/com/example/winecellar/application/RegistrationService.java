@@ -2,6 +2,8 @@ package com.example.winecellar.application;
 
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.UserToken.Purpose;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,6 +24,8 @@ import java.util.Optional;
 @Service
 public class RegistrationService {
 
+    private static final Logger log = LoggerFactory.getLogger(RegistrationService.class);
+
     static final int MAX_VERIFICATION_MAILS_PER_ADDRESS = 3;
     static final Duration VERIFICATION_MAIL_WINDOW = Duration.ofHours(1);
 
@@ -32,9 +36,12 @@ public class RegistrationService {
     private final Clock clock;
     private final String baseUrl;
     private final RequestRateLimiter resendLimiter;
+    private final RequestRateLimiter registrationLimiter;
+    private final AccountWriter accountWriter;
 
     public RegistrationService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                               TokenService tokenService, MailSender mailSender, Clock clock,
+                               TokenService tokenService, AccountWriter accountWriter, MailSender mailSender,
+                               Clock clock,
                                @Value("${winecellar.base-url}") String baseUrl) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -42,7 +49,11 @@ public class RegistrationService {
         this.mailSender = mailSender;
         this.clock = clock;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.accountWriter = accountWriter;
+        // Skilda kvoter (egna kartor): "skicka ny länk" respektive omregistrering.
         this.resendLimiter = new RequestRateLimiter(
+                MAX_VERIFICATION_MAILS_PER_ADDRESS, VERIFICATION_MAIL_WINDOW, clock);
+        this.registrationLimiter = new RequestRateLimiter(
                 MAX_VERIFICATION_MAILS_PER_ADDRESS, VERIFICATION_MAIL_WINDOW, clock);
     }
 
@@ -63,18 +74,26 @@ public class RegistrationService {
             // gamla länkar sker ALLTID, oberoende av mailkvoten (annars kunde en angripare tömma
             // kvoten först och göra offrets omregistrering till en tyst no-op). Bara utskicket av
             // ett nytt mail kvoteras; är kvoten slut står offret utan giltig länk tills hen begär en ny.
-            User updated = userRepository.save(
-                    existing.get().withHashedPassword(passwordEncoder.encode(password)));
-            tokenService.revokeAll(updated.id(), Purpose.EMAIL_VERIFICATION);
-            if (resendLimiter.tryAcquire(email.get())) {
+            // Atomärt (AccountWriter); mailet skickas först efter commit. Egen kvot, skild från
+            // "skicka ny länk", så att en angripare inte kan tömma offrets omregistreringskvot.
+            User updated = accountWriter.overwritePasswordAndRevokeLinks(
+                    existing.get(), passwordEncoder.encode(password));
+            if (registrationLimiter.tryAcquire(email.get())) {
                 sendVerificationMail(updated);
             }
             return new RegistrationResult.Registered(existing.get());
         }
         // Senaste login = skapad vid registrering (ingen inloggningshändelse publiceras).
         Instant now = clock.instant();
-        User user = userRepository.save(
-                new User(null, email.get(), passwordEncoder.encode(password), now, 1, false, false, now, false));
+        User user;
+        try {
+            user = userRepository.save(
+                    new User(null, email.get(), passwordEncoder.encode(password), now, 1, false, false, now, false));
+        } catch (DataIntegrityViolationException e) {
+            // Samtidig förstagångsregistrering av samma adress (unikt användarnamn): behandla som upptaget.
+            log.warn("Samtidig registrering av samma adress - behandlas som upptagen.");
+            return new RegistrationResult.UsernameTaken();
+        }
         sendVerificationMail(user);
         return new RegistrationResult.Registered(user);
     }
@@ -127,6 +146,7 @@ public class RegistrationService {
             token = tokenService.issue(user.id(), Purpose.EMAIL_VERIFICATION);
         } catch (DataIntegrityViolationException e) {
             // Annan samtidig begäran hann före (unikt index) - tyst, samma neutrala svar.
+            log.warn("Verifieringstoken kunde inte utfärdas (samtidig begäran) för användare {}.", user.id());
             return;
         }
         mailSender.send(user.username(), "Verifiera din e-postadress - Vinkällaren",

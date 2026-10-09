@@ -32,10 +32,23 @@ class ConcurrentIssueRaceTest {
 
     @Test
     void registreringSkaInteKrascha() {
-        RegistrationService service = new RegistrationService(users, encoder, losingTokens, mail, clock, "http://x");
+        RegistrationService service = new RegistrationService(users, encoder, losingTokens, new AccountWriter(users, losingTokens), mail, clock, "http://x");
         assertThatCode(() -> service.register("anna@example.com", "hemligt123")).doesNotThrowAnyException();
         assertThat(service.register("anna@example.com", "hemligt123"))
                 .isInstanceOf(RegistrationResult.Registered.class);
+        assertThat(mail.all()).isEmpty();
+    }
+
+    @Test
+    void samtidigFörstagångsregistreringSkaBehandlasSomUpptagetUtanFel() {
+        UserRepository racing = mock(UserRepository.class);
+        when(racing.findByUsername(any())).thenReturn(java.util.Optional.empty());
+        when(racing.save(any())).thenThrow(new DataIntegrityViolationException("unikt användarnamn"));
+        RegistrationService service = new RegistrationService(racing, encoder, losingTokens,
+                new AccountWriter(racing, losingTokens), mail, clock, "http://x");
+
+        assertThat(service.register("anna@example.com", "hemligt123"))
+                .isInstanceOf(RegistrationResult.UsernameTaken.class);
         assertThat(mail.all()).isEmpty();
     }
 
@@ -54,7 +67,7 @@ class ConcurrentIssueRaceTest {
         Instant now = Instant.now();
         users.save(new User(null, "anna@example.com", "h", now, 1, false, false,
                 now, false));
-        RegistrationService service = new RegistrationService(users, encoder, losingTokens, mail, clock, "http://x");
+        RegistrationService service = new RegistrationService(users, encoder, losingTokens, new AccountWriter(users, losingTokens), mail, clock, "http://x");
         assertThatCode(() -> service.resendVerification("anna@example.com")).doesNotThrowAnyException();
     }
 }

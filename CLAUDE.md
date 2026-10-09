@@ -675,18 +675,19 @@ användaren öppnat verifieringslänken.
   inte (en tom `spring.mail.host` hade ändå aktiverat den). `MailConfig` bär även
   `Clock`-beanen (UTC) som tjänsterna använder - en `@Configuration` laddas inte av
   `@WebMvcTest`, så en controller som beror på dem testas med `@MockBean` på tjänsterna.
-- **Granskningsåtgärder (PR #50):** (a) pre-hijacking: `register` för en overifierad adress
-  skriver över lösenordshashen och utfärdar nytt token (samma rate limit, svar som för ny
-  adress); verifierad adress => "upptaget". (b) `RequestRateLimiter` förbrukas först när ett
-  mail ska skickas (efter kontouppslag), okända adresser rör aldrig kartan, kartan har hårt tak
-  (10 000 nycklar; full => nya nycklar nekas tyst). (c) `UserTokenRepository.deleteById` är
-  atomär (returnerar om raden faktiskt raderades) och är engångsgrinden vid verifiering och
-  återställning; `TokenService.issue` är `@Transactional` med unikt index (user_id, purpose).
-  (d) `MailConfigGuard` varnar vid uppstart på Clever Cloud om `WINECELLAR_MAIL_HOST`/
-  `WINECELLAR_BASE_URL` saknas. (e) `SmtpMailSender` fångar Throwable, har en kö på 100.
-  (f) Den åttaargumentiga `User`-konstruktorn är borttagen - tester använder
-  `support/TestUsers.verifiedUser(...)`. (g) `userDetailsService` trimmar användarnamnet.
-- **Granskning runda 2:** överskrivning av lösenord + `revokeAll` vid omregistrering av en overifierad adress sker OBEROENDE av mailkvoten (bara utskicket kvoteras; slut kvot = offret saknar giltig länk tills ny begärs). `DataIntegrityViolationException` från `TokenService.issue` (race på unika indexet) fångas i registrering/återutskick/glömt lösenord och ger tyst det neutrala svaret.
+- **Nuläge, registrering/token (fällor att minnas):** omregistrering av en OVERIFIERAD adress
+  skriver över lösenordshashen och revokerar gamla verifieringslänkar atomärt
+  (`AccountWriter`, `@Transactional` i egen böna), OBEROENDE av mailkvoten - bara utskicket
+  kvoteras, med en egen kvot (`registrationLimiter`) skild från "skicka ny länk"
+  (`resendLimiter`) och från glömt lösenord, så ingen kvot kan tömmas för att stänga ute en annan
+  väg. Kvoten förbrukas först när ett mail ska skickas (okända adresser rör aldrig kartan;
+  kartan har tak). Token-inlösen är atomär (`UserTokenRepository.deleteById` returnerar om
+  raden faktiskt raderades), `TokenService.issue` är `@Transactional` med unikt index
+  (user_id, purpose); förloraren i ett race får `DataIntegrityViolationException`
+  (bevisat av `TokenIssueRaceIT`), som tjänsterna fångar, loggar på WARN (utan token) och
+  besvarar neutralt. Samtidig förstagångsregistrering behandlas som "upptaget".
+  Tester skapar verifierade konton via `support/TestUsers`/`TestAccounts` - det finns
+  ingen "verifierad som standard"-konstruktor på `User`.
 - **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (speglad i
   `schema.sql`) lägger till `users.email_verified`, backfillar ALLA befintliga rader
   till `true` INNAN `NOT NULL` och skapar `user_tokens`. Backfillen rör bara rader som

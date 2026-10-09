@@ -156,10 +156,11 @@ public class RegistrationSteps {
         }
     }
 
-    @Och("alla tidigare verifieringslänkar till {string} är ogiltiga")
+    @Och("alla verifieringslänkar utom den senaste till {string} är ogiltiga")
     public void allaTidigareLänkarOgiltiga(String address) {
         assertThat(mailSender.sentTo(address)).isNotEmpty();
-        for (FakeMailSender.Mail mail : mailSender.sentTo(address)) {
+        List<FakeMailSender.Mail> earlier = mailSender.sentTo(address);
+        for (FakeMailSender.Mail mail : earlier.subList(0, earlier.size() - 1)) {
             assertThat(registrationService.checkVerificationToken(mail.token())).isEqualTo(TokenOutcome.INVALID);
         }
     }
@@ -168,6 +169,18 @@ public class RegistrationSteps {
     public void angriparensLösenordFungerarInte(String password, String username) throws Exception {
         // Fel lösenord ger "error"; hade lösenordet fortfarande varit giltigt hade kontot gett "unverified".
         assertThat(login(username, password).getResponse().getRedirectedUrl()).isEqualTo("/login?error");
+    }
+
+    @Så("har ett ersättningsmail med enda giltiga verifieringslänken skickats till {string}")
+    public void ersättningsmailMedEndaGiltigaLänken(String address) {
+        List<FakeMailSender.Mail> mails = mailSender.sentTo(address);
+        assertThat(mails.size()).isGreaterThan(1);
+        for (int i = 0; i < mails.size() - 1; i++) {
+            assertThat(registrationService.checkVerificationToken(mails.get(i).token()))
+                    .isEqualTo(TokenOutcome.INVALID);
+        }
+        assertThat(registrationService.checkVerificationToken(mails.get(mails.size() - 1).token()))
+                .isEqualTo(TokenOutcome.SUCCESS);
     }
 
     @Och("inget konto med användarnamnet {string} har skapats")

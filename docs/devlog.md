@@ -1158,3 +1158,22 @@ inte är arkitektur men värt att veta:
   bygger en scratch-databas med en users-tabell i det gamla formatet och riktiga
   rader, kör migreringsfilen (två gånger) och kontrollerar backfill, NOT NULL och
   att ett nytt overifierat konto inte rörs av omkörningen.
+
+### WINE-59 - granskningsrundor på PR #50 (2026-10-09)
+
+- **Runda 1:** (a) pre-hijacking: `register` för en overifierad adress skriver över
+  lösenordshashen och utfärdar nytt token (svar som för ny adress); verifierad adress =>
+  "upptaget". (b) `RequestRateLimiter` förbrukas först när ett mail ska skickas, okända
+  adresser rör aldrig kartan, hårt tak på kartan. (c) atomär token-inlösen och transaktionell
+  `issue` med unikt index. (d) `MailConfigGuard` (uppstartsvarning på Clever Cloud). (e)
+  `SmtpMailSender` fångar Throwable, kö på 100. (f) åttaargumentskonstruktorn på `User`
+  borttagen (-> `support/TestUsers`). (g) `userDetailsService` trimmar användarnamnet.
+- **Runda 2:** överskrivning + revokering vid omregistrering gjordes oberoende av mailkvoten
+  (en angripare kunde annars tömma kvoten och göra offrets omregistrering till en no-op).
+  `DataIntegrityViolationException` från `issue` fångas och ger tyst neutralt svar.
+- **Runda 3:** separata kvoter för omregistrering respektive "ny länk" (en tömd resend-kvot
+  hindrade annars ersättningsmailet); överskrivning + revokering atomärt via `AccountWriter`
+  med mail efter commit; WARN-loggning i catch-blocken; samtidig förstagångsregistrering
+  fångas som "upptaget"; `TokenIssueRaceIT` bevisar mot riktig Postgres vilken exception ett
+  förlorat race ger. Tidsskillnaden i `resendVerification` (känd overifierad adress =
+  DB-skrivning + mail, okänd = bara hash) accepterades medvetet, se ADR 0026.
