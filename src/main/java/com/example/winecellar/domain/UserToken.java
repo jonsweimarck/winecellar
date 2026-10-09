@@ -10,8 +10,13 @@ import java.time.Instant;
  * det råa värdet finns bara i mailet till användaren. Tunt, som resten av
  * domänen: giltighetsregler (24 h / 1 h, engångsbruk) ligger i
  * application.TokenService.
+ *
+ * `pendingPasswordHash` (bara för EMAIL_VERIFICATION, annars null) är lösenordshashen
+ * som aktiveras när just det här tokenet löses in - lösenordet är bundet till
+ * tokenet (och därmed till brevlådan), inte till kontoraden. Se ADR 0026.
  */
-public record UserToken(Long id, UserId userId, Purpose purpose, String tokenHash, Instant expiresAt) {
+public record UserToken(Long id, UserId userId, Purpose purpose, String tokenHash, Instant expiresAt,
+                        String pendingPasswordHash) {
 
     public enum Purpose {
         EMAIL_VERIFICATION,

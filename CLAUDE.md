@@ -646,7 +646,7 @@ användaren öppnat verifieringslänken.
   (`/glomt-losenord`, `/aterstall-losenord`). Alla fem rutter är `permitAll`.
 - **Tokens:** 256 bitar `SecureRandom` (`TokenHasher`), bara SHA-256-hashen lagras,
   konstant-tidsjämförelse, engångsbruk, verifiering 24 h / återställning 1 h
-  (`TokenService`), en ny utfärdning raderar tidigare av samma slag. GET på länken
+  (`TokenService`), en ny utfärdning av ett ÅTERSTÄLLNINGSTOKEN raderar tidigare (verifieringstokens: se nedan). GET på länken
   FÖRBRUKAR INTE (visar bara en bekräfta-knapp) - POST gör det, annars förbrukar en
   mailskanner länken.
 - **E-postvalidering är avsiktligt lös** (`EmailAddress`): ändra den inte till en
@@ -675,17 +675,23 @@ användaren öppnat verifieringslänken.
   inte (en tom `spring.mail.host` hade ändå aktiverat den). `MailConfig` bär även
   `Clock`-beanen (UTC) som tjänsterna använder - en `@Configuration` laddas inte av
   `@WebMvcTest`, så en controller som beror på dem testas med `@MockBean` på tjänsterna.
-- **Nuläge, registrering/token (fällor att minnas):** omregistrering av en OVERIFIERAD adress
-  skriver över lösenordshashen och revokerar gamla verifieringslänkar atomärt
-  (`AccountWriter`, `@Transactional` i egen böna), OBEROENDE av mailkvoten - bara utskicket
-  kvoteras, med en egen kvot (`registrationLimiter`) skild från "skicka ny länk"
-  (`resendLimiter`) och från glömt lösenord, så ingen kvot kan tömmas för att stänga ute en annan
-  väg. Kvoten förbrukas först när ett mail ska skickas (okända adresser rör aldrig kartan;
-  kartan har tak). Token-inlösen är atomär (`UserTokenRepository.deleteById` returnerar om
-  raden faktiskt raderades), `TokenService.issue` är `@Transactional` med unikt index
-  (user_id, purpose); förloraren i ett race får `DataIntegrityViolationException`
-  (bevisat av `TokenIssueRaceIT`), som tjänsterna fångar, loggar på WARN (utan token) och
-  besvarar neutralt. Samtidig förstagångsregistrering behandlas som "upptaget".
+- **Nuläge, registrering/token (fällor att minnas):** lösenordet vid registrering är bundet till
+  VERIFIERINGSTOKENET (`user_tokens.pending_password_hash`), inte till kontoraden. Varje
+  registrering av en overifierad adress utfärdar ett ytterligare token med sin egen hash
+  (kontoraden rörs inte, inga tokens revokeras); `AccountWriter.activate` (en transaktion)
+  raderar tokenet villkorat, sätter kontot verifierat med just det tokenets hash och raderar
+  kontots övriga verifieringstokens. Max 3 verifieringstokens per användare (`TokenService`,
+  äldsta skjuts ut); `resendVerification` ersätter alla med ett som bär senaste hashen.
+  Unikt index finns bara för PASSWORD_RESET (PARTIELLT index i `schema.sql`, inte i
+  entiteten - Hibernate kan inte deklarera det). En EN kvot (3/h) per adress för
+  verifieringsmail, gemensam för registrering och resend; är den slut ändras ingenting.
+  Kvoten förbrukas först när ett mail ska skickas (okända adresser rör aldrig kartan; kartan
+  har tak). Token-inlösen är atomär (`UserTokenRepository.deleteById` returnerar om raden
+  faktiskt raderades). Förloraren i ett återställningstoken-race får
+  `DataIntegrityViolationException` (bevisat deterministiskt av `TokenIssueRaceIT`), som
+  `PasswordResetService` fångar, loggar på WARN (utan token) och besvarar neutralt. Samtidig
+  förstagångsregistrering behandlas som "upptaget". Accepterad rest: identiska mail, så en ägare
+  som klickar på ett angripar-utlöst mail aktiverar angriparens lösenord (se ADR 0026).
   Tester skapar verifierade konton via `support/TestUsers`/`TestAccounts` - det finns
   ingen "verifierad som standard"-konstruktor på `User`.
 - **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (speglad i

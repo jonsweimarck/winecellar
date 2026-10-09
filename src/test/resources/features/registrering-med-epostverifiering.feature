@@ -53,32 +53,32 @@ Egenskap: Registrering med e-postverifiering
     När jag försöker registrera mig med användarnamnet "anna@example.com" och lösenordet "hemligt123"
     Så avvisas registreringen eftersom användarnamnet är upptaget
 
-  Scenario: Offrets registrering skriver över en förhandsregistrering med angriparens lösenord
+  Scenario: Förhandsregistrering ger inget inloggningsbart konto och offrets egen länk ger offrets lösenord
     Givet att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "angripare123"
-    När jag registrerar mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
-    Så blir registreringen godkänd precis som för en ny adress
-    Och angriparens verifieringslänk till "offer@example.com" är ogiltig
-    Och den senaste verifieringslänken till "offer@example.com" aktiverar kontot
+    Och att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
+    Så jag kan inte logga in som "offer@example.com" med lösenordet "angripare123"
+    Och jag kan inte logga in som "offer@example.com" med lösenordet "offerLösen456"
+    När jag öppnar verifieringslänken i mail nummer 2 till "offer@example.com"
+    Så jag kan logga in som "offer@example.com" med lösenordet "offerLösen456"
     Och angriparens lösenord "angripare123" fungerar inte för "offer@example.com"
+
+  Scenario: Tömd mailkvot via omregistrering låser inte ute offret
+    Givet att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
+    Och att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "angripare1"
+    Och att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "angripare2"
+    När jag registrerar mig med användarnamnet "offer@example.com" och lösenordet "angripare3"
+    Så blir registreringen godkänd precis som för en ny adress
+    Och har exakt 3 verifieringsmail skickats till "offer@example.com"
+    När jag öppnar verifieringslänken i mail nummer 1 till "offer@example.com"
+    Så jag kan logga in som "offer@example.com" med lösenordet "offerLösen456"
+    Och angriparens lösenord "angripare1" fungerar inte för "offer@example.com"
+    Och angriparens lösenord "angripare3" fungerar inte för "offer@example.com"
+
+  Scenario: Nytt verifieringsmail kan begäras när kvotfönstret gått ut
+    Givet att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
+    Och att jag har begärt en ny verifieringslänk för "offer@example.com" 2 gånger
+    Och att det har gått 61 minuter
+    När jag begär en ny verifieringslänk för "offer@example.com"
+    Så har exakt 4 verifieringsmail skickats till "offer@example.com"
+    Och den nya verifieringslänken aktiverar kontot "offer@example.com"
     Och jag kan logga in som "offer@example.com" med lösenordet "offerLösen456"
-
-  Scenario: Ett verifierat konto kan inte skrivas över genom ny registrering
-    Givet att ett konto med användarnamnet "Anna@Example.com" redan finns
-    När jag försöker registrera mig med användarnamnet "anna@example.com" och lösenordet "angripare123"
-    Så avvisas registreringen eftersom användarnamnet är upptaget
-    Och jag kan inte logga in som "anna@example.com" med lösenordet "angripare123"
-
-  Scenario: Offrets omregistrering skriver över lösenordet även när mailkvoten är slut
-    Givet att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "angripare123"
-    Och att jag har begärt en ny verifieringslänk för "offer@example.com" 3 gånger
-    När jag registrerar mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
-    Så blir registreringen godkänd precis som för en ny adress
-    Och alla verifieringslänkar utom den senaste till "offer@example.com" är ogiltiga
-    Och angriparens lösenord "angripare123" fungerar inte för "offer@example.com"
-
-  Scenario: Tömd kvot för "ny länk" hindrar inte omregistrering från att skicka ett ersättningsmail
-    Givet att jag har registrerat mig med användarnamnet "offer@example.com" och lösenordet "angripare123"
-    Och att jag har begärt en ny verifieringslänk för "offer@example.com" 3 gånger
-    När jag registrerar mig med användarnamnet "offer@example.com" och lösenordet "offerLösen456"
-    Så har ett ersättningsmail med enda giltiga verifieringslänken skickats till "offer@example.com"
-    Och angriparens lösenord "angripare123" fungerar inte för "offer@example.com"

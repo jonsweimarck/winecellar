@@ -17,8 +17,14 @@ CREATE TABLE IF NOT EXISTS user_tokens (
     purpose varchar(255) NOT NULL,
     token_hash varchar(255) NOT NULL UNIQUE,
     expires_at timestamptz NOT NULL,
-    UNIQUE (user_id, purpose)
+    pending_password_hash varchar(255)
 );
+-- Flera verifieringstokens per användare tillåts (varje registrering har sitt eget, bundet till
+-- sin lösenordshash - ADR 0026), men bara ETT återställningstoken åt gången. Därför ett PARTIELLT
+-- unikt index i stället för UNIQUE (user_id, purpose). Det tidigare, bredare constraintet släpps.
+ALTER TABLE user_tokens ADD COLUMN IF NOT EXISTS pending_password_hash varchar(255);
+ALTER TABLE user_tokens DROP CONSTRAINT IF EXISTS user_tokens_user_id_purpose_key;
+CREATE UNIQUE INDEX IF NOT EXISTS user_tokens_one_reset_per_user ON user_tokens (user_id) WHERE purpose = 'PASSWORD_RESET';
 CREATE INDEX IF NOT EXISTS user_tokens_user_id_idx ON user_tokens (user_id);
 
 COMMIT;

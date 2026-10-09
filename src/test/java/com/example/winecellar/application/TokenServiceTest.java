@@ -61,6 +61,35 @@ class TokenServiceTest {
     }
 
     @Test
+    void skaTillåtaFleraVerifieringstokensMedEgenLösenordshashMenHållaAntaletBegränsat() {
+        String t1 = service.issueVerification(USER, "hash-1");
+        String t2 = service.issueVerification(USER, "hash-2");
+        String t3 = service.issueVerification(USER, "hash-3");
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, t1).token().pendingPasswordHash()).isEqualTo("hash-1");
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, t2).token().pendingPasswordHash()).isEqualTo("hash-2");
+
+        String t4 = service.issueVerification(USER, "hash-4");
+        // Äldsta (t1) har skjutits ut, övriga gäller fortfarande
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, t1).outcome()).isEqualTo(TokenOutcome.INVALID);
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, t2).outcome()).isEqualTo(TokenOutcome.SUCCESS);
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, t3).outcome()).isEqualTo(TokenOutcome.SUCCESS);
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, t4).outcome()).isEqualTo(TokenOutcome.SUCCESS);
+    }
+
+    @Test
+    void skaErsättaAllaVerifieringstokensMedEttSomBärSenasteLösenordshashVidNyLänk() {
+        String t1 = service.issueVerification(USER, "hash-1");
+        String t2 = service.issueVerification(USER, "hash-2");
+
+        String fresh = service.reissueVerification(USER);
+
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, t1).outcome()).isEqualTo(TokenOutcome.INVALID);
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, t2).outcome()).isEqualTo(TokenOutcome.INVALID);
+        assertThat(service.check(Purpose.EMAIL_VERIFICATION, fresh).token().pendingPasswordHash())
+                .isEqualTo("hash-2");
+    }
+
+    @Test
     void skaGodkännaGiltigtTokenOchAvvisaOkäntOchTomt() {
         String raw = service.issue(USER, Purpose.PASSWORD_RESET);
         assertThat(service.check(Purpose.PASSWORD_RESET, raw).outcome()).isEqualTo(TokenOutcome.SUCCESS);

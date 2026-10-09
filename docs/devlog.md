@@ -1177,3 +1177,13 @@ inte är arkitektur men värt att veta:
   fångas som "upptaget"; `TokenIssueRaceIT` bevisar mot riktig Postgres vilken exception ett
   förlorat race ger. Tidsskillnaden i `resendVerification` (känd overifierad adress =
   DB-skrivning + mail, okänd = bara hash) accepterades medvetet, se ADR 0026.
+- **Runda 4 (designändring):** lösenordsbytet vid omregistrering av en overifierad adress blev
+  "pending" och bundet till verifieringstokenet (`pending_password_hash`) i stället för att
+  skriva över kontoraden. Det löste tre fynd samtidigt: utelåsning via kvoten, stale-write av
+  hela User-raden och att en angripare som bara känner till ett lösenord aldrig kan aktivera
+  något. Följder: flera verifieringstokens per användare (tak 3), partiellt unikt index bara för
+  PASSWORD_RESET, EN gemensam kvot för verifieringsmail, `AccountWriter` ändrad från
+  "skriv över" till atomär aktivering. `TokenIssueRaceIT` skrevs om till ett deterministiskt
+  race (tråd A håller en öppen transaktion med ett återställningstoken, tråd B misslyckas alltid)
+  med en riktig användare. Tidigare påståenden i kod/CLAUDE.md/ADR om att "omregistrering
+  skriver över lösenordet" och "egen kvot för omregistrering" gäller inte längre.

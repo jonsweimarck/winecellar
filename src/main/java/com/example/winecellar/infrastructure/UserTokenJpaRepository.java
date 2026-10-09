@@ -11,6 +11,8 @@ interface UserTokenJpaRepository extends JpaRepository<UserTokenEntity, Long> {
 
     Optional<UserTokenEntity> findByPurposeAndTokenHash(String purpose, String tokenHash);
 
+    java.util.List<UserTokenEntity> findByUserIdAndPurposeOrderByIdAsc(Long userId, String purpose);
+
     @Modifying
     @Query("delete from UserTokenEntity t where t.id = :id")
     int deleteByTokenId(@Param("id") Long id);

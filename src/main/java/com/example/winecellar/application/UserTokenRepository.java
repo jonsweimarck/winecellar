@@ -12,6 +12,9 @@ public interface UserTokenRepository {
 
     Optional<UserToken> findByHash(Purpose purpose, String tokenHash);
 
+    /** Användarens tokens av ett slag, äldsta först. */
+    java.util.List<UserToken> findByUserAndPurpose(UserId userId, Purpose purpose);
+
     /**
      * Atomär: raderar tokenet och returnerar true bara för den ENDA anropare
      * vars radering faktiskt tog bort raden. Används som själva

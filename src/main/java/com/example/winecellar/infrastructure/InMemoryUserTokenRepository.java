@@ -20,7 +20,7 @@ public class InMemoryUserTokenRepository implements UserTokenRepository {
     public UserToken save(UserToken token) {
         UserToken toStore = token.id() != null ? token
                 : new UserToken(nextId.getAndIncrement(), token.userId(), token.purpose(), token.tokenHash(),
-                        token.expiresAt());
+                        token.expiresAt(), token.pendingPasswordHash());
         tokens.put(toStore.id(), toStore);
         return toStore;
     }
@@ -30,6 +30,13 @@ public class InMemoryUserTokenRepository implements UserTokenRepository {
         return tokens.values().stream()
                 .filter(t -> t.purpose() == purpose && t.tokenHash().equals(tokenHash))
                 .findFirst();
+    }
+
+    @Override
+    public java.util.List<UserToken> findByUserAndPurpose(UserId userId, Purpose purpose) {
+        return tokens.values().stream()
+                .filter(t -> t.userId().equals(userId) && t.purpose() == purpose)
+                .sorted(java.util.Comparator.comparing(UserToken::id)).toList();
     }
 
     @Override

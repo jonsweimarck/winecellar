@@ -16,7 +16,7 @@ import java.time.Instant;
  * CHECK-constraint att underhålla).
  */
 @Entity
-@Table(name = "user_tokens", uniqueConstraints = @jakarta.persistence.UniqueConstraint(columnNames = {"user_id", "purpose"}))
+@Table(name = "user_tokens")
 public class UserTokenEntity {
 
     @Id
@@ -34,6 +34,10 @@ public class UserTokenEntity {
 
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
+
+    /** Bara för EMAIL_VERIFICATION: lösenordshashen som aktiveras när tokenet löses in (ADR 0026). */
+    @Column(name = "pending_password_hash")
+    private String pendingPasswordHash;
 
     protected UserTokenEntity() {
     }
@@ -76,5 +80,13 @@ public class UserTokenEntity {
 
     void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
+    }
+
+    String getPendingPasswordHash() {
+        return pendingPasswordHash;
+    }
+
+    void setPendingPasswordHash(String pendingPasswordHash) {
+        this.pendingPasswordHash = pendingPasswordHash;
     }
 }

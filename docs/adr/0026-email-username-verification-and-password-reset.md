@@ -38,7 +38,7 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   (giltig 1 timme) men bara om adressen tillhör ett verifierat konto.
   Svaret är alltid exakt detsamma oavsett om adressen finns, och
   utskicket görs asynkront så att svarstiden inte avslöjar skillnaden.
-  Mailutskick per adress begränsas (några få per timme, i minnet).
+  Mailutskick per adress begränsas (några få per timme, i minnet; verifieringsmail har en gemensam kvot för registrering och "skicka ny länk").
   En ny begäran ogiltigförklarar tidigare länkar. Ett lösenordsbyte
   avslutar användarens övriga sessioner, och "håll mig inloggad"-cookien
   upphör att gälla av sig själv eftersom dess signatur bygger på
@@ -79,17 +79,27 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   databasskrivning och ett mail, en okänd bara en hash, så svarstiden kan skilja. Det är
   medvetet accepterat (samma resonemang som uppräkningen vid registrering) - inget
   dummyarbete läggs till.
-- Skydd mot att någon förhandsregistrerar en annans adress: en ny
-  registrering för en ännu OVERIFIERAD adress skriver över lösenordet och
-  utfärdar ett nytt token (tidigare ogiltigförklaras), och svaret ser ut som
-  för en ny adress. Då fungerar inte angriparens lösenord när den riktige
-  ägaren registrerat om sig. För en verifierad adress gäller "upptaget".
-  Gamla overifierade konton städas inte bort. Överskrivningen och
-  ogiltigförklaringen av gamla länkar sker oberoende av mailkvoten (annars
-  kunde en angripare tömma kvoten först); bara själva utskicket kvoteras, med en
-  egen kvot för omregistrering skild från "skicka ny länk" och glömt lösenord.
-  Medvetet val: den som äger brevlådan vinner - ett overifierat konto är
-  tomt, så inget går förlorat när lösenordet skrivs över.
+- Skydd mot att någon förhandsregistrerar en annans adress: lösenordet är
+  bundet till verifieringstokenet, inte till kontoraden. Varje registrering av en
+  ännu OVERIFIERAD adress utfärdar ett eget verifieringstoken som bär sin egen
+  lösenordshash och mailas till adressen; kontoraden skrivs inte över och inga
+  tidigare tokens revokeras. Den som klickar på ett token aktiverar kontot med
+  DET tokenets lösenord, och kontots övriga verifieringstokens raderas. Därmed
+  är kontot inte inloggningsbart av någon som bara känner till ett lösenord
+  (det kräver att brevlådan kontrolleras), ingen kan låsa ut en annan via
+  mailkvoten (en ytterligare registrering tar bort ingenting), och ingen
+  hel kontorad skrivs över i ett race. Brevlådans ägare avgör alltså vilket
+  lösenord som aktiveras. För en verifierad adress gäller "upptaget". Ett konto kan
+  ha högst tre verifieringstokens åt gången (det äldsta skjuts ut); "skicka ny länk"
+  ersätter dem med ett enda som bär samma lösenord som det senast utfärdade.
+  Gamla overifierade konton städas inte bort. Är mailkvoten slut vid en ny
+  registrering ändras ingenting (inget nytt token, inget mail) men svaret är
+  detsamma som för en ny adress.
+  Kvarvarande, accepterad begränsning: mailen är identiska, så en ägare som
+  klickar på ett mail som utlösts av en angripare aktiverar angriparens
+  lösenord (ägaren kan då använda "glömt lösenord"). Skyddet är att ingen kan
+  aktivera ett lösenord utan att kontrollera brevlådan, inte att ägaren kan
+  se vem som begärde mailet.
 - Mailkvoten per adress förbrukas först när ett mail faktiskt ska skickas,
   så okända adresser aldrig hamnar i begränsarens karta. En anonym part kan
   dock förbruka kvoten för en känd adress och därmed tillfälligt hindra

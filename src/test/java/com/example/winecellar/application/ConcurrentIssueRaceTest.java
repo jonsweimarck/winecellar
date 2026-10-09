@@ -31,15 +31,6 @@ class ConcurrentIssueRaceTest {
     }
 
     @Test
-    void registreringSkaInteKrascha() {
-        RegistrationService service = new RegistrationService(users, encoder, losingTokens, new AccountWriter(users, losingTokens), mail, clock, "http://x");
-        assertThatCode(() -> service.register("anna@example.com", "hemligt123")).doesNotThrowAnyException();
-        assertThat(service.register("anna@example.com", "hemligt123"))
-                .isInstanceOf(RegistrationResult.Registered.class);
-        assertThat(mail.all()).isEmpty();
-    }
-
-    @Test
     void samtidigFörstagångsregistreringSkaBehandlasSomUpptagetUtanFel() {
         UserRepository racing = mock(UserRepository.class);
         when(racing.findByUsername(any())).thenReturn(java.util.Optional.empty());
@@ -60,14 +51,5 @@ class ConcurrentIssueRaceTest {
                 mock(SessionTerminator.class), clock, "http://x");
         assertThatCode(() -> service.requestReset("anna@example.com")).doesNotThrowAnyException();
         assertThat(mail.all()).isEmpty();
-    }
-
-    @Test
-    void ÅterutskickSkaInteKrascha() {
-        Instant now = Instant.now();
-        users.save(new User(null, "anna@example.com", "h", now, 1, false, false,
-                now, false));
-        RegistrationService service = new RegistrationService(users, encoder, losingTokens, new AccountWriter(users, losingTokens), mail, clock, "http://x");
-        assertThatCode(() -> service.resendVerification("anna@example.com")).doesNotThrowAnyException();
     }
 }

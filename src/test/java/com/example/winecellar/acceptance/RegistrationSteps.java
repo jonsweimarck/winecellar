@@ -136,19 +136,6 @@ public class RegistrationSteps {
         assertThat(lastRegistration).isInstanceOf(RegistrationResult.Registered.class);
     }
 
-    @Och("angriparens verifieringslänk till {string} är ogiltig")
-    public void angriparensLänkÄrOgiltig(String address) {
-        assertThat(registrationService.checkVerificationToken(mailSender.sentTo(address).get(0).token()))
-                .isEqualTo(TokenOutcome.INVALID);
-    }
-
-    @Och("den senaste verifieringslänken till {string} aktiverar kontot")
-    public void senasteLänkenAktiverar(String address) {
-        List<FakeMailSender.Mail> mails = mailSender.sentTo(address);
-        assertThat(registrationService.verifyEmail(mails.get(mails.size() - 1).token()))
-                .isEqualTo(TokenOutcome.SUCCESS);
-    }
-
     @Givet("att jag har begärt en ny verifieringslänk för {string} {int} gånger")
     public void attJagHarBegärtNyLänkFleraGånger(String address, int times) {
         for (int i = 0; i < times; i++) {
@@ -156,31 +143,10 @@ public class RegistrationSteps {
         }
     }
 
-    @Och("alla verifieringslänkar utom den senaste till {string} är ogiltiga")
-    public void allaTidigareLänkarOgiltiga(String address) {
-        assertThat(mailSender.sentTo(address)).isNotEmpty();
-        List<FakeMailSender.Mail> earlier = mailSender.sentTo(address);
-        for (FakeMailSender.Mail mail : earlier.subList(0, earlier.size() - 1)) {
-            assertThat(registrationService.checkVerificationToken(mail.token())).isEqualTo(TokenOutcome.INVALID);
-        }
-    }
-
     @Och("angriparens lösenord {string} fungerar inte för {string}")
     public void angriparensLösenordFungerarInte(String password, String username) throws Exception {
         // Fel lösenord ger "error"; hade lösenordet fortfarande varit giltigt hade kontot gett "unverified".
         assertThat(login(username, password).getResponse().getRedirectedUrl()).isEqualTo("/login?error");
-    }
-
-    @Så("har ett ersättningsmail med enda giltiga verifieringslänken skickats till {string}")
-    public void ersättningsmailMedEndaGiltigaLänken(String address) {
-        List<FakeMailSender.Mail> mails = mailSender.sentTo(address);
-        assertThat(mails.size()).isGreaterThan(1);
-        for (int i = 0; i < mails.size() - 1; i++) {
-            assertThat(registrationService.checkVerificationToken(mails.get(i).token()))
-                    .isEqualTo(TokenOutcome.INVALID);
-        }
-        assertThat(registrationService.checkVerificationToken(mails.get(mails.size() - 1).token()))
-                .isEqualTo(TokenOutcome.SUCCESS);
     }
 
     @Och("inget konto med användarnamnet {string} har skapats")
@@ -253,6 +219,17 @@ public class RegistrationSteps {
         jagÖppnarVerifieringslänken(address);
     }
 
+    @När("jag öppnar verifieringslänken i mail nummer {int} till {string}")
+    public void jagÖppnarVerifieringslänkenIMailNummer(int number, String address) {
+        lastOutcome = registrationService.verifyEmail(mailSender.sentTo(address).get(number - 1).token());
+        assertThat(lastOutcome).isEqualTo(TokenOutcome.SUCCESS);
+    }
+
+    @Så("har exakt {int} verifieringsmail skickats till {string}")
+    public void harExaktVerifieringsmail(int count, String address) {
+        assertThat(mailSender.sentTo(address)).hasSize(count);
+    }
+
     @Så("är kontot {string} verifierat")
     public void ärKontotVerifierat(String username) {
         assertThat(lastOutcome).isEqualTo(TokenOutcome.SUCCESS);
@@ -298,8 +275,7 @@ public class RegistrationSteps {
     @Och("den nya verifieringslänken aktiverar kontot {string}")
     public void denNyaLänkenAktiverar(String username) {
         List<FakeMailSender.Mail> mails = mailSender.sentTo(username);
-        assertThat(mails).hasSize(2);
-        assertThat(registrationService.verifyEmail(mails.get(1).token())).isEqualTo(TokenOutcome.SUCCESS);
+        assertThat(registrationService.verifyEmail(mails.get(mails.size() - 1).token())).isEqualTo(TokenOutcome.SUCCESS);
         assertThat(user(username).emailVerified()).isTrue();
     }
 
