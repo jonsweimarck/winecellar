@@ -7,6 +7,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.authentication.AccountExpiredException;
+import org.springframework.security.authentication.CredentialsExpiredException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
@@ -165,5 +170,37 @@ public class SecurityConfig {
                         .disabled(!user.emailVerified())
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException(username));
+    }
+
+    /**
+     * WINE-59: "enabled" kontrolleras EFTER lösenordsjämförelsen (post-check) i stället för före
+     * (Spring Securitys standard). Annars avvisas ett overifierat (disabled) konto utan någon
+     * bcrypt-jämförelse och svarar märkbart snabbare än ett verifierat konto med fel lösenord -
+     * svarstiden hade avslöjat kontostatus. Alla fel ger ändå samma /login?error (ingen egen
+     * failure-handler). Ett overifierat konto har dessutom aldrig ett lösenord som kan matcha.
+     */
+    @Bean
+    public DaoAuthenticationProvider daoAuthenticationProvider(
+            UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
+        provider.setPreAuthenticationChecks(details -> {
+            if (!details.isAccountNonLocked()) {
+                throw new LockedException("Kontot är låst");
+            }
+            if (!details.isAccountNonExpired()) {
+                throw new AccountExpiredException("Kontot har gått ut");
+            }
+        });
+        provider.setPostAuthenticationChecks(details -> {
+            if (!details.isCredentialsNonExpired()) {
+                throw new CredentialsExpiredException("Lösenordet har gått ut");
+            }
+            if (!details.isEnabled()) {
+                throw new DisabledException("E-postadressen är inte verifierad");
+            }
+        });
+        return provider;
     }
 }

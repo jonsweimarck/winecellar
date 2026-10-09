@@ -32,7 +32,7 @@ class LoginVerificationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
+    @org.springframework.boot.test.mock.mockito.SpyBean
     private PasswordEncoder passwordEncoder;
 
     @MockBean
@@ -41,11 +41,12 @@ class LoginVerificationTest {
     @BeforeEach
     void stubKonton() {
         Instant now = Instant.now();
+        String hash = passwordEncoder.encode("hemligt123");
         when(userRepository.findByUsername("ny@example.com")).thenReturn(Optional.of(
-                new User(new UserId(1L), "ny@example.com", passwordEncoder.encode("hemligt123"), now, 1, false,
+                new User(new UserId(1L), "ny@example.com", hash, now, 1, false,
                         false, now, false)));
         when(userRepository.findByUsername("gammal@example.com")).thenReturn(Optional.of(
-                new User(new UserId(2L), "gammal@example.com", passwordEncoder.encode("hemligt123"), now, 1,
+                new User(new UserId(2L), "gammal@example.com", hash, now, 1,
                         false, false, now, true)));
     }
 
@@ -81,5 +82,23 @@ class LoginVerificationTest {
         mockMvc.perform(post("/login").with(csrf()).param("username", "gammal@example.com")
                         .param("password", "hemligt123"))
                 .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    void skaGöraSammaLösenordsjämförelseFörOverifieratKontoSomFörFelLösenord() throws Exception {
+        org.mockito.Mockito.clearInvocations(passwordEncoder);
+
+        mockMvc.perform(post("/login").with(csrf()).param("username", "ny@example.com").param("password", "hemligt123"))
+                .andExpect(redirectedUrl("/login?error"));
+
+        // Jämförelsen (bcrypt) sker även för ett disabled konto - annars avslöjar svarstiden kontostatus.
+        org.mockito.Mockito.verify(passwordEncoder).matches(org.mockito.ArgumentMatchers.eq("hemligt123"),
+                org.mockito.ArgumentMatchers.anyString());
+
+        // Och svaret är identiskt med fel lösenord för ett verifierat konto och för ett okänt konto
+        mockMvc.perform(post("/login").with(csrf()).param("username", "gammal@example.com").param("password", "fel"))
+                .andExpect(redirectedUrl("/login?error"));
+        mockMvc.perform(post("/login").with(csrf()).param("username", "okand@example.com").param("password", "fel"))
+                .andExpect(redirectedUrl("/login?error"));
     }
 }

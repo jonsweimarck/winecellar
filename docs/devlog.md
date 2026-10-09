@@ -1202,3 +1202,11 @@ inte är arkitektur men värt att veta:
   meddelandet inte längre visas efter lösenordskontrollen; alla inloggningsfel ger i stället
   samma svar och inloggningssidan erbjuder en länk till ny verifieringslänk. Den egna
   `DaoAuthenticationProvider`-beanen och `/login?unverified` togs bort.
+- **Runda 6:** (1) den egna `DaoAuthenticationProvider`-beanen kom tillbaka (utan failure-handler): `enabled`
+  kontrolleras efter lösenordsjämförelsen, så ett overifierat konto kostar samma bcrypt-arbete som fel
+  lösenord och svarstiden avslöjar inte kontostatus (bevisat i `LoginVerificationTest` med en spion på
+  `PasswordEncoder`). Alla fel ger fortfarande `/login?error`. (2) Städningen av övergivna
+  `user_tokens`-varianter flyttades ur `schema.sql` (som körs vid varje start) till enbart den fristående
+  migreringsfilen; `schema.sql` ger bara slutläget för en färsk databas. Entitetens `@UniqueConstraint` och
+  `schema.sql`:s `CREATE TABLE IF NOT EXISTS` kolliderar inte: Hibernate skapar tabellen först och
+  `CREATE ... IF NOT EXISTS` är då ett no-op.

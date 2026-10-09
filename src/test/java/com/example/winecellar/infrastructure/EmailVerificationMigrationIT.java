@@ -26,7 +26,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *   den med ett UK_-namngivet unikt constraint över (user_id, purpose) och en kolumn
  *   pending_password_hash, och (B) med partiellt unikt index, pending-kolumn och dubbletter av
  *   verifieringstokens utan något bredare constraint,
- * och kör både migreringsfilen och motsvarande del av schema.sql TVÅ gånger mot dem.
+ * och kör migreringsfilen TVÅ gånger mot dem (städningen av övergivna lägen finns bara i migreringen,
+ * inte i schema.sql). Mot en färsk databas körs även schema.sql:s del två gånger och måste ge slutläget.
  */
 class EmailVerificationMigrationIT extends SharedPostgres {
 
@@ -64,8 +65,7 @@ class EmailVerificationMigrationIT extends SharedPostgres {
     }
 
     @ParameterizedTest(name = "{0} / {1}")
-    @CsvSource({"A_HIBERNATE_UK_OCH_PENDING, MIGRATION", "A_HIBERNATE_UK_OCH_PENDING, SCHEMA",
-            "B_PARTIELLT_INDEX_OCH_DUBBLETTER, MIGRATION", "B_PARTIELLT_INDEX_OCH_DUBBLETTER, SCHEMA",
+    @CsvSource({"A_HIBERNATE_UK_OCH_PENDING, MIGRATION", "B_PARTIELLT_INDEX_OCH_DUBBLETTER, MIGRATION",
             "C_FÄRSK_DATABAS, MIGRATION", "C_FÄRSK_DATABAS, SCHEMA"})
     void skaFörvandlaGamlaUserTokensLägenTillEttUnikaConstraintUtanPendingKolumn(String state, String runner)
             throws Exception {

@@ -659,8 +659,9 @@ användaren öppnat verifieringslänken och valt sitt lösenord där.
   slumpmässigt, oanvändbart lösenord (hash av 256 bitar slump som kastas) och är `disabled` i
   `UserDetails`. Ingen känner alltså till något lösenord för ett förhandsregistrerat konto, och
   bara den som kontrollerar brevlådan kan välja ett (på verifieringslänken). Alla inloggningsfel
-  ger samma `/login?error` (default-providern kontrollerar `disabled` före lösenord, men
-  failure-handlern skiljer inte på feltyp) och inloggningssidans felmeddelande innehåller en
+  ger samma `/login?error` (en egen `DaoAuthenticationProvider` i `SecurityConfig` kontrollerar `disabled` EFTER
+  lösenordsjämförelsen, så ett overifierat konto genomgår samma bcrypt-arbete som fel lösenord
+  och svarstiden avslöjar inte kontostatus; ingen egen failure-handler) och inloggningssidans felmeddelande innehåller en
   länk till "begär ny verifieringslänk". Remember-me avvisar disabled-konton via UserDetailsChecker.
 - **Neutralt svar vid glömt lösenord:** samma sida oavsett adress, rate limit
   (`RequestRateLimiter`, 3 mail/adress/timme, i minnet, även för okända adresser),
@@ -689,15 +690,17 @@ användaren öppnat verifieringslänken och valt sitt lösenord där.
   (utan token) och besvarar neutralt. Samtidig förstagångsregistrering behandlas som "upptaget".
   Tester skapar verifierade konton via `support/TestUsers`/`TestAccounts` - det finns
   ingen "verifierad som standard"-konstruktor på `User`.
-- **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (speglad i
-  `schema.sql`) lägger till `users.email_verified`, backfillar ALLA befintliga rader
+- **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (`schema.sql` har
+  motsvarande rader för `email_verified`) lägger till `users.email_verified`, backfillar ALLA befintliga rader
   till `true` INNAN `NOT NULL` och skapar `user_tokens` (och städar övergivna tidigare varianter av den: kolumnen
   `pending_password_hash`, ett partiellt index, dubbletter, och säkerställer ETT unikt
   constraint över `(user_id, purpose)` oavsett namn via uppslag i `pg_constraint`). Backfillen rör bara rader som
   är NULL, så en omkörning vid varje appstart påverkar aldrig ett medvetet overifierat
   konto. `EmailVerificationMigrationIT` bygger scratch-databaser med en GAMMAL
   users-tabell och riktiga rader samt gamla `user_tokens`-lägen (Hibernate-namngivet UK_ +
-  pending-kolumn, partiellt index + dubbletter) och kör både migreringsfilen och schema.sql två gånger (en tom Testcontainers-databas bevisar inget om
+  pending-kolumn, partiellt index + dubbletter) och kör migreringsfilen två gånger (städningen av övergivna `user_tokens`-lägen finns
+  BARA i migreringsfilen, inte i `schema.sql`, som bara ger slutläget för en färsk databas och körs
+  idempotent på varje start; mot en färsk databas testas även `schema.sql`) (en tom Testcontainers-databas bevisar inget om
   migreringsordning, se Kända fällor). `AdminService.deleteUser` raderar användarens
   tokens (ingen FK).
 - **Testfällor:** (1) De flesta UI-/persistenstester skapar sina konton med
