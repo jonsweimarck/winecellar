@@ -36,12 +36,11 @@
             </div>
         </form>
 
-        <p class="fel" th:if="${param.error}">Fel användarnamn eller lösenord.</p>
-        <p class="fel" th:if="${param.unverified}">Din e-postadress är inte verifierad. Öppna länken i verifieringsmailet, eller
-            <a th:href="@{/verifiera/ny}">begär en ny länk</a>.</p>
-        <p class="info" th:if="${param.registered}">Kontot är skapat. Vi har skickat ett mail med en verifieringslänk - öppna den
-            innan du loggar in. Länken gäller i 24 timmar.</p>
-        <p class="info" th:if="${param.verified}">Din e-postadress är verifierad. Du kan nu logga in.</p>
+        <p class="fel" th:if="${param.error}">Fel användarnamn eller lösenord. Har du inte verifierat din
+            e-postadress än? <a th:href="@{/verifiera/ny}">Begär en ny verifieringslänk</a>.</p>
+        <p class="info" th:if="${param.registered}">Vi har skickat ett mail med en verifieringslänk - öppna den för att bekräfta
+            adressen och välja ett lösenord. Länken gäller i 24 timmar.</p>
+        <p class="info" th:if="${param.verified}">Din e-postadress är verifierad och ditt lösenord är sparat. Du kan nu logga in.</p>
         <p class="info" th:if="${param.reset}">Ditt lösenord är ändrat. Logga in med det nya lösenordet.</p>
         <p class="info" th:if="${param.logout}">Du är utloggad.</p>
 

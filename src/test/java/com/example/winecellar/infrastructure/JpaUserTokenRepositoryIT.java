@@ -36,7 +36,7 @@ class JpaUserTokenRepositoryIT extends SharedPostgres {
     @Test
     void baraEnAvFleraSamtidigaRadering​arSkaLyckas() throws Exception {
         UserToken token = repository.save(
-                new UserToken(null, USER, Purpose.PASSWORD_RESET, "hash-atomar-1", Instant.now().plusSeconds(60), null));
+                new UserToken(null, USER, Purpose.PASSWORD_RESET, "hash-atomar-1", Instant.now().plusSeconds(60)));
         var pool = Executors.newFixedThreadPool(8);
         try {
             List<Future<Boolean>> results = new ArrayList<>();
@@ -56,18 +56,11 @@ class JpaUserTokenRepositoryIT extends SharedPostgres {
     }
 
     @Test
-    void skaNekaTvåÅterställningstokensMenTillåtaFleraVerifieringstokensFörSammaAnvändare() {
+    void skaNekaTvåTokensAvSammaSlagFörSammaAnvändare() {
         repository.save(new UserToken(null, USER, Purpose.EMAIL_VERIFICATION, "hash-unik-1",
-                Instant.now().plusSeconds(60), "pending-1"));
-        repository.save(new UserToken(null, USER, Purpose.EMAIL_VERIFICATION, "hash-unik-2",
-                Instant.now().plusSeconds(60), "pending-2"));
-        assertThat(repository.findByUserAndPurpose(USER, Purpose.EMAIL_VERIFICATION))
-                .extracting(UserToken::pendingPasswordHash).containsExactly("pending-1", "pending-2");
-
-        repository.save(new UserToken(null, USER, Purpose.PASSWORD_RESET, "hash-unik-3",
-                Instant.now().plusSeconds(60), null));
-        assertThatThrownBy(() -> repository.save(new UserToken(null, USER, Purpose.PASSWORD_RESET,
-                "hash-unik-4", Instant.now().plusSeconds(60), null)))
+                Instant.now().plusSeconds(60)));
+        assertThatThrownBy(() -> repository.save(new UserToken(null, USER, Purpose.EMAIL_VERIFICATION,
+                "hash-unik-2", Instant.now().plusSeconds(60))))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

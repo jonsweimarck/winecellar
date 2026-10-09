@@ -26,19 +26,12 @@ public class JpaUserTokenRepository implements UserTokenRepository {
         entity.setPurpose(token.purpose().name());
         entity.setTokenHash(token.tokenHash());
         entity.setExpiresAt(token.expiresAt());
-        entity.setPendingPasswordHash(token.pendingPasswordHash());
         return toDomain(jpaRepository.save(entity));
     }
 
     @Override
     public Optional<UserToken> findByHash(Purpose purpose, String tokenHash) {
         return jpaRepository.findByPurposeAndTokenHash(purpose.name(), tokenHash).map(JpaUserTokenRepository::toDomain);
-    }
-
-    @Override
-    public java.util.List<UserToken> findByUserAndPurpose(UserId userId, Purpose purpose) {
-        return jpaRepository.findByUserIdAndPurposeOrderByIdAsc(userId.value(), purpose.name()).stream()
-                .map(JpaUserTokenRepository::toDomain).toList();
     }
 
     /** Villkorad radering (DELETE ... WHERE id = ?) - antalet påverkade rader avgör vem som "vann". */
@@ -62,7 +55,6 @@ public class JpaUserTokenRepository implements UserTokenRepository {
 
     private static UserToken toDomain(UserTokenEntity entity) {
         return new UserToken(entity.getId(), new UserId(entity.getUserId()),
-                Purpose.valueOf(entity.getPurpose()), entity.getTokenHash(), entity.getExpiresAt(),
-                entity.getPendingPasswordHash());
+                Purpose.valueOf(entity.getPurpose()), entity.getTokenHash(), entity.getExpiresAt());
     }
 }

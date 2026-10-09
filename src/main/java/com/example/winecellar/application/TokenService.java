@@ -8,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,7 +21,6 @@ public class TokenService {
 
     public static final Duration VERIFICATION_TTL = Duration.ofHours(24);
     public static final Duration RESET_TTL = Duration.ofHours(1);
-    public static final int MAX_VERIFICATION_TOKENS = 3;
 
     public record Redeemed(TokenOutcome outcome, UserToken token) {
     }
@@ -43,45 +41,10 @@ public class TokenService {
      */
     @Transactional
     public String issue(UserId userId, Purpose purpose) {
-        if (purpose == Purpose.EMAIL_VERIFICATION) {
-            return issueVerification(userId, null);
-        }
         tokenRepository.deleteByUserAndPurpose(userId, purpose);
-        return save(userId, purpose, null);
-    }
-
-    /**
-     * Utfärdar ett ytterligare verifieringstoken som bär sin egen väntande lösenordshash
-     * (null = behåll kontots). Äldre tokens revokeras INTE; antalet håller sig under
-     * {@link #MAX_VERIFICATION_TOKENS} genom att de äldsta raderas. Se ADR 0026.
-     */
-    @Transactional
-    public String issueVerification(UserId userId, String pendingPasswordHash) {
-        String raw = save(userId, Purpose.EMAIL_VERIFICATION, pendingPasswordHash);
-        List<UserToken> all = tokenRepository.findByUserAndPurpose(userId, Purpose.EMAIL_VERIFICATION);
-        for (int i = 0; i < all.size() - MAX_VERIFICATION_TOKENS; i++) {
-            tokenRepository.deleteById(all.get(i).id());
-        }
-        return raw;
-    }
-
-    /**
-     * "Skicka ny länk": ersätter användarens verifieringstokens med ETT nytt som bär samma
-     * väntande lösenordshash som det senast utfärdade (eller null om inget finns kvar).
-     */
-    @Transactional
-    public String reissueVerification(UserId userId) {
-        List<UserToken> all = tokenRepository.findByUserAndPurpose(userId, Purpose.EMAIL_VERIFICATION);
-        String pending = all.isEmpty() ? null : all.get(all.size() - 1).pendingPasswordHash();
-        tokenRepository.deleteByUserAndPurpose(userId, Purpose.EMAIL_VERIFICATION);
-        return save(userId, Purpose.EMAIL_VERIFICATION, pending);
-    }
-
-    private String save(UserId userId, Purpose purpose, String pendingPasswordHash) {
         String raw = TokenHasher.generate();
         Duration ttl = purpose == Purpose.EMAIL_VERIFICATION ? VERIFICATION_TTL : RESET_TTL;
-        tokenRepository.save(new UserToken(null, userId, purpose, TokenHasher.hash(raw),
-                clock.instant().plus(ttl), pendingPasswordHash));
+        tokenRepository.save(new UserToken(null, userId, purpose, TokenHasher.hash(raw), clock.instant().plus(ttl)));
         return raw;
     }
 

@@ -9,7 +9,8 @@ import com.example.winecellar.domain.UserToken.Purpose;
 import com.example.winecellar.support.SharedPostgres;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,12 +27,12 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * WINE-59: ett DETERMINISTISKT race mot det riktiga partiella unika indexet för
- * återställningstokens (ett åt gången per användare), i den riktiga transaktionsstacken.
- * Tråd A infogar ett återställningstoken i en öppen, ännu ej committad transaktion. Tråd B
+ * WINE-59: ett DETERMINISTISKT race mot det riktiga unika constraintet (user_id, purpose) - ett
+ * token per användare och syfte, för både verifiering och återställning - i den riktiga
+ * transaktionsstacken. Tråd A infogar ett token i en öppen, ännu ej committad transaktion. Tråd B
  * anropar då TokenService.issue: dess radering ser inte A:s rad, dess insert blockerar på
  * indexet och misslyckas efter A:s commit - alltid, så racet OBSERVERAS i stället för att
- * hoppas på tur. Verifieringstokens har inget sådant index (flera tillåts, ADR 0026).
+ * hoppas på tur.
  */
 @SpringBootTest
 class TokenIssueRaceIT extends SharedPostgres {
@@ -66,15 +67,16 @@ class TokenIssueRaceIT extends SharedPostgres {
         userRepository.deleteById(userId);
     }
 
-    @Test
-    void förloradeRaceFörÅterställningstokenSkaGeDataIntegrityViolationException() throws Exception {
+    @ParameterizedTest
+    @EnumSource(Purpose.class)
+    void förloratRaceSkaGeDataIntegrityViolationException(Purpose purpose) throws Exception {
         CountDownLatch insertedByA = new CountDownLatch(1);
         CountDownLatch bHasStarted = new CountDownLatch(1);
 
         CompletableFuture<Void> a = CompletableFuture.runAsync(() ->
                 new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-                    tokenRepository.save(new UserToken(null, userId, Purpose.PASSWORD_RESET, "race-hash-a",
-                            Instant.now().plusSeconds(60), null));
+                    tokenRepository.save(new UserToken(null, userId, purpose, "race-hash-a",
+                            Instant.now().plusSeconds(60)));
                     insertedByA.countDown();
                     await(bHasStarted);
                     sleep(1000); // B hinner blockera på indexet innan A committar
@@ -83,7 +85,7 @@ class TokenIssueRaceIT extends SharedPostgres {
 
         CompletableFuture<String> b = CompletableFuture.supplyAsync(() -> {
             bHasStarted.countDown();
-            return tokenService.issue(userId, Purpose.PASSWORD_RESET);
+            return tokenService.issue(userId, purpose);
         });
 
         a.get(20, TimeUnit.SECONDS);
@@ -96,18 +98,8 @@ class TokenIssueRaceIT extends SharedPostgres {
         // Racet SKA ha observerats, och med exakt den typ som anroparna fångar.
         assertThat(failure).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from user_tokens where user_id = ? and purpose = 'PASSWORD_RESET'",
-                Integer.class, userId.value())).isEqualTo(1);
-    }
-
-    @Test
-    void flerVerifieringstokensFörSammaAnvändareSkaTillåtasOchHållasUnderTaket() {
-        for (int i = 0; i < 5; i++) {
-            tokenService.issueVerification(userId, "pending-" + i);
-        }
-        assertThat(tokenRepository.findByUserAndPurpose(userId, Purpose.EMAIL_VERIFICATION))
-                .extracting(UserToken::pendingPasswordHash)
-                .containsExactly("pending-2", "pending-3", "pending-4");
+                "select count(*) from user_tokens where user_id = ? and purpose = ?",
+                Integer.class, userId.value(), purpose.name())).isEqualTo(1);
     }
 
     private static void await(CountDownLatch latch) {

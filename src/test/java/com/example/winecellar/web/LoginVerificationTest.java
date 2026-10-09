@@ -55,17 +55,17 @@ class LoginVerificationTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("href=\"/glomt-losenord\"")))
                 .andExpect(content().string(containsString("Glömt ditt lösenord?")));
-        mockMvc.perform(get("/login").param("unverified", ""))
-                .andExpect(content().string(containsString("inte verifierad")))
+        mockMvc.perform(get("/login").param("error", ""))
+                .andExpect(content().string(containsString("Fel användarnamn eller lösenord")))
                 .andExpect(content().string(containsString("/verifiera/ny")));
         mockMvc.perform(get("/login").param("registered", ""))
                 .andExpect(content().string(containsString("verifieringslänk")));
     }
 
     @Test
-    void skaNekaOverifieratKontoMedRättLösenordMedBeskedOmVerifiering() throws Exception {
+    void skaNekaOverifieratKontoUtanAttAvslöjaAttDetÄrOverifierat() throws Exception {
         mockMvc.perform(post("/login").with(csrf()).param("username", "ny@example.com").param("password", "hemligt123"))
-                .andExpect(redirectedUrl("/login?unverified"));
+                .andExpect(redirectedUrl("/login?error"));
     }
 
     @Test

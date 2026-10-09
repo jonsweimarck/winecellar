@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * Registrering (WINE-11, se ADR 0013). Sedan WINE-59 (ADR 0026) är
- * användarnamnet en e-postadress och användaren loggas INTE in automatiskt:
- * kontot skapas overifierat och aktiveras via länken i verifieringsmailet.
+ * användarnamnet en e-postadress och formuläret frågar BARA efter den; lösenordet väljs
+ * först när länken i verifieringsmailet öppnas. Användaren loggas inte in automatiskt.
  */
 @Controller
 public class RegistrationController {
@@ -30,21 +30,15 @@ public class RegistrationController {
     @PostMapping("/registrera")
     public String register(
             @RequestParam String username,
-            @RequestParam String password,
-            @RequestParam String confirmPassword,
             Model model) {
         model.addAttribute("username", username);
 
-        if (username == null || username.isBlank() || password == null || password.isBlank()) {
-            model.addAttribute("error", "Fyll i e-postadress och lösenord.");
-            return "registrera";
-        }
-        if (!password.equals(confirmPassword)) {
-            model.addAttribute("error", "Lösenorden matchar inte.");
+        if (username == null || username.isBlank()) {
+            model.addAttribute("error", "Fyll i din e-postadress.");
             return "registrera";
         }
 
-        RegistrationResult result = registrationService.register(username, password);
+        RegistrationResult result = registrationService.register(username);
         if (result instanceof RegistrationResult.InvalidEmail) {
             model.addAttribute("error", "Användarnamnet måste vara en e-postadress.");
             return "registrera";

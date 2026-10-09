@@ -16,14 +16,20 @@
         <form method="post" th:action="@{/verifiera}" th:unless="${failed}">
             <input type="hidden" name="token" th:value="${token}">
             <div class="kort">
+                <label class="falt"><span>Välj lösenord</span>
+                    <input type="password" id="password" name="password" autocomplete="new-password"
+                           autofocus="autofocus">
+                </label>
+                <label class="falt"><span>Bekräfta lösenord</span>
+                    <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password">
+                </label>
                 <div class="falt">
-                    <p>Bekräfta att det här är din e-postadress för att aktivera kontot.</p>
-                    <button type="submit" class="knapp-bred">Verifiera e-postadress</button>
+                    <button type="submit" class="knapp-bred">Verifiera e-postadress och spara lösenord</button>
                 </div>
             </div>
         </form>
 
-        <p class="fel" th:if="${failed}" th:text="${error}"></p>
+        <p class="fel" th:if="${error}" th:text="${error}"></p>
 
         <p class="lank" th:if="${failed}"><a th:href="@{/verifiera/ny}">Begär en ny verifieringslänk</a></p>
         <p class="lank"><a th:href="@{/login}">Till inloggningen</a></p>

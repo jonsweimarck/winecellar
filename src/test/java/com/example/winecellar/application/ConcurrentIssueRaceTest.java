@@ -38,7 +38,7 @@ class ConcurrentIssueRaceTest {
         RegistrationService service = new RegistrationService(racing, encoder, losingTokens,
                 new AccountWriter(racing, losingTokens), mail, clock, "http://x");
 
-        assertThat(service.register("anna@example.com", "hemligt123"))
+        assertThat(service.register("anna@example.com"))
                 .isInstanceOf(RegistrationResult.UsernameTaken.class);
         assertThat(mail.all()).isEmpty();
     }
@@ -50,6 +50,18 @@ class ConcurrentIssueRaceTest {
         PasswordResetService service = new PasswordResetService(users, encoder, losingTokens, mail,
                 mock(SessionTerminator.class), clock, "http://x");
         assertThatCode(() -> service.requestReset("anna@example.com")).doesNotThrowAnyException();
+        assertThat(mail.all()).isEmpty();
+    }
+
+    @Test
+    void omregistreringOchNyLänkSkaInteKraschaOchInteSkickaMailNärTokenRaceFörloras() {
+        Instant now = Instant.now();
+        users.save(new User(null, "anna@example.com", "h", now, 1, false, false, now, false));
+        RegistrationService service = new RegistrationService(users, encoder, losingTokens,
+                new AccountWriter(users, losingTokens), mail, clock, "http://x");
+
+        assertThat(service.register("anna@example.com")).isInstanceOf(RegistrationResult.Registered.class);
+        assertThatCode(() -> service.resendVerification("anna@example.com")).doesNotThrowAnyException();
         assertThat(mail.all()).isEmpty();
     }
 }

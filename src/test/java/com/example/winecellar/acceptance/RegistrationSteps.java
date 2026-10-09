@@ -105,20 +105,27 @@ public class RegistrationSteps {
         testAccounts.register(username, DEFAULT_PASSWORD);
     }
 
-    @Givet("att jag har registrerat mig med användarnamnet {string} och lösenordet {string}")
-    public void attJagHarRegistreratMig(String username, String password) {
-        lastRegistration = registrationService.register(username, password);
+    @Givet("att jag har registrerat mig med e-postadressen {string}")
+    public void attJagHarRegistreratMig(String address) {
+        lastRegistration = registrationService.register(address);
         assertThat(lastRegistration).isInstanceOf(RegistrationResult.Registered.class);
     }
 
-    @När("jag registrerar mig med användarnamnet {string} och lösenordet {string}")
-    public void jagRegistrerarMig(String username, String password) {
-        lastRegistration = registrationService.register(username, password);
+    @Givet("att jag har registrerat mig igen med e-postadressen {string} {int} gånger")
+    public void attJagHarRegistreratMigIgen(String address, int times) {
+        for (int i = 0; i < times; i++) {
+            lastRegistration = registrationService.register(address);
+        }
     }
 
-    @När("jag försöker registrera mig med användarnamnet {string} och lösenordet {string}")
-    public void jagFörsökerRegistreraMig(String username, String password) {
-        lastRegistration = registrationService.register(username, password);
+    @När("jag registrerar mig med e-postadressen {string}")
+    public void jagRegistrerarMig(String address) {
+        lastRegistration = registrationService.register(address);
+    }
+
+    @När("jag försöker registrera mig med e-postadressen {string}")
+    public void jagFörsökerRegistreraMig(String address) {
+        lastRegistration = registrationService.register(address);
     }
 
     @Så("avvisas registreringen eftersom användarnamnet måste vara en e-postadress")
@@ -145,7 +152,6 @@ public class RegistrationSteps {
 
     @Och("angriparens lösenord {string} fungerar inte för {string}")
     public void angriparensLösenordFungerarInte(String password, String username) throws Exception {
-        // Fel lösenord ger "error"; hade lösenordet fortfarande varit giltigt hade kontot gett "unverified".
         assertThat(login(username, password).getResponse().getRedirectedUrl()).isEqualTo("/login?error");
     }
 
@@ -158,6 +164,16 @@ public class RegistrationSteps {
     public void finnsEttOverifieratKonto(String username) {
         assertThat(lastRegistration).isInstanceOf(RegistrationResult.Registered.class);
         assertThat(user(username).emailVerified()).isFalse();
+    }
+
+    @Och("kontot {string} har ett oanvändbart slumpmässigt lösenord som ingen känner till")
+    public void kontotHarOanvändbartLösenord(String username) throws Exception {
+        String hash = user(username).hashedPassword();
+        assertThat(hash).isNotBlank().startsWith("{");
+        // Varken ett tomt lösenord eller vanliga gissningar fungerar - och inget lösenord har någonsin angetts.
+        for (String guess : new String[] {"", "password", "hemligt123", "angripare123", username}) {
+            assertThat(login(username, guess).getResponse().getRedirectedUrl()).isEqualTo("/login?error");
+        }
     }
 
     @Och("ett mail med en verifieringslänk har skickats till {string}")
@@ -183,12 +199,12 @@ public class RegistrationSteps {
         lastLogin = login(username, password);
     }
 
-    @Så("nekas inloggningen med ett meddelande om att adressen måste verifieras")
-    public void nekasMedMeddelandeOmVerifiering() throws Exception {
-        assertThat(lastLogin.getResponse().getRedirectedUrl()).isEqualTo("/login?unverified");
-        String page = mockMvc.perform(get("/login").param("unverified", ""))
+    @Så("nekas inloggningen utan att avslöja att kontot finns, och sidan erbjuder en ny verifieringslänk")
+    public void nekasUtanAttAvslöja() throws Exception {
+        assertThat(lastLogin.getResponse().getRedirectedUrl()).isEqualTo("/login?error");
+        String page = mockMvc.perform(get("/login").param("error", ""))
                 .andReturn().getResponse().getContentAsString();
-        assertThat(page).contains("inte verifierad");
+        assertThat(page).contains("Fel användarnamn eller lösenord").contains("/verifiera/ny");
     }
 
     @Så("jag kan logga in som {string} med lösenordet {string}")
@@ -201,33 +217,45 @@ public class RegistrationSteps {
         assertThat(login(username, password).getResponse().getRedirectedUrl()).startsWith("/login?");
     }
 
-    // ---- Verifiering --------------------------------------------------
+    // ---- Verifiering (lösenordet väljs på länken) ---------------------
 
-    @När("jag öppnar verifieringslänken i mailet till {string}")
-    public void jagÖppnarVerifieringslänken(String address) {
-        lastOutcome = registrationService.verifyEmail(mailSender.sentTo(address).get(0).token());
+    @När("jag väljer lösenordet {string} via verifieringslänken i mailet till {string}")
+    public void jagVäljerLösenordViaLänken(String password, String address) throws Exception {
+        choosePassword(lastToken(address), password, password);
     }
 
-    @Givet("att jag har öppnat verifieringslänken i mailet till {string}")
-    public void attJagHarÖppnatVerifieringslänken(String address) {
-        assertThat(registrationService.verifyEmail(mailSender.sentTo(address).get(0).token()))
-                .isEqualTo(TokenOutcome.SUCCESS);
-    }
-
-    @När("jag öppnar verifieringslänken i mailet till {string} igen")
-    public void jagÖppnarVerifieringslänkenIgen(String address) {
-        jagÖppnarVerifieringslänken(address);
-    }
-
-    @När("jag öppnar verifieringslänken i mail nummer {int} till {string}")
-    public void jagÖppnarVerifieringslänkenIMailNummer(int number, String address) {
-        lastOutcome = registrationService.verifyEmail(mailSender.sentTo(address).get(number - 1).token());
+    @Givet("att jag har valt lösenordet {string} via verifieringslänken i mailet till {string}")
+    public void attJagHarValtLösenordViaLänken(String password, String address) throws Exception {
+        choosePassword(lastToken(address), password, password);
         assertThat(lastOutcome).isEqualTo(TokenOutcome.SUCCESS);
     }
 
-    @Så("har exakt {int} verifieringsmail skickats till {string}")
-    public void harExaktVerifieringsmail(int count, String address) {
-        assertThat(mailSender.sentTo(address)).hasSize(count);
+    @När("jag väljer lösenordet {string} via verifieringslänken i mail nummer {int} till {string}")
+    public void jagVäljerLösenordViaMailNummer(String password, int number, String address) throws Exception {
+        choosePassword(mailSender.sentTo(address).get(number - 1).token(), password, password);
+    }
+
+    @När("jag försöker välja lösenordet {string} med bekräftelsen {string} via verifieringslänken i mailet till {string}")
+    public void jagFörsökerVäljaLösenordMedBekräftelse(String password, String confirm, String address)
+            throws Exception {
+        choosePassword(lastToken(address), password, confirm);
+    }
+
+    @När("någon försöker välja lösenordet {string} via en påhittad verifieringslänk")
+    public void någonFörsökerMedPåhittadLänk(String password) throws Exception {
+        choosePassword("pahittad-lank-som-ingen-har-fatt", password, password);
+    }
+
+    @Så("avvisas lösenordet utan att länken förbrukas")
+    public void avvisasLösenordetUtanAttFörbrukaLänken() {
+        assertThat(lastOutcome).isNull();
+        assertThat(lastPage.getResponse().getStatus()).isEqualTo(200);
+        assertThat(lastPage.getResponse().getRedirectedUrl()).isNull();
+    }
+
+    @Och("den senaste verifieringslänken till {string} fungerar fortfarande")
+    public void denSenasteLänkenFungerarFortfarande(String address) {
+        assertThat(registrationService.checkVerificationToken(lastToken(address))).isEqualTo(TokenOutcome.SUCCESS);
     }
 
     @Så("är kontot {string} verifierat")
@@ -261,6 +289,11 @@ public class RegistrationSteps {
         clock.advance(Duration.ofMinutes(minutes));
     }
 
+    @Så("har exakt {int} verifieringsmail skickats till {string}")
+    public void harExaktVerifieringsmail(int count, String address) {
+        assertThat(mailSender.sentTo(address)).hasSize(count);
+    }
+
     @När("jag begär en ny verifieringslänk för {string}")
     public void jagBegärEnNyVerifieringslänk(String address) {
         registrationService.resendVerification(address);
@@ -272,10 +305,10 @@ public class RegistrationSteps {
                 .isEqualTo(TokenOutcome.INVALID);
     }
 
-    @Och("den nya verifieringslänken aktiverar kontot {string}")
-    public void denNyaLänkenAktiverar(String username) {
-        List<FakeMailSender.Mail> mails = mailSender.sentTo(username);
-        assertThat(registrationService.verifyEmail(mails.get(mails.size() - 1).token())).isEqualTo(TokenOutcome.SUCCESS);
+    @Och("den nya verifieringslänken låter mig välja lösenordet {string} för {string}")
+    public void denNyaLänkenLåterMigVälja(String password, String username) throws Exception {
+        choosePassword(lastToken(username), password, password);
+        assertThat(lastOutcome).isEqualTo(TokenOutcome.SUCCESS);
         assertThat(user(username).emailVerified()).isTrue();
     }
 
@@ -394,6 +427,27 @@ public class RegistrationSteps {
     }
 
     // ---- Hjälpare -----------------------------------------------------
+
+    private String lastToken(String address) {
+        List<FakeMailSender.Mail> mails = mailSender.sentTo(address);
+        return mails.get(mails.size() - 1).token();
+    }
+
+    /** POST /verifiera. lastOutcome = null när formuläret avvisade lösenordet (tomt/olika). */
+    private void choosePassword(String token, String password, String confirm) throws Exception {
+        lastPage = mockMvc.perform(post("/verifiera").param("token", token).param("password", password)
+                .param("confirmPassword", confirm).with(csrf())).andReturn();
+        String body = lastPage.getResponse().getContentAsString();
+        if ("/login?verified".equals(lastPage.getResponse().getRedirectedUrl())) {
+            lastOutcome = TokenOutcome.SUCCESS;
+        } else if (body.contains("har gått ut")) {
+            lastOutcome = TokenOutcome.EXPIRED;
+        } else if (body.contains("ogiltig eller redan använd")) {
+            lastOutcome = TokenOutcome.INVALID;
+        } else {
+            lastOutcome = null;
+        }
+    }
 
     private MvcResult login(String username, String password) throws Exception {
         return mockMvc.perform(post("/login").param("username", username).param("password", password).with(csrf()))

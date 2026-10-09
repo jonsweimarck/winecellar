@@ -65,6 +65,22 @@ public class RequestRateLimiter {
         return true;
     }
 
+    /**
+     * Icke-förbrukande kontroll: skulle {@link #tryAcquire} för nyckeln lyckas just nu?
+     * Används för att avgöra om ett mail över huvud taget får skickas INNAN något ändras
+     * (kvoten förbrukas först efter en lyckad utfärdning).
+     */
+    public synchronized boolean hasCapacity(String key) {
+        Instant cutoff = clock.instant().minus(window);
+        Deque<Instant> times = requests.get(key);
+        if (times == null) {
+            return requests.size() < maxKeys || requests.values().stream()
+                    .anyMatch(t -> t.isEmpty() || !t.peekLast().isAfter(cutoff));
+        }
+        long live = times.stream().filter(t -> t.isAfter(cutoff)).count();
+        return live < maxRequests;
+    }
+
     synchronized int size() {
         return requests.size();
     }

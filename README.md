@@ -274,7 +274,12 @@ Användarnamnet är en e-postadress (valideras löst: lokal del, @ och en
 domän med punkt; sparas i gemener, unikt oavsett versaler). Ett nytt konto
 är overifierat och kan inte logga in förrän användaren öppnat länken i
 verifieringsmailet (giltig 24 timmar, engångsbruk; en ny länk kan begäras på
-`/verifiera/ny`). Inloggningssidans "Glömt ditt lösenord?" leder till
+`/verifiera/ny`). Registreringen frågar bara efter e-postadressen: ett nytt konto får
+ett slumpmässigt, oanvändbart lösenord, och användaren väljer sitt riktiga lösenord (med
+bekräftelse) på sidan som verifieringslänken öppnar - först då aktiveras kontot, och
+hen skickas till inloggningen. Ingen som bara känner till en adress kan alltså ta över
+ett konto; bara brevlådans ägare kan välja lösenord. En ny registrering av en ännu
+overifierad adress är samma sak som att begära en ny länk (den gamla ersätts). Inloggningssidans "Glömt ditt lösenord?" leder till
 `/glomt-losenord`: en återställningslänk (giltig 1 timme, engångsbruk, en ny
 begäran ogiltigförklarar tidigare) mailas bara till ett verifierat konto, men
 svaret är alltid detsamma ("Om adressen finns har ett mail skickats"), och

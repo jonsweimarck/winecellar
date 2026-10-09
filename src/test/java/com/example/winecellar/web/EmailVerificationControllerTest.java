@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,7 +37,7 @@ class EmailVerificationControllerTest {
     private UserRepository userRepository;
 
     @Test
-    void skaVisaBekräftaKnappUtanInloggningOchUtanAttFörbrukaTokenet() throws Exception {
+    void skaVisaLösenordsformulärUtanInloggningOchUtanAttFörbrukaTokenet() throws Exception {
         when(registrationService.checkVerificationToken("abc")).thenReturn(TokenOutcome.SUCCESS);
 
         mockMvc.perform(get("/verifiera").param("token", "abc"))
@@ -44,7 +45,7 @@ class EmailVerificationControllerTest {
                 .andExpect(content().string(containsString("name=\"token\" value=\"abc\"")))
                 .andExpect(content().string(containsString("name=\"_csrf\"")));
 
-        verify(registrationService, never()).verifyEmail("abc");
+        verify(registrationService, never()).activateAccount(any(), any());
     }
 
     @Test
@@ -61,28 +62,55 @@ class EmailVerificationControllerTest {
     }
 
     @Test
-    void skaVerifieraViaPostOchOmdirigeraTillInloggningen() throws Exception {
-        when(registrationService.verifyEmail("abc")).thenReturn(TokenOutcome.SUCCESS);
+    void skaVisaLösenordsformulärVidGiltigLänkUtanAttFörbrukaDen() throws Exception {
+        when(registrationService.checkVerificationToken("abc")).thenReturn(TokenOutcome.SUCCESS);
 
-        mockMvc.perform(post("/verifiera").with(csrf()).param("token", "abc"))
+        mockMvc.perform(get("/verifiera").param("token", "abc"))
+                .andExpect(content().string(containsString("name=\"password\"")))
+                .andExpect(content().string(containsString("name=\"confirmPassword\"")));
+
+        verify(registrationService, never()).activateAccount(any(), any());
+    }
+
+    @Test
+    void skaAktiveraMedValtLösenordViaPostOchOmdirigeraTillInloggningen() throws Exception {
+        when(registrationService.activateAccount("abc", "hemligt123")).thenReturn(TokenOutcome.SUCCESS);
+
+        mockMvc.perform(post("/verifiera").with(csrf()).param("token", "abc")
+                        .param("password", "hemligt123").param("confirmPassword", "hemligt123"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?verified"));
     }
 
     @Test
     void skaVisaFelVidPostMedOgiltigtToken() throws Exception {
-        when(registrationService.verifyEmail("fel")).thenReturn(TokenOutcome.INVALID);
+        when(registrationService.activateAccount("fel", "hemligt123")).thenReturn(TokenOutcome.INVALID);
 
-        mockMvc.perform(post("/verifiera").with(csrf()).param("token", "fel"))
+        mockMvc.perform(post("/verifiera").with(csrf()).param("token", "fel")
+                        .param("password", "hemligt123").param("confirmPassword", "hemligt123"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("ogiltig eller redan använd")));
     }
 
     @Test
+    void skaAvvisaTomtEllerOlikaLösenordUtanAttFörbrukaLänken() throws Exception {
+        mockMvc.perform(post("/verifiera").with(csrf()).param("token", "abc")
+                        .param("password", "a").param("confirmPassword", "b"))
+                .andExpect(content().string(containsString("matchar inte")))
+                .andExpect(content().string(containsString("name=\"token\" value=\"abc\"")));
+        mockMvc.perform(post("/verifiera").with(csrf()).param("token", "abc")
+                        .param("password", "").param("confirmPassword", ""))
+                .andExpect(content().string(containsString("Fyll i")));
+
+        verify(registrationService, never()).activateAccount(any(), any());
+    }
+
+    @Test
     void skaKrävaCsrfPåPost() throws Exception {
-        mockMvc.perform(post("/verifiera").param("token", "abc")).andExpect(status().isForbidden());
+        mockMvc.perform(post("/verifiera").param("token", "abc").param("password", "x")
+                .param("confirmPassword", "x")).andExpect(status().isForbidden());
         mockMvc.perform(post("/verifiera/ny").param("username", "a@b.se")).andExpect(status().isForbidden());
-        verify(registrationService, never()).verifyEmail("abc");
+        verify(registrationService, never()).activateAccount(any(), any());
     }
 
     @Test

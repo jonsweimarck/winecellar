@@ -26,22 +26,26 @@ public class AccountWriter {
 
     /**
      * Löser in ett verifieringstoken: i EN transaktion raderas tokenet villkorat (den enda
-     * vinnaren av ett race går vidare), kontot markeras verifierat och får just det tokenets
-     * väntande lösenordshash, och kontots övriga verifieringstokens raderas.
+     * vinnaren av ett race går vidare), och kontot får det valda lösenordet och markeras
+     * verifierat. Tillämpas BARA om kontot fortfarande är overifierat - ett redan verifierat
+     * kontos lösenord ändras aldrig härifrån.
      *
-     * @return false om någon annan hann före eller kontot saknas (inget ändras då)
+     * @return false om kontot saknas/redan är verifierat eller någon annan hann före (inget ändras då)
      */
     @Transactional
-    public boolean activate(UserToken token) {
+    public boolean activate(UserToken token, String newPasswordHash) {
         Optional<User> user = userRepository.findById(token.userId());
-        if (user.isEmpty() || !tokenService.consume(token)) {
+        if (user.isEmpty()) {
             return false;
         }
-        User activated = user.get().withEmailVerified(true);
-        if (token.pendingPasswordHash() != null) {
-            activated = activated.withHashedPassword(token.pendingPasswordHash());
+        if (user.get().emailVerified()) {
+            tokenService.revokeAll(token.userId(), Purpose.EMAIL_VERIFICATION);
+            return false;
         }
-        userRepository.save(activated);
+        if (!tokenService.consume(token)) {
+            return false;
+        }
+        userRepository.save(user.get().withHashedPassword(newPasswordHash).withEmailVerified(true));
         tokenService.revokeAll(token.userId(), Purpose.EMAIL_VERIFICATION);
         return true;
     }

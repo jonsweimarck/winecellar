@@ -1187,3 +1187,18 @@ inte är arkitektur men värt att veta:
   race (tråd A håller en öppen transaktion med ett återställningstoken, tråd B misslyckas alltid)
   med en riktig användare. Tidigare påståenden i kod/CLAUDE.md/ADR om att "omregistrering
   skriver över lösenordet" och "egen kvot för omregistrering" gäller inte längre.
+- **Runda 5 (alternativ A, användarens beslut):** lösenordet i registreringen togs bort helt.
+  Registreringen frågar bara efter e-postadressen; ett overifierat konto får en slumpmässig,
+  kastad lösenordshash, och lösenordet väljs på verifieringslänken (POST förbrukar tokenet,
+  sätter lösenordet och markerar kontot verifierat i en transaktion, bara om kontot ännu är
+  overifierat). Alla pending-hash-varianter (round 3-4) övergavs: ingen `pending_password_hash`,
+  ingen ärvd hash i resend, ingen överskrivning av konton. Omregistrering = "skicka ny länk" under
+  en gemensam kvot (hasCapacity före ändring, förbrukning efter lyckad utfärdning). Tillbaka till
+  ett token per användare och syfte (unikt constraint över `(user_id, purpose)`); `TokenService`
+  förenklades. Migreringen och schema.sql städar nu övergivna varianter av `user_tokens` som
+  Hibernate kan ha skapat från tidigare versioner av grenen (UK_-constraint, pending-kolumn,
+  partiellt index, dubbletter) och bevisas av `EmailVerificationMigrationIT` mot scratch-databaser.
+  Eftersom ett overifierat konto aldrig har ett användbart lösenord kan "måste verifieras"-
+  meddelandet inte längre visas efter lösenordskontrollen; alla inloggningsfel ger i stället
+  samma svar och inloggningssidan erbjuder en länk till ny verifieringslänk. Den egna
+  `DaoAuthenticationProvider`-beanen och `/login?unverified` togs bort.
