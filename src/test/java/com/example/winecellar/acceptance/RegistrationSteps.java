@@ -149,6 +149,27 @@ public class RegistrationSteps {
                 .isEqualTo(TokenOutcome.SUCCESS);
     }
 
+    @Givet("att jag har begärt en ny verifieringslänk för {string} {int} gånger")
+    public void attJagHarBegärtNyLänkFleraGånger(String address, int times) {
+        for (int i = 0; i < times; i++) {
+            registrationService.resendVerification(address);
+        }
+    }
+
+    @Och("alla tidigare verifieringslänkar till {string} är ogiltiga")
+    public void allaTidigareLänkarOgiltiga(String address) {
+        assertThat(mailSender.sentTo(address)).isNotEmpty();
+        for (FakeMailSender.Mail mail : mailSender.sentTo(address)) {
+            assertThat(registrationService.checkVerificationToken(mail.token())).isEqualTo(TokenOutcome.INVALID);
+        }
+    }
+
+    @Och("angriparens lösenord {string} fungerar inte för {string}")
+    public void angriparensLösenordFungerarInte(String password, String username) throws Exception {
+        // Fel lösenord ger "error"; hade lösenordet fortfarande varit giltigt hade kontot gett "unverified".
+        assertThat(login(username, password).getResponse().getRedirectedUrl()).isEqualTo("/login?error");
+    }
+
     @Och("inget konto med användarnamnet {string} har skapats")
     public void ingetKontoHarSkapats(String username) {
         assertThat(userRepository.findByUsername(username)).isEmpty();

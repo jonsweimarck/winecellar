@@ -3,6 +3,7 @@ package com.example.winecellar.application;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.UserToken.Purpose;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -65,7 +66,13 @@ public class PasswordResetService {
         if (!limiter.tryAcquire(email.get())) {
             return;
         }
-        String token = tokenService.issue(user.get().id(), Purpose.PASSWORD_RESET);
+        String token;
+        try {
+            token = tokenService.issue(user.get().id(), Purpose.PASSWORD_RESET);
+        } catch (DataIntegrityViolationException e) {
+            // Annan samtidig begäran hann före (unikt index) - tyst, samma neutrala svar.
+            return;
+        }
         mailSender.send(user.get().username(), "Återställ ditt lösenord - Vinkällaren",
                 "Någon (förhoppningsvis du) har begärt att återställa lösenordet för ditt konto i Vinkällaren.\n\n"
                         + "Öppna länken nedan för att välja ett nytt lösenord. Länken gäller i 1 timme och kan "

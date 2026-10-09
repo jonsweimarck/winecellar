@@ -686,6 +686,7 @@ användaren öppnat verifieringslänken.
   `WINECELLAR_BASE_URL` saknas. (e) `SmtpMailSender` fångar Throwable, har en kö på 100.
   (f) Den åttaargumentiga `User`-konstruktorn är borttagen - tester använder
   `support/TestUsers.verifiedUser(...)`. (g) `userDetailsService` trimmar användarnamnet.
+- **Granskning runda 2:** överskrivning av lösenord + `revokeAll` vid omregistrering av en overifierad adress sker OBEROENDE av mailkvoten (bara utskicket kvoteras; slut kvot = offret saknar giltig länk tills ny begärs). `DataIntegrityViolationException` från `TokenService.issue` (race på unika indexet) fångas i registrering/återutskick/glömt lösenord och ger tyst det neutrala svaret.
 - **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (speglad i
   `schema.sql`) lägger till `users.email_verified`, backfillar ALLA befintliga rader
   till `true` INNAN `NOT NULL` och skapar `user_tokens`. Backfillen rör bara rader som

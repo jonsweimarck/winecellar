@@ -80,7 +80,11 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   utfärdar ett nytt token (tidigare ogiltigförklaras), och svaret ser ut som
   för en ny adress. Då fungerar inte angriparens lösenord när den riktige
   ägaren registrerat om sig. För en verifierad adress gäller "upptaget".
-  Gamla overifierade konton städas inte bort.
+  Gamla overifierade konton städas inte bort. Överskrivningen och
+  ogiltigförklaringen av gamla länkar sker oberoende av mailkvoten (annars
+  kunde en angripare tömma kvoten först); bara själva utskicket kvoteras.
+  Medvetet val: den som äger brevlådan vinner - ett overifierat konto är
+  tomt, så inget går förlorat när lösenordet skrivs över.
 - Mailkvoten per adress förbrukas först när ett mail faktiskt ska skickas,
   så okända adresser aldrig hamnar i begränsarens karta. En anonym part kan
   dock förbruka kvoten för en känd adress och därmed tillfälligt hindra

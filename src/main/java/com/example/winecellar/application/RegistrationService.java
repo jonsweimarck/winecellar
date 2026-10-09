@@ -3,6 +3,7 @@ package com.example.winecellar.application;
 import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.UserToken.Purpose;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -58,10 +59,14 @@ public class RegistrationService {
             // Mot "pre-hijacking" (WINE-59, ADR 0026): någon annan kan ha registrerat offrets adress
             // i förväg med ett lösenord de känner till. Den riktige ägarens nya registrering
             // skriver därför över lösenordet och utfärdar ett nytt token (de gamla ogiltigförklaras).
-            // Svaret är detsamma som för en ny adress, och samma rate limit som för ny länk gäller.
+            // Svaret är detsamma som för en ny adress. Själva överskrivningen och revokeringen av
+            // gamla länkar sker ALLTID, oberoende av mailkvoten (annars kunde en angripare tömma
+            // kvoten först och göra offrets omregistrering till en tyst no-op). Bara utskicket av
+            // ett nytt mail kvoteras; är kvoten slut står offret utan giltig länk tills hen begär en ny.
+            User updated = userRepository.save(
+                    existing.get().withHashedPassword(passwordEncoder.encode(password)));
+            tokenService.revokeAll(updated.id(), Purpose.EMAIL_VERIFICATION);
             if (resendLimiter.tryAcquire(email.get())) {
-                User updated = userRepository.save(
-                        existing.get().withHashedPassword(passwordEncoder.encode(password)));
                 sendVerificationMail(updated);
             }
             return new RegistrationResult.Registered(existing.get());
@@ -117,7 +122,13 @@ public class RegistrationService {
     }
 
     private void sendVerificationMail(User user) {
-        String token = tokenService.issue(user.id(), Purpose.EMAIL_VERIFICATION);
+        String token;
+        try {
+            token = tokenService.issue(user.id(), Purpose.EMAIL_VERIFICATION);
+        } catch (DataIntegrityViolationException e) {
+            // Annan samtidig begäran hann före (unikt index) - tyst, samma neutrala svar.
+            return;
+        }
         mailSender.send(user.username(), "Verifiera din e-postadress - Vinkällaren",
                 "Välkommen till Vinkällaren!\n\n"
                         + "Bekräfta din e-postadress genom att öppna länken nedan. Länken gäller i 24 timmar "
