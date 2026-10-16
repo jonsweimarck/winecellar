@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kolla din e-post - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <th:block th:replace="~{fragments/inloggningsstil :: inloggningsstil}"></th:block>
+</head>
+<body>
+    <main class="inloggningssida">
+        <h1 class="apptitel">Vinkällaren</h1>
+        <div class="kort">
+            <div class="falt">
+                <h2>Kolla din e-post</h2>
+                <p>Vi har skickat ett mail med en verifieringslänk. Öppna länken för att bekräfta din adress
+                    och välja ett lösenord. Länken gäller i 24 timmar.</p>
+                <p>Hittar du inget mail? Titta i skräpposten, eller
+                    <a th:href="@{/verifiera/ny}">begär en ny verifieringslänk</a>.</p>
+            </div>
+        </div>
+        <p class="lank"><a th:href="@{/login}">Till inloggningen</a></p>
+    </main>
+</body>
+</html>

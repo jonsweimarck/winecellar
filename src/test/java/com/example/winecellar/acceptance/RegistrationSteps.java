@@ -438,7 +438,7 @@ public class RegistrationSteps {
         lastPage = mockMvc.perform(post("/verifiera").param("token", token).param("password", password)
                 .param("confirmPassword", confirm).with(csrf())).andReturn();
         String body = lastPage.getResponse().getContentAsString();
-        if ("/login?verified".equals(lastPage.getResponse().getRedirectedUrl())) {
+        if ("/verifierad".equals(lastPage.getResponse().getRedirectedUrl())) {
             lastOutcome = TokenOutcome.SUCCESS;
         } else if (body.contains("har gått ut")) {
             lastOutcome = TokenOutcome.EXPIRED;
