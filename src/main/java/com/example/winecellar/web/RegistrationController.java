@@ -47,7 +47,7 @@ public class RegistrationController {
             model.addAttribute("error", "Användarnamnet är upptaget.");
             return "registrera";
         }
-        // Post-Redirect-Get: informationen visas på inloggningssidan.
-        return "redirect:/login?registered";
+        // Post-Redirect-Get: en egen bekräftelsesida (ConfirmationController).
+        return "redirect:/registrerad";
     }
 }

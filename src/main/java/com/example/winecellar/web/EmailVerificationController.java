@@ -50,7 +50,7 @@ public class EmailVerificationController {
         }
         TokenOutcome outcome = registrationService.activateAccount(token, password);
         if (outcome == TokenOutcome.SUCCESS) {
-            return "redirect:/login?verified";
+            return "redirect:/verifierad";
         }
         model.addAttribute("failed", true);
         model.addAttribute("error", message(outcome));

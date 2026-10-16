@@ -59,8 +59,6 @@ class LoginVerificationTest {
         mockMvc.perform(get("/login").param("error", ""))
                 .andExpect(content().string(containsString("Fel användarnamn eller lösenord")))
                 .andExpect(content().string(containsString("/verifiera/ny")));
-        mockMvc.perform(get("/login").param("registered", ""))
-                .andExpect(content().string(containsString("verifieringslänk")));
     }
 
     @Test

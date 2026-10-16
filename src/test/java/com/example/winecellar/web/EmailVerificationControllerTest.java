@@ -79,7 +79,7 @@ class EmailVerificationControllerTest {
         mockMvc.perform(post("/verifiera").with(csrf()).param("token", "abc")
                         .param("password", "hemligt123").param("confirmPassword", "hemligt123"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login?verified"));
+                .andExpect(redirectedUrl("/verifierad"));
     }
 
     @Test

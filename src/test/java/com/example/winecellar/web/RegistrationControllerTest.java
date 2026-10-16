@@ -68,7 +68,7 @@ class RegistrationControllerTest {
     class NärEttKontoRegistreras {
 
         @Test
-        @DisplayName("ska ett lyckat konto INTE logga in användaren utan omdirigera till inloggningen med besked")
+        @DisplayName("ska ett lyckat konto INTE logga in användaren utan omdirigera till bekräftelsesidan")
         void skaInteLoggaInUtanOmdirigeraTillInloggningen() throws Exception {
             User user = new User(new UserId(1L), "anna@example.com", "hashat", Instant.now(), 1, false, false,
                     Instant.now(), false);
@@ -79,7 +79,7 @@ class RegistrationControllerTest {
                             .with(csrf())
                             .param("username", "anna@example.com"))
                     .andExpect(status().is3xxRedirection())
-                    .andExpect(redirectedUrl("/login?registered"))
+                    .andExpect(redirectedUrl("/registrerad"))
                     .andReturn();
 
             assertThat(result.getRequest().getSession(false) == null
