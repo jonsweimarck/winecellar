@@ -1,6 +1,6 @@
 package com.example.winecellar.web;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.support.SharedPostgres;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -38,7 +38,7 @@ class VinFormularIT extends SharedPostgres {
     private int port;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     private static final String TESTKONTO_ANVÄNDARNAMN = "vinFormularTest";
     private static final String TESTKONTO_LÖSENORD = "testlösenord123";
@@ -63,7 +63,7 @@ class VinFormularIT extends SharedPostgres {
 
     @BeforeEach
     void säkerställTestkonto() {
-        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testAccounts.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
     }
 
     @Test

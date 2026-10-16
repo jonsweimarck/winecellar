@@ -2,7 +2,7 @@ package com.example.winecellar.web;
 
 import com.example.winecellar.application.InterpretedLabel;
 import com.example.winecellar.application.LabelInterpreter;
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
@@ -44,7 +44,7 @@ class LabelScanFormIT extends SharedPostgres {
     private LabelInterpreter labelInterpreter;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     private static final String TESTKONTO_ANVÄNDARNAMN = "labelScanFormTest";
     private static final String TESTKONTO_LÖSENORD = "testlösenord123";
@@ -71,7 +71,7 @@ class LabelScanFormIT extends SharedPostgres {
      */
     @BeforeEach
     void säkerställTestkonto() {
-        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testAccounts.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
     }
 
     // En riktig, avkodningsbar 1x1-PNG (samma testbild som

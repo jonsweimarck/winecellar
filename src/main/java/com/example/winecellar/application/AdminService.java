@@ -22,8 +22,11 @@ public class AdminService {
     private final WineRepository wineRepository;
     private final ConversationRepository conversationRepository;
 
+    private final UserTokenRepository userTokenRepository;
+
     public AdminService(UserRepository userRepository, WineRepository wineRepository,
-                        ConversationRepository conversationRepository) {
+                        ConversationRepository conversationRepository, UserTokenRepository userTokenRepository) {
+        this.userTokenRepository = userTokenRepository;
         this.userRepository = userRepository;
         this.wineRepository = wineRepository;
         this.conversationRepository = conversationRepository;
@@ -46,9 +49,7 @@ public class AdminService {
         }
         return userRepository.findById(target).map(user -> {
             if (!user.admin()) {
-                userRepository.save(new User(user.id(), user.username(), user.hashedPassword(),
-                        user.createdAt(), user.defaultMinQuantityFilter(), user.ownRatingFromScale(), true,
-                        user.lastLoginAt()));
+                userRepository.save(user.withAdmin(true));
             }
             return true;
         }).orElse(false);
@@ -70,6 +71,7 @@ public class AdminService {
         }
         conversationRepository.deleteAllByOwner(target);
         wineRepository.deleteAllByOwner(target);
+        userTokenRepository.deleteAllByUser(target);
         userRepository.deleteById(target);
         return true;
     }

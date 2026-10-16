@@ -10,7 +10,8 @@ import java.util.Optional;
 
 interface UserJpaRepository extends JpaRepository<UserEntity, Long> {
 
-    Optional<UserEntity> findByUsername(String username);
+    /** Skiftlägesokänsligt (WINE-59); äldsta kontot vinner i det osannolika fallet två äldre konton skiljer sig bara i versaler. */
+    Optional<UserEntity> findFirstByUsernameIgnoreCaseOrderByIdAsc(String username);
 
     @Modifying
     @Query("update UserEntity u set u.lastLoginAt = :at where u.id = :id")

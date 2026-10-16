@@ -67,6 +67,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- E-postutskick för verifiering/återställning av lösenord (WINE-59,
+             se ADR 0026). Bara jakarta.mail + JavaMailSenderImpl används;
+             SMTP-uppkopplingen byggs för hand i MailConfig av winecellar.mail.*,
+             inte av Boots autokonfiguration (som aktiveras av en tom spring.mail.host). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
         <!-- Ger sec:*-dialekten och auto-injicerar CSRF-hidden-fältet i varje
              th:action-formulär - annars måste varje formulär (login.html,
              vin-formular.html, ...) lägga till fältet manuellt. -->

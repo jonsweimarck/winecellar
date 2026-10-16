@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>Nytt lösenord - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <th:block th:replace="~{fragments/inloggningsstil :: inloggningsstil}"></th:block>
+</head>
+<body>
+    <main class="inloggningssida">
+        <h1 class="apptitel">Vinkällaren</h1>
+
+        <form method="post" th:action="@{/aterstall-losenord}" th:unless="${failed}">
+            <input type="hidden" name="token" th:value="${token}">
+            <div class="kort">
+                <label class="falt"><span>Nytt lösenord</span>
+                    <input type="password" id="password" name="password" autocomplete="new-password"
+                           autofocus="autofocus">
+                </label>
+                <label class="falt"><span>Bekräfta nytt lösenord</span>
+                    <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password">
+                </label>
+                <div class="falt">
+                    <button type="submit" class="knapp-bred">Byt lösenord</button>
+                </div>
+            </div>
+        </form>
+
+        <p class="fel" th:if="${error}" th:text="${error}"></p>
+
+        <p class="lank" th:if="${failed}"><a th:href="@{/glomt-losenord}">Begär en ny länk</a></p>
+        <p class="lank"><a th:href="@{/login}">Till inloggningen</a></p>
+    </main>
+</body>
+</html>

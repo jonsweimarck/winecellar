@@ -98,3 +98,19 @@ winecellar:
     # omdeploy för att justera dem.
     max-conversations: ${WINECELLAR_CHAT_MAX_CONVERSATIONS:20}
     max-messages-per-conversation: ${WINECELLAR_CHAT_MAX_MESSAGES_PER_CONVERSATION:40}
+  # Publik bas-URL som byggs in i länkarna i verifierings-/återställningsmail
+  # (WINE-59, se ADR 0026). Lokal default; i produktion MÅSTE den sättas till
+  # appens riktiga HTTPS-adress, annars pekar mailen på localhost.
+  base-url: ${WINECELLAR_BASE_URL:http://localhost:8080}
+  mail:
+    # SMTP för utgående mail (WINE-59). Tom host = inget mail skickas (logg-
+    # adapter), appen startar ändå. Se README för vilka variabler som sätts i
+    # Clever Cloud. log-content loggar mailets innehåll (inkl. tokenlänken) -
+    # sätt BARA lokalt, aldrig i produktion.
+    host: ${WINECELLAR_MAIL_HOST:}
+    port: ${WINECELLAR_MAIL_PORT:587}
+    username: ${WINECELLAR_MAIL_USERNAME:}
+    password: ${WINECELLAR_MAIL_PASSWORD:}
+    from: ${WINECELLAR_MAIL_FROM:no-reply@localhost}
+    starttls: ${WINECELLAR_MAIL_STARTTLS:true}
+    log-content: ${WINECELLAR_MAIL_LOG_CONTENT:false}

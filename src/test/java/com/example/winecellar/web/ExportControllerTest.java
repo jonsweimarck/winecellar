@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.User;
@@ -98,7 +99,7 @@ class ExportControllerTest {
     @BeforeEach
     void stubbaInloggadAnvändare() {
         when(userRepository.findByUsername("testperson")).thenReturn(Optional.of(
-                new User(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false, false, Instant.now())));
+                TestUsers.verifiedUser(MIN_ANVÄNDARE_ID, "testperson", "hash", Instant.now(), 0, false, false, Instant.now())));
     }
 
     /**

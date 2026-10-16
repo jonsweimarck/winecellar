@@ -1,6 +1,6 @@
 package com.example.winecellar.web;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.support.SharedPostgres;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,7 +61,7 @@ class ForwardedHeadersIT extends SharedPostgres {
     private TestRestTemplate restTemplate;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     @Test
     void skaSättaSäkerRememberMeCookieMedForwardedHttpsHeader() {
@@ -101,7 +101,7 @@ class ForwardedHeadersIT extends SharedPostgres {
     }
 
     private String loggaInOchHämtaRememberMeCookie(boolean medForwardedHttpsHeader) {
-        registrationService.register(ANVÄNDARNAMN, LÖSENORD);
+        testAccounts.register(ANVÄNDARNAMN, LÖSENORD);
 
         HttpHeaders getHeaders = new HttpHeaders();
         if (medForwardedHttpsHeader) {

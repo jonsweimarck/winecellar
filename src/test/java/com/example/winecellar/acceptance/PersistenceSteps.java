@@ -1,6 +1,6 @@
 package com.example.winecellar.acceptance;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.ChatMessage;
@@ -49,7 +49,7 @@ public class PersistenceSteps {
     private EntityManager entityManager;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     @Autowired
     private UserRepository userRepository;
@@ -102,7 +102,7 @@ public class PersistenceSteps {
 
     @Before(order = 1)
     public void registreraTestkonto() {
-        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testAccounts.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
         ägare = userRepository.findByUsername(TESTKONTO_ANVÄNDARNAMN).orElseThrow().id();
     }
 

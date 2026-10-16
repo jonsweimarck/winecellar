@@ -2,7 +2,7 @@ package com.example.winecellar.acceptance;
 
 import com.example.winecellar.application.ImportPreview;
 import com.example.winecellar.application.ImportPreviewService;
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.application.RowCandidate;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
@@ -35,7 +35,7 @@ public class ImportSteps {
     private ImportPreviewService importPreviewService;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     @Autowired
     private UserRepository userRepository;
@@ -53,7 +53,7 @@ public class ImportSteps {
      */
     @Before(order = 2)
     public void registreraTestkonto() {
-        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testAccounts.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
         ägare = userRepository.findByUsername(TESTKONTO_ANVÄNDARNAMN).orElseThrow().id();
     }
 

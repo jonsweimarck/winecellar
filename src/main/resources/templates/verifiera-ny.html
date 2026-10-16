@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ny verifieringslänk - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <th:block th:replace="~{fragments/inloggningsstil :: inloggningsstil}"></th:block>
+</head>
+<body>
+    <main class="inloggningssida">
+        <h1 class="apptitel">Vinkällaren</h1>
+
+        <form method="post" th:action="@{/verifiera/ny}">
+            <div class="kort">
+                <label class="falt"><span>E-postadress</span>
+                    <input type="text" id="username" name="username" autocomplete="email" inputmode="email"
+                           autofocus="autofocus">
+                </label>
+                <div class="falt">
+                    <button type="submit" class="knapp-bred">Skicka ny verifieringslänk</button>
+                </div>
+            </div>
+        </form>
+
+        <p class="info" th:if="${sent}">Om adressen finns och ännu inte är verifierad har ett nytt mail skickats.
+            Tidigare länkar slutar fungera.</p>
+
+        <p class="lank"><a th:href="@{/login}">Till inloggningen</a></p>
+    </main>
+</body>
+</html>

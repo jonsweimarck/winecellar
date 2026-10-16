@@ -1,6 +1,6 @@
 package com.example.winecellar.web;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.application.WineChatAssistant;
 import com.example.winecellar.support.SharedPostgres;
 import com.microsoft.playwright.Browser;
@@ -45,7 +45,7 @@ class ChattFormIT extends SharedPostgres {
     private WineChatAssistant wineChatAssistant;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     private static final String TESTKONTO_ANVÄNDARNAMN = "chattFormTest";
     private static final String TESTKONTO_LÖSENORD = "testlösenord123";
@@ -72,7 +72,7 @@ class ChattFormIT extends SharedPostgres {
      */
     @BeforeEach
     void säkerställTestkonto() {
-        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testAccounts.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
     }
 
     @Test

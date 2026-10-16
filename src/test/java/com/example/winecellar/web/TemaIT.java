@@ -1,6 +1,6 @@
 package com.example.winecellar.web;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.support.SharedPostgres;
 import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
@@ -36,7 +36,7 @@ class TemaIT extends SharedPostgres {
     private int port;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     private static final String TESTKONTO_ANVÄNDARNAMN = "temaTest";
     private static final String TESTKONTO_LÖSENORD = "testlösenord123";
@@ -58,7 +58,7 @@ class TemaIT extends SharedPostgres {
 
     @BeforeEach
     void säkerställTestkonto() {
-        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testAccounts.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
     }
 
     /**

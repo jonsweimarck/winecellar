@@ -1,6 +1,6 @@
 package com.example.winecellar.web;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.User.UserId;
@@ -40,7 +40,7 @@ class WineListResponsiveIT extends SharedPostgres {
     private WineService wineService;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     @Autowired
     private UserRepository userRepository;
@@ -79,7 +79,7 @@ class WineListResponsiveIT extends SharedPostgres {
      */
     @BeforeEach
     void säkerställTestkontoOchLäggTillEttVin() {
-        registrationService.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
+        testAccounts.register(TESTKONTO_ANVÄNDARNAMN, TESTKONTO_LÖSENORD);
         testkontoId = userRepository.findByUsername(TESTKONTO_ANVÄNDARNAMN).orElseThrow().id();
 
         wineService.save(Wine.builder()

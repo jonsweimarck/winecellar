@@ -1,6 +1,6 @@
 package com.example.winecellar.web;
 
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -48,7 +48,7 @@ class ImportExportFlowIT extends SharedPostgres {
     private int port;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     private static final String KONTO_A_ANVÄNDARNAMN = "importExportFlowA";
     private static final String KONTO_B_ANVÄNDARNAMN = "importExportFlowB";
@@ -88,8 +88,8 @@ class ImportExportFlowIT extends SharedPostgres {
 
     @Test
     void skaExporteraOchImporteraEttVinMedBildTillEttAnnatKontoIdentiskt(@TempDir Path tempDir) throws Exception {
-        registrationService.register(KONTO_A_ANVÄNDARNAMN, LÖSENORD);
-        registrationService.register(KONTO_B_ANVÄNDARNAMN, LÖSENORD);
+        testAccounts.register(KONTO_A_ANVÄNDARNAMN, LÖSENORD);
+        testAccounts.register(KONTO_B_ANVÄNDARNAMN, LÖSENORD);
 
         try (BrowserContext kontoA = nyKontext()) {
             loggaIn(kontoA, KONTO_A_ANVÄNDARNAMN);
@@ -162,8 +162,8 @@ class ImportExportFlowIT extends SharedPostgres {
      */
     @Test
     void skaBevaraTransparensVidBulkimportAvEnBildMedGenomskinligBakgrund(@TempDir Path tempDir) throws Exception {
-        registrationService.register(KONTO_TRANSPARENS_A_ANVÄNDARNAMN, LÖSENORD);
-        registrationService.register(KONTO_TRANSPARENS_B_ANVÄNDARNAMN, LÖSENORD);
+        testAccounts.register(KONTO_TRANSPARENS_A_ANVÄNDARNAMN, LÖSENORD);
+        testAccounts.register(KONTO_TRANSPARENS_B_ANVÄNDARNAMN, LÖSENORD);
 
         try (BrowserContext kontoA = nyKontext()) {
             loggaIn(kontoA, KONTO_TRANSPARENS_A_ANVÄNDARNAMN);

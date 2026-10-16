@@ -1130,3 +1130,83 @@ den ursprungliga WINE-30-buggen, bara med lägre sannolikhet.
   vänds till sin motsats.
 - **ADR 0014 punkt 5 uppdaterad** - beskrev tidigare fallbacken som
   ovillkorlig, vilket inte längre stämmer.
+
+## E-post som användarnamn, verifiering och "glömt lösenord" - WINE-59 (2026-10-09)
+
+Beslutet står i [ADR 0026](adr/0026-email-username-verification-and-password-reset.md);
+nuläget i `CLAUDE.md` ("E-postverifiering och glömt lösenord - nuläge"). Det som
+inte är arkitektur men värt att veta:
+
+- **Cucumber-scenarierna körs mot riktig Postgres och den riktiga
+  säkerhetskedjan (MockMvc), med en flyttbar testklocka och en mail-fake**
+  (`AcceptanceTestBeans`). Tidsregler (24 h / 1 h) testas alltså utan att
+  vänta. Rate-limitarna är singleton i minnet och hade läckt mellan
+  scenarier; i stället för en test-only-nollställning i produktionskoden
+  flyttas klockan 2 h framåt före varje scenario.
+- **Ordningen på "enabled"-kontrollen:** Spring Securitys standard kontrollerar
+  `enabled` FÖRE lösenordet, vilket hade avslöjat "kontot finns men är
+  overifierat" utan att kunna lösenordet. Därför en egen `DaoAuthenticationProvider`
+  med kontrollen som post-check. Bieffekt: en WARN vid uppstart om att
+  `UserDetailsService`-beanen inte används av den globala AuthenticationManager
+  (den används av providern, varningen är kosmetisk).
+- **Befintliga tester:** de ~12 testklasser som registrerade konton via
+  `RegistrationService` byttes till `TestAccounts` (verifierat konto direkt via
+  repositoryt) - annars hade alla behövt e-postformade namn och ett
+  verifieringssteg. `DeletedUserAccessTest` loggar numera in via `/login` i
+  stället för via registreringens (borttagna) auto-inloggning.
+- **Verifiering av migreringen mot gammal data:** `EmailVerificationMigrationIT`
+  bygger en scratch-databas med en users-tabell i det gamla formatet och riktiga
+  rader, kör migreringsfilen (två gånger) och kontrollerar backfill, NOT NULL och
+  att ett nytt overifierat konto inte rörs av omkörningen.
+
+### WINE-59 - granskningsrundor på PR #50 (2026-10-09)
+
+- **Runda 1:** (a) pre-hijacking: `register` för en overifierad adress skriver över
+  lösenordshashen och utfärdar nytt token (svar som för ny adress); verifierad adress =>
+  "upptaget". (b) `RequestRateLimiter` förbrukas först när ett mail ska skickas, okända
+  adresser rör aldrig kartan, hårt tak på kartan. (c) atomär token-inlösen och transaktionell
+  `issue` med unikt index. (d) `MailConfigGuard` (uppstartsvarning på Clever Cloud). (e)
+  `SmtpMailSender` fångar Throwable, kö på 100. (f) åttaargumentskonstruktorn på `User`
+  borttagen (-> `support/TestUsers`). (g) `userDetailsService` trimmar användarnamnet.
+- **Runda 2:** överskrivning + revokering vid omregistrering gjordes oberoende av mailkvoten
+  (en angripare kunde annars tömma kvoten och göra offrets omregistrering till en no-op).
+  `DataIntegrityViolationException` från `issue` fångas och ger tyst neutralt svar.
+- **Runda 3:** separata kvoter för omregistrering respektive "ny länk" (en tömd resend-kvot
+  hindrade annars ersättningsmailet); överskrivning + revokering atomärt via `AccountWriter`
+  med mail efter commit; WARN-loggning i catch-blocken; samtidig förstagångsregistrering
+  fångas som "upptaget"; `TokenIssueRaceIT` bevisar mot riktig Postgres vilken exception ett
+  förlorat race ger. Tidsskillnaden i `resendVerification` (känd overifierad adress =
+  DB-skrivning + mail, okänd = bara hash) accepterades medvetet, se ADR 0026.
+- **Runda 4 (designändring):** lösenordsbytet vid omregistrering av en overifierad adress blev
+  "pending" och bundet till verifieringstokenet (`pending_password_hash`) i stället för att
+  skriva över kontoraden. Det löste tre fynd samtidigt: utelåsning via kvoten, stale-write av
+  hela User-raden och att en angripare som bara känner till ett lösenord aldrig kan aktivera
+  något. Följder: flera verifieringstokens per användare (tak 3), partiellt unikt index bara för
+  PASSWORD_RESET, EN gemensam kvot för verifieringsmail, `AccountWriter` ändrad från
+  "skriv över" till atomär aktivering. `TokenIssueRaceIT` skrevs om till ett deterministiskt
+  race (tråd A håller en öppen transaktion med ett återställningstoken, tråd B misslyckas alltid)
+  med en riktig användare. Tidigare påståenden i kod/CLAUDE.md/ADR om att "omregistrering
+  skriver över lösenordet" och "egen kvot för omregistrering" gäller inte längre.
+- **Runda 5 (alternativ A, användarens beslut):** lösenordet i registreringen togs bort helt.
+  Registreringen frågar bara efter e-postadressen; ett overifierat konto får en slumpmässig,
+  kastad lösenordshash, och lösenordet väljs på verifieringslänken (POST förbrukar tokenet,
+  sätter lösenordet och markerar kontot verifierat i en transaktion, bara om kontot ännu är
+  overifierat). Alla pending-hash-varianter (round 3-4) övergavs: ingen `pending_password_hash`,
+  ingen ärvd hash i resend, ingen överskrivning av konton. Omregistrering = "skicka ny länk" under
+  en gemensam kvot (hasCapacity före ändring, förbrukning efter lyckad utfärdning). Tillbaka till
+  ett token per användare och syfte (unikt constraint över `(user_id, purpose)`); `TokenService`
+  förenklades. Migreringen och schema.sql städar nu övergivna varianter av `user_tokens` som
+  Hibernate kan ha skapat från tidigare versioner av grenen (UK_-constraint, pending-kolumn,
+  partiellt index, dubbletter) och bevisas av `EmailVerificationMigrationIT` mot scratch-databaser.
+  Eftersom ett overifierat konto aldrig har ett användbart lösenord kan "måste verifieras"-
+  meddelandet inte längre visas efter lösenordskontrollen; alla inloggningsfel ger i stället
+  samma svar och inloggningssidan erbjuder en länk till ny verifieringslänk. Den egna
+  `DaoAuthenticationProvider`-beanen och `/login?unverified` togs bort.
+- **Runda 6:** (1) den egna `DaoAuthenticationProvider`-beanen kom tillbaka (utan failure-handler): `enabled`
+  kontrolleras efter lösenordsjämförelsen, så ett overifierat konto kostar samma bcrypt-arbete som fel
+  lösenord och svarstiden avslöjar inte kontostatus (bevisat i `LoginVerificationTest` med en spion på
+  `PasswordEncoder`). Alla fel ger fortfarande `/login?error`. (2) Städningen av övergivna
+  `user_tokens`-varianter flyttades ur `schema.sql` (som körs vid varje start) till enbart den fristående
+  migreringsfilen; `schema.sql` ger bara slutläget för en färsk databas. Entitetens `@UniqueConstraint` och
+  `schema.sql`:s `CREATE TABLE IF NOT EXISTS` kolliderar inte: Hibernate skapar tabellen först och
+  `CREATE ... IF NOT EXISTS` är då ett no-op.

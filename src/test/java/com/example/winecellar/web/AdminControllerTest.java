@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.AdminService;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.domain.User;
@@ -63,11 +64,11 @@ class AdminControllerTest {
     private UserRepository userRepository;
 
     private User alice(boolean admin) {
-        return new User(ALICE_ID, "alice", passwordEncoder.encode("hemligt123"), Instant.now(), 1, false, admin, Instant.now());
+        return TestUsers.verifiedUser(ALICE_ID, "alice", passwordEncoder.encode("hemligt123"), Instant.now(), 1, false, admin, Instant.now());
     }
 
     private User bob(boolean admin) {
-        return new User(BOB_ID, "bob", "hash", Instant.now(), 1, false, admin, Instant.now());
+        return TestUsers.verifiedUser(BOB_ID, "bob", "hash", Instant.now(), 1, false, admin, Instant.now());
     }
 
     @Test
@@ -164,7 +165,7 @@ class AdminControllerTest {
     @Test
     void skaSlutaFungeraForEnRaderadAnvändaresPågåendeSession() throws Exception {
         // bob (admin, för att kunna nå /admin) loggar in på riktigt och har en session.
-        User bobAdmin = new User(BOB_ID, "bob", passwordEncoder.encode("hemligt123"), Instant.now(), 1, false, true, Instant.now());
+        User bobAdmin = TestUsers.verifiedUser(BOB_ID, "bob", passwordEncoder.encode("hemligt123"), Instant.now(), 1, false, true, Instant.now());
         when(userRepository.findByUsername("bob")).thenReturn(Optional.of(bobAdmin));
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(alice(true)));
         when(userRepository.findById(BOB_ID)).thenReturn(Optional.of(bobAdmin));
@@ -186,7 +187,7 @@ class AdminControllerTest {
 
     @Test
     void skaSlutaFungeraForEnRaderadAnvändaresRememberMeCookie() throws Exception {
-        User bobAdmin = new User(BOB_ID, "bob", passwordEncoder.encode("hemligt123"), Instant.now(), 1, false, true, Instant.now());
+        User bobAdmin = TestUsers.verifiedUser(BOB_ID, "bob", passwordEncoder.encode("hemligt123"), Instant.now(), 1, false, true, Instant.now());
         when(userRepository.findByUsername("bob")).thenReturn(Optional.of(bobAdmin));
 
         MvcResult inloggning = mockMvc.perform(post("/login").with(csrf())
@@ -210,7 +211,7 @@ class AdminControllerTest {
     @Test
     void skaVisaSkapadOchSenasteLoginMedMinutprecisionIUtc() throws Exception {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(alice(true)));
-        User bob = new User(BOB_ID, "bob", "hash", Instant.parse("2026-10-07T17:32:45Z"), 1, false, false,
+        User bob = TestUsers.verifiedUser(BOB_ID, "bob", "hash", Instant.parse("2026-10-07T17:32:45Z"), 1, false, false,
                 Instant.parse("2026-10-08T00:05:59Z"));
         when(adminService.listUsers(ALICE_ID)).thenReturn(List.of(bob));
 

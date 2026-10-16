@@ -1,8 +1,9 @@
 package com.example.winecellar.acceptance;
 
+import com.example.winecellar.support.TestUsers;
 import com.example.winecellar.application.AdminService;
 import com.example.winecellar.application.ConversationRepository;
-import com.example.winecellar.application.RegistrationService;
+import com.example.winecellar.support.TestAccounts;
 import com.example.winecellar.application.UserRepository;
 import com.example.winecellar.application.WineService;
 import com.example.winecellar.domain.ChatMessage;
@@ -42,7 +43,7 @@ public class AdminSteps {
     private AdminService adminService;
 
     @Autowired
-    private RegistrationService registrationService;
+    private TestAccounts testAccounts;
 
     @Autowired
     private UserRepository userRepository;
@@ -65,7 +66,7 @@ public class AdminSteps {
     public void attÄrAdmin(String username) {
         registerUser(username);
         User user = userRepository.findByUsername(username).orElseThrow();
-        userRepository.save(new User(user.id(), user.username(), user.hashedPassword(), user.createdAt(),
+        userRepository.save(TestUsers.verifiedUser(user.id(), user.username(), user.hashedPassword(), user.createdAt(),
                 user.defaultMinQuantityFilter(), user.ownRatingFromScale(), true, user.lastLoginAt()));
     }
 
@@ -174,7 +175,7 @@ public class AdminSteps {
     }
 
     private void registerUser(String username) {
-        registrationService.register(username, PASSWORD);
+        testAccounts.register(username, PASSWORD);
         userIds.put(username, userRepository.findByUsername(username).orElseThrow().id());
     }
 
