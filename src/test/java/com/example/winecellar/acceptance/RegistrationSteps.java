@@ -463,7 +463,7 @@ public class RegistrationSteps {
     }
 
     private static TokenOutcome outcomeOf(MvcResult result) throws Exception {
-        if ("/login?reset".equals(result.getResponse().getRedirectedUrl())) {
+        if ("/losenord-andrat".equals(result.getResponse().getRedirectedUrl())) {
             return TokenOutcome.SUCCESS;
         }
         String body = result.getResponse().getContentAsString();

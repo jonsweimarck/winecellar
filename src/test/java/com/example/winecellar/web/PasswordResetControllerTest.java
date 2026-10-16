@@ -101,7 +101,7 @@ class PasswordResetControllerTest {
         mockMvc.perform(post("/aterstall-losenord").with(csrf()).param("token", "abc")
                         .param("password", "nyttLösen456").param("confirmPassword", "nyttLösen456"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login?reset"));
+                .andExpect(redirectedUrl("/losenord-andrat"));
     }
 
     @Test

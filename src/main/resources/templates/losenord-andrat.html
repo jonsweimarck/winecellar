@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lösenordet är ändrat - Vinkällaren</title>
+    <th:block th:replace="~{fragments/tema :: tema}"></th:block>
+    <th:block th:replace="~{fragments/inloggningsstil :: inloggningsstil}"></th:block>
+</head>
+<body>
+    <main class="inloggningssida">
+        <h1 class="apptitel">Vinkällaren</h1>
+        <div class="kort">
+            <div class="falt">
+                <h2>Ditt lösenord är ändrat</h2>
+                <p>Ditt nya lösenord är sparat. Logga in med det nya lösenordet.</p>
+            </div>
+            <div class="falt">
+                <a class="knapp knapp-bred" th:href="@{/login}">Till inloggningen</a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
