@@ -40,4 +40,12 @@ class ConfirmationControllerTest {
                 .andExpect(content().string(containsString("Ditt konto är klart")))
                 .andExpect(content().string(containsString("href=\"/login\"")));
     }
+
+    @Test
+    void skaVisaBekräftelseMedLänkTillInloggningenEfterÅterställtLösenord() throws Exception {
+        mockMvc.perform(get("/losenord-andrat"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Ditt lösenord är ändrat")))
+                .andExpect(content().string(containsString("href=\"/login\"")));
+    }
 }

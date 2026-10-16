@@ -104,7 +104,7 @@ public class SecurityConfig {
                         // renderats helt ostylad (WINE-39).
                         .requestMatchers("/css/**", "/js/**").permitAll()
                         // WINE-59: registrering, e-postverifiering och glömt lösenord är anonyma sidor.
-                        .requestMatchers("/registrera", "/registrerad", "/verifierad", "/verifiera", "/verifiera/**",
+                        .requestMatchers("/registrera", "/registrerad", "/verifierad", "/losenord-andrat", "/verifiera", "/verifiera/**",
                                 "/glomt-losenord", "/aterstall-losenord").permitAll()
                         // WINE-61: adminsidan och dess POST:ar - server-side
                         // behörighet (utloggad -> /login, inloggad icke-admin -> 403).

@@ -62,7 +62,7 @@ public class PasswordResetController {
         }
         TokenOutcome outcome = passwordResetService.resetPassword(token, password);
         if (outcome == TokenOutcome.SUCCESS) {
-            return "redirect:/login?reset";
+            return "redirect:/losenord-andrat";
         }
         model.addAttribute("failed", true);
         model.addAttribute("error", message(outcome));

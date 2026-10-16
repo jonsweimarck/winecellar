@@ -38,7 +38,6 @@
 
         <p class="fel" th:if="${param.error}">Fel användarnamn eller lösenord. Har du inte verifierat din
             e-postadress än? <a th:href="@{/verifiera/ny}">Begär en ny verifieringslänk</a>.</p>
-        <p class="info" th:if="${param.reset}">Ditt lösenord är ändrat. Logga in med det nya lösenordet.</p>
         <p class="info" th:if="${param.logout}">Du är utloggad.</p>
 
         <p class="lank"><a th:href="@{/glomt-losenord}">Glömt ditt lösenord?</a></p>
