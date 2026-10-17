@@ -25,8 +25,8 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   kommer fram. Adressen trimmas och sparas i gemener, och unikhet
   gäller oavsett versaler (uppslag är skiftlägesokänsliga).
 - **Registreringen frågar bara efter e-postadressen; lösenordet väljs på
-  verifieringslänken.** Ett konto skapas overifierat med ett slumpmässigt,
-  oanvändbart lösenord som ingen känner till, och kan inte logga in förrän
+  verifieringslänken.** Ett konto skapas overifierat med ett oanvändbart
+  platshållarlösenord (en delad, fast hash, se uppföljningsavsnittet nedan) som ingen kan logga in med, och kan inte logga in förrän
   adressen verifierats via en engångslänk (giltig 24 timmar). Länken öppnar
   en sida där användaren väljer och bekräftar sitt lösenord (samma regler som
   vid "glömt lösenord"); först då markeras kontot verifierat. Användaren loggas
@@ -88,8 +88,8 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   medvetet accepterat (samma resonemang som uppräkningen vid registrering) - inget
   dummyarbete läggs till.
 - Skydd mot att någon förhandsregistrerar en annans adress: det finns inget
-  lösenord att känna till. Ett förhandsregistrerat konto har bara ett slumpmässigt
-  lösenord som kastats, och bara den som kan öppna en länk i brevlådan kan välja
+  lösenord att känna till. Ett förhandsregistrerat konto har bara det oanvändbara
+  platshållarlösenordet (klartexten är okänd och kontot är avstängt), och bara den som kan öppna en länk i brevlådan kan välja
   ett. Länkarna går alltid bara till brevlådans ägare. För en verifierad adress
   gäller "upptaget". Overifierade konton äldre än sju dagar städas bort (se
   uppföljningen nedan). Är mailkvoten

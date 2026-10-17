@@ -311,8 +311,8 @@ innehåll, inklusive länken, i loggen (gör aldrig det i produktion).
 Migreringen `db/migrations/2026-10-09-add-email-verification.sql` körs
 automatiskt av `schema.sql` vid uppstart (kan också köras för hand i förväg).
 
-**Skydd mot massregistrering (WINE-65):** de två `WINECELLAR_MAIL_MAX_PER_*`-taken gäller alla
-utgående mail gemensamt (registrering, ny länk, glömt lösenord) och räknas i minnet. Är taket
+**Skydd mot massregistrering (WINE-65):** `WINECELLAR_MAIL_MAX_PER_*`-taken gäller registrering och ny
+länk gemensamt; "glömt lösenord" har en egen, separat budget (`WINECELLAR_MAIL_RESET_MAX_PER_*`). Båda räknas i minnet. Är taket
 nått skapas inget konto och inget mail skickas, men svaret är detsamma som vid en vanlig
 registrering. Registreringsformuläret har dessutom ett dolt honeypot-fält. En lyckad inloggning
 städar bort utgångna länkar och overifierade konton äldre än sju dagar. SMTP-anslutningen kräver

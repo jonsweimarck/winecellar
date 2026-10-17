@@ -4,6 +4,7 @@ import com.example.winecellar.domain.User;
 import com.example.winecellar.domain.UserToken.Purpose;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -58,7 +59,7 @@ public class RegistrationService {
 
     public RegistrationService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                                TokenService tokenService, AccountWriter accountWriter, MailSender mailSender,
-                               @org.springframework.beans.factory.annotation.Qualifier("registrationMailBudget") MailBudget mailBudget, Clock clock, @Value("${winecellar.base-url}") String baseUrl) {
+                               @Qualifier("registrationMailBudget") MailBudget mailBudget, Clock clock, @Value("${winecellar.base-url}") String baseUrl) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;

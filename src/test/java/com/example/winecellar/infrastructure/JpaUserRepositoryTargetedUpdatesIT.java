@@ -68,6 +68,15 @@ class JpaUserRepositoryTargetedUpdatesIT extends SharedPostgres {
     }
 
     @Test
+    void villkoradRaderingSkaBaraRaderaEttFortfarandeOverifieratKonto() {
+        assertThat(userRepository.deleteIfUnverified(verifiedId)).isFalse();
+        assertThat(userRepository.findById(verifiedId)).isPresent();
+
+        assertThat(userRepository.deleteIfUnverified(unverifiedId)).isTrue();
+        assertThat(userRepository.findById(unverifiedId)).isEmpty();
+    }
+
+    @Test
     void lösenordsbyteSkaBaraÄndraHashenOchRapporteraOmAnvändarenFinns() {
         Instant later = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         userRepository.updateLastLogin(verifiedId, later);

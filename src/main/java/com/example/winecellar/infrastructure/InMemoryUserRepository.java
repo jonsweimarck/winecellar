@@ -68,6 +68,12 @@ public class InMemoryUserRepository implements UserRepository {
     }
 
     @Override
+    public boolean deleteIfUnverified(UserId id) {
+        User user = users.get(id.value());
+        return user != null && !user.emailVerified() && users.remove(id.value(), user);
+    }
+
+    @Override
     public List<User> findUnverifiedCreatedBefore(Instant createdBefore) {
         return users.values().stream()
                 .filter(user -> !user.emailVerified() && user.createdAt().isBefore(createdBefore))

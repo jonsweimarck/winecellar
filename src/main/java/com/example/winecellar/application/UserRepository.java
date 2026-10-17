@@ -52,6 +52,14 @@ public interface UserRepository {
     /** WINE-65: overifierade konton skapade före tidpunkten (kandidater för städning). */
     List<User> findUnverifiedCreatedBefore(Instant createdBefore);
 
+    /**
+     * WINE-65: raderar kontot BARA om det fortfarande är overifierat (villkorad), så att en användare som
+     * hinner verifieras mellan en kontroll och raderingen inte raderas.
+     *
+     * @return true om en rad raderades
+     */
+    boolean deleteIfUnverified(UserId id);
+
     /** WINE-61: scopas inte - anropande kod (AdminService) kontrollerar behörigheten. */
     void deleteById(UserId id);
 }

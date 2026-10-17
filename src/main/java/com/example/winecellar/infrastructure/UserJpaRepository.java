@@ -23,6 +23,10 @@ interface UserJpaRepository extends JpaRepository<UserEntity, Long> {
             + "where u.id = :id and u.emailVerified = false")
     int activate(@Param("id") Long id, @Param("hash") String hash);
 
+    @Modifying
+    @Query("delete from UserEntity u where u.id = :id and u.emailVerified = false")
+    int deleteIfUnverified(@Param("id") Long id);
+
     java.util.List<UserEntity> findByEmailVerifiedFalseAndCreatedAtBefore(Instant createdBefore);
 
     @Modifying

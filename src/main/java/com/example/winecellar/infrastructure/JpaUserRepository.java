@@ -59,6 +59,12 @@ public class JpaUserRepository implements UserRepository {
     }
 
     @Override
+    @Transactional
+    public boolean deleteIfUnverified(UserId id) {
+        return jpaRepository.deleteIfUnverified(id.value()) > 0;
+    }
+
+    @Override
     public List<User> findUnverifiedCreatedBefore(Instant createdBefore) {
         return jpaRepository.findByEmailVerifiedFalseAndCreatedAtBefore(createdBefore).stream()
                 .map(JpaUserRepository::toDomain).toList();

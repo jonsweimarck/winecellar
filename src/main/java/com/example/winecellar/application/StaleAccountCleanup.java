@@ -55,7 +55,8 @@ public class StaleAccountCleanup {
             if (tokenRepository.existsByUser(stale.id())) {
                 continue;
             }
-            userRepository.deleteById(stale.id());
+            // Villkorad radering: en användare som hunnit verifieras sedan urvalet raderas inte.
+            userRepository.deleteIfUnverified(stale.id());
         }
     }
 }
