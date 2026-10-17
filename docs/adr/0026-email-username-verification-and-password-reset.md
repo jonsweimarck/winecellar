@@ -92,7 +92,7 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   platshållarlösenordet (klartexten är okänd och kontot är avstängt), och bara den som kan öppna en länk i brevlådan kan välja
   ett. Länkarna går alltid bara till brevlådans ägare. För en verifierad adress
   gäller "upptaget". Overifierade konton äldre än sju dagar städas bort (se
-  uppföljningen nedan). Är mailkvoten
+  0028 och uppföljningen nedan). Är mailkvoten
   slut vid en ny registrering ändras ingenting (ingen ny länk, inget mail) men svaret
   är detsamma som för en ny adress.
 - Störning via kvoten är accepterad: en anonym part kan förbruka en adress mailkvot
@@ -119,37 +119,16 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   mail till alla befintliga konton för att bekräfta adressen (onödigt
   friktion för redan etablerade användare).
 
-## Uppföljning (WINE-65): skydd mot massregistrering och städning
+## Uppföljning (WINE-65)
 
 Ett efterföljande granskningsvarv gav följande tillägg, utan att ändra något av ovanstående
 (avslöjande av verifierad adress vid registrering, svarstidsskillnader och att en anonym part kan
 förbruka en adress kvot är fortsatt medvetet accepterat):
 
-- **Globalt mailtak.** Kvoten per adress stoppar inte någon som registrerar många olika adresser.
-  Därför finns tak för det totala antalet utgående mail, per timme och per dygn, i TVÅ separata
-  budgetar: en gemensam för registrering och "ny länk", och en egen, mindre för "glömt lösenord".
-  Uppdelningen gör att ett fullt registreringstak aldrig kan svälta lösenordsåterställning. Restrisk:
-  den som tömmer återställningsbudgeten kan blockera återställning för alla en stund, men det kräver
-  många begäranden mot VERIFIERADE adresser (okända och overifierade adresser förbrukar inget), och
-  varje adress tillåter bara tre per timme. Taken sätts via miljövariabler med
-  försiktiga standardvärden och räknas i minnet (nollställs vid omstart, passar enkelinstansdrift).
-  Är taket nått skapas inget konto och inget mail skickas, men svaret är detsamma som för en lyckad
-  registrering. Timtaket klipps så att det aldrig kan närma sig storleksgränsen på kartan över
-  adresser: en full karta skulle annars tyst kunna neka nya adresser. Inget CAPTCHA och ingen
-  IP-baserad begränsning.
-- **Honeypot.** Registreringsformuläret har ett dolt fält som en människa aldrig fyller i. Är det
-  ifyllt skapas inget konto och inget mail skickas, men svaret är detsamma som för en vanlig
-  registrering.
-- **Kvotplatsen tas atomärt och återbetalas vid fel.** Platsen i kvoten per adress tas innan något
-  ändras, så samtidiga anrop aldrig kan släppa igenom fler mail än kvoten. Går själva utskicket
-  (som sker asynkront) sedan inte att genomföra återbetalas användarens plats, så ett trasigt
-  mailsystem inte gör att användaren förlorar sina försök. Det globala taket återbetalas
-  INTE vid ett misslyckat utskick: det räknar försöket, så att en nedlagd SMTP-server inte kan hamras
-  obegränsat. Konsekvensen är att en längre SMTP-störning kan tömma budgeten på mail som aldrig gick
-  iväg, så att nya registreringar tillfälligt får det neutrala svaret utan mail tills fönstret passerat.
-  Platserna lämnas däremot tillbaka (både per adress och globalt) om ingen mailförsändelse alls
-  kommer till stånd, t.ex. vid ett databasfel. Mailtrafiken kräver dessutom
-  STARTTLS när det är påslaget, så att länkarna aldrig går i klartext om servern inte erbjuder det.
+- **Skydd mot massregistrering och mailmissbruk** (globala tak i två budgetar, honeypot, atomära och
+  återbetalade kvotplatser, STARTTLS-krav) beskrivs i [0027](0027-mail-abuse-protection.md).
+- **Städning av övergivna overifierade konton och utgångna länkar** vid inloggning beskrivs i
+  [0028](0028-stale-unverified-account-cleanup.md).
 - **Platshållarlösenord utan bcrypt.** Alla overifierade konton delar EN fast, syntaktiskt giltig hash
   med samma kostnadsfaktor som riktiga lösenord. Klartexten var ett slumpmässigt värde på minst 256
   bitar som kasserades, och hashen genererades en gång offline. Säkerheten vilar på att kontot är
@@ -161,11 +140,3 @@ förbruka en adress kvot är fortsatt medvetet accepterat):
   fungerar fortfarande. Aktivering och återställning skriver bara hash (och verifierad-flaggan) och
   sparar aldrig hela användaren, så en samtidig ändring av senaste login eller adminflaggan skrivs
   inte över.
-- **Städning vid inloggning.** Samma mönster som för övergivna importmappar
-  ([0017](0017-login-triggered-temp-import-cleanup.md)): en lyckad inloggning raderar utgångna länkar
-  och overifierade konton äldre än sju dagar (inklusive deras länkar), högst en gång per timme.
-  Ett gammalt overifierat konto som fortfarande har en giltig länk (användaren har begärt en ny)
-  städas inte bort. Verifierade konton, färska
-  overifierade konton och giltiga länkar rörs aldrig. Ett fel i städningen loggas (utan någon
-  tokeninformation) och fäller aldrig inloggningen. Ingen schemaläggare införs; en app som ingen
-  loggar in i städas alltså inte, vilket är försumbart för dess storlek.

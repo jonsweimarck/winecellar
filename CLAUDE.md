@@ -79,8 +79,10 @@ dem:
   `_USERNAME`/`_PASSWORD`/`_FROM`** (se "E-postverifiering och glömt
   lösenord - nuläge"; saknas `WINECELLAR_MAIL_HOST` startar appen ändå men
   inga mail skickas, så inga nya konton kan aktiveras; `MailConfigGuard` (`web`) loggar
-  en varning vid uppstart om Clever Cloud-drift känns igen men någon av dem saknas -
-  samma säkerhetsnät-princip som `RememberMeKeyGuard`).
+  en varning vid uppstart om Clever Cloud-drift känns igen men någon av dem saknas, eller
+  om `WINECELLAR_MAIL_STARTTLS=false` - samma säkerhetsnät-princip som `RememberMeKeyGuard`.
+  Valfria, har defaultvärden: STARTTLS och de fyra mailtaken `WINECELLAR_MAIL_MAX_PER_*`/
+  `WINECELLAR_MAIL_RESET_MAX_PER_*`, se README och WINE-65-stycket nedan).
 
 ## Namngivning
 
@@ -690,7 +692,7 @@ användaren öppnat verifieringslänken och valt sitt lösenord där.
   (utan token) och besvarar neutralt. Samtidig förstagångsregistrering behandlas som "upptaget".
   Tester skapar verifierade konton via `support/TestUsers`/`TestAccounts` - det finns
   ingen "verifierad som standard"-konstruktor på `User`.
-- **Mailtak, honeypot och städning (WINE-65, se ADR 0026 "Uppföljning").** `MailBudget`
+- **Mailtak, honeypot och städning (WINE-65, se [ADR 0027](docs/adr/0027-mail-abuse-protection.md) och [ADR 0028](docs/adr/0028-stale-unverified-account-cleanup.md)).** `MailBudget`
   (`application`) är ett GLOBALT tak för utgående mail, timme (`WINECELLAR_MAIL_MAX_PER_HOUR`,
   default 30) och dygn (`WINECELLAR_MAIL_MAX_PER_DAY`, default 150), gemensamt för registrering och ny
   länk. "Glömt lösenord" har en EGEN, mindre budget (`WINECELLAR_MAIL_RESET_MAX_PER_HOUR`/`_PER_DAY`,

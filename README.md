@@ -299,10 +299,10 @@ innehåll, inklusive länken, i loggen (gör aldrig det i produktion).
 | `WINECELLAR_MAIL_PORT` | SMTP-port | `587` |
 | `WINECELLAR_MAIL_USERNAME` / `WINECELLAR_MAIL_PASSWORD` | SMTP-inloggning (hoppas över om användarnamn är tomt) | tom |
 | `WINECELLAR_MAIL_FROM` | Avsändaradress | `no-reply@localhost` |
-| `WINECELLAR_MAIL_STARTTLS` | STARTTLS på/av | `true` |
+| `WINECELLAR_MAIL_STARTTLS` | STARTTLS på/av. På betyder att STARTTLS också KRÄVS (ingen tyst nedgradering till klartext). Implicit TLS (port 465) stöds inte. Ett lokalt SMTP-relä utan STARTTLS (t.ex. MailHog) kräver `false` | `true` |
 | `WINECELLAR_MAIL_LOG_CONTENT` | Logga mailets innehåll när SMTP saknas (bara lokalt) | `false` |
 | `WINECELLAR_MAIL_MAX_PER_HOUR` | Tak för utgående mail per timme (registrering och ny länk gemensamt) | `30` |
-| `WINECELLAR_MAIL_MAX_PER_DAY` | Globalt tak för utgående mail per dygn | `150` |
+| `WINECELLAR_MAIL_MAX_PER_DAY` | Tak för utgående mail per dygn (registrering och ny länk gemensamt) | `150` |
 | `WINECELLAR_MAIL_RESET_MAX_PER_HOUR` / `_PER_DAY` | Egen, separat budget för "glömt lösenord" (kan inte svältas av registreringstaket) | `10` / `50` |
 
 **Att sätta i Clever Cloud:** `WINECELLAR_BASE_URL`, `WINECELLAR_MAIL_HOST`,

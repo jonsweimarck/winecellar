@@ -60,3 +60,5 @@ WINE-36).
 | [0024](0024-chat-wine-mention-links.md) | AI-chattens svar länkar till nämnda viner i vinlistan | Accepted |
 | [0025](0025-admin-role-and-user-deletion.md) | En enkel adminroll som kan förvalta konton, inklusive radera användare | Accepted |
 | [0026](0026-email-username-verification-and-password-reset.md) | E-postadress som användarnamn, verifiering via mail och "glömt lösenord" | Accepted |
+| [0027](0027-mail-abuse-protection.md) | Skydd mot mailmissbruk - globala tak och honeypot, inget CAPTCHA eller IP-gräns | Accepted |
+| [0028](0028-stale-unverified-account-cleanup.md) | Övergivna overifierade konton och utgångna länkar städas vid inloggning | Accepted |

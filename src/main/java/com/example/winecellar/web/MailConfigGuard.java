@@ -54,7 +54,7 @@ class MailConfigGuard {
         if ("false".equalsIgnoreCase(String.valueOf(environment.getProperty(STARTTLS_VARIABLE)).trim())) {
             log.warn("Appen ser ut att köra på Clever Cloud, men {} är false - mail (med verifierings- och "
                     + "återställningslänkar) skickas då utan STARTTLS-krav, dvs. potentiellt okrypterat. Låt "
-                    + "den vara true om inte SMTP-leverantören använder implicit TLS.", STARTTLS_VARIABLE);
+                    + "den vara true; implicit TLS (t.ex. port 465) stöds inte av konfigurationen.", STARTTLS_VARIABLE);
         }
     }
 }

@@ -114,7 +114,7 @@ winecellar:
     from: ${WINECELLAR_MAIL_FROM:no-reply@localhost}
     starttls: ${WINECELLAR_MAIL_STARTTLS:true}
     log-content: ${WINECELLAR_MAIL_LOG_CONTENT:false}
-    # Globalt tak för utgående mail, för ALLA mailtyper gemensamt (WINE-65, skydd mot
+    # Globalt tak för utgående mail från registrering och "ny länk" gemensamt (WINE-65, skydd mot
     # massregistrering). Slut tak = inget konto skapas och inget mail skickas, men svaret är
     # detsamma som annars. I minnet, nollställs vid omstart.
     max-per-hour: ${WINECELLAR_MAIL_MAX_PER_HOUR:30}
