@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.MailBudget;
 import com.example.winecellar.application.MailSender;
 import com.example.winecellar.infrastructure.LoggingMailSender;
 import com.example.winecellar.infrastructure.SmtpMailSender;
@@ -32,6 +33,22 @@ public class MailConfig {
         return Clock.systemUTC();
     }
 
+    /** Budget för registrering och "ny länk" (WINE-65). Skild från återställningsbudgeten nedan. */
+    @Bean
+    public MailBudget registrationMailBudget(
+            @Value("${winecellar.mail.max-per-hour:30}") int perHour,
+            @Value("${winecellar.mail.max-per-day:150}") int perDay, Clock clock) {
+        return new MailBudget(perHour, perDay, clock);
+    }
+
+    /** Egen, mindre budget för "glömt lösenord", så att ett fullt registreringstak aldrig svälter återställning. */
+    @Bean
+    public MailBudget resetMailBudget(
+            @Value("${winecellar.mail.reset-max-per-hour:10}") int perHour,
+            @Value("${winecellar.mail.reset-max-per-day:50}") int perDay, Clock clock) {
+        return new MailBudget(perHour, perDay, clock);
+    }
+
     @Bean
     public MailSender mailSender(
             @Value("${winecellar.mail.host:}") String host,
@@ -49,16 +66,30 @@ public class MailConfig {
         JavaMailSenderImpl sender = new JavaMailSenderImpl();
         sender.setHost(host);
         sender.setPort(port);
-        Properties props = sender.getJavaMailProperties();
+        boolean auth = StringUtils.hasText(username);
+        sender.getJavaMailProperties().putAll(javaMailProperties(startTls, auth));
+        if (auth) {
+            sender.setUsername(username);
+            sender.setPassword(password);
+        }
+        return new SmtpMailSender(sender, from);
+    }
+
+    /**
+     * JavaMail-egenskaper för SMTP. När STARTTLS är påslaget är det också OBLIGATORISKT
+     * (WINE-65): utan starttls.required faller JavaMail tyst tillbaka på ren text om servern
+     * inte erbjuder STARTTLS, och lösenordet och länkarna i mailen skickas då okrypterat.
+     */
+    static Properties javaMailProperties(boolean startTls, boolean auth) {
+        Properties props = new Properties();
         props.put("mail.smtp.connectiontimeout", "10000");
         props.put("mail.smtp.timeout", "10000");
         props.put("mail.smtp.writetimeout", "10000");
         props.put("mail.smtp.starttls.enable", String.valueOf(startTls));
-        if (StringUtils.hasText(username)) {
-            sender.setUsername(username);
-            sender.setPassword(password);
+        props.put("mail.smtp.starttls.required", String.valueOf(startTls));
+        if (auth) {
             props.put("mail.smtp.auth", "true");
         }
-        return new SmtpMailSender(sender, from);
+        return props;
     }
 }

@@ -17,6 +17,9 @@ import java.util.Map;
  *
  * Kartan är storleksbegränsad: utgångna poster rensas, och är den ändå full
  * nekas nya nycklar tyst (anroparen svarar ändå neutralt, så ingenting avslöjas).
+ * Det ska i praktiken aldrig hända för mailkvoterna (WINE-65): {@link MailBudget}
+ * begränsar det totala antalet mail per timme - och därmed antalet adresser med en
+ * levande post - till klart under nyckeltaket.
  * Ingen IP-baserad begränsning - X-Forwarded-For är förfalskningsbar (ADR 0020).
  */
 public class RequestRateLimiter {
@@ -43,20 +46,13 @@ public class RequestRateLimiter {
     /** @return true (och räknar upp) om begäran är tillåten, annars false */
     public synchronized boolean tryAcquire(String key) {
         Instant now = clock.instant();
-        Instant cutoff = now.minus(window);
-        Deque<Instant> times = requests.get(key);
+        Deque<Instant> times = livePrunedEntry(key, now);
         if (times == null) {
-            if (requests.size() >= maxKeys) {
-                requests.values().removeIf(t -> t.isEmpty() || !t.peekLast().isAfter(cutoff));
-            }
-            if (requests.size() >= maxKeys) {
+            if (!roomForNewKey(now)) {
                 return false;
             }
             times = new ArrayDeque<>();
             requests.put(key, times);
-        }
-        while (!times.isEmpty() && !times.peekFirst().isAfter(cutoff)) {
-            times.pollFirst();
         }
         if (times.size() >= maxRequests) {
             return false;
@@ -67,18 +63,52 @@ public class RequestRateLimiter {
 
     /**
      * Icke-förbrukande kontroll: skulle {@link #tryAcquire} för nyckeln lyckas just nu?
-     * Används för att avgöra om ett mail över huvud taget får skickas INNAN något ändras
-     * (kvoten förbrukas först efter en lyckad utfärdning).
+     * Delar fönster- och rensningslogik med tryAcquire (samma privata metoder), så de två
+     * kan aldrig ge olika svar. Att kontrollera och sedan anropa tryAcquire är INTE atomärt:
+     * använd tryAcquire direkt när ett slut på kvoten ska avgöra om något får göras.
      */
     public synchronized boolean hasCapacity(String key) {
-        Instant cutoff = clock.instant().minus(window);
-        Deque<Instant> times = requests.get(key);
+        Instant now = clock.instant();
+        Deque<Instant> times = livePrunedEntry(key, now);
         if (times == null) {
-            return requests.size() < maxKeys || requests.values().stream()
-                    .anyMatch(t -> t.isEmpty() || !t.peekLast().isAfter(cutoff));
+            return roomForNewKey(now);
         }
-        long live = times.stream().filter(t -> t.isAfter(cutoff)).count();
-        return live < maxRequests;
+        return times.size() < maxRequests;
+    }
+
+    /**
+     * Återbetalar den senast förbrukade platsen för nyckeln (t.ex. när ett mail som kvoten
+     * räknade för aldrig kunde skickas). No-op om nyckeln saknas eller inga platser finns kvar.
+     * Begränsning: den SENAST registrerade tidsstämpeln tas bort, inte nödvändigtvis den som tillhörde
+     * just det anrop som nu återbetalas. Det spelar ingen roll för antalet (det är alltid en plats som
+     * frigörs), men vid samtidiga anrop kan fönstret för en annan förfrågan bli något kortare än exakt.
+     */
+    public synchronized void release(String key) {
+        Deque<Instant> times = requests.get(key);
+        if (times != null) {
+            times.pollLast();
+        }
+    }
+
+    /** Nyckelns kö efter att utgångna tidsstämplar tagits bort, eller null om nyckeln saknas. */
+    private Deque<Instant> livePrunedEntry(String key, Instant now) {
+        Deque<Instant> times = requests.get(key);
+        if (times != null) {
+            Instant cutoff = now.minus(window);
+            while (!times.isEmpty() && !times.peekFirst().isAfter(cutoff)) {
+                times.pollFirst();
+            }
+        }
+        return times;
+    }
+
+    /** Finns plats för en ny nyckel? Är kartan full rensas först utgångna poster. */
+    private boolean roomForNewKey(Instant now) {
+        if (requests.size() >= maxKeys) {
+            Instant cutoff = now.minus(window);
+            requests.values().removeIf(t -> t.isEmpty() || !t.peekLast().isAfter(cutoff));
+        }
+        return requests.size() < maxKeys;
     }
 
     synchronized int size() {

@@ -29,7 +29,7 @@ class AccountWriterTest {
     private final AccountWriter writer = new AccountWriter(users, tokenService);
     private final FakeMailSender mail = new FakeMailSender();
     private final RegistrationService service =
-            new RegistrationService(users, encoder, tokenService, writer, mail, clock, "http://x");
+            new RegistrationService(users, encoder, tokenService, writer, mail, new MailBudget(1000, 1000, clock), clock, "http://x");
 
     @Test
     void skaSättaDetValdaLösenordetOchVerifieraKontot() {

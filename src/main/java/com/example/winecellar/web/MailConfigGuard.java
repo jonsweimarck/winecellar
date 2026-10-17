@@ -23,6 +23,7 @@ class MailConfigGuard {
 
     static final String MAIL_HOST_VARIABLE = "WINECELLAR_MAIL_HOST";
     static final String BASE_URL_VARIABLE = "WINECELLAR_BASE_URL";
+    static final String STARTTLS_VARIABLE = "WINECELLAR_MAIL_STARTTLS";
 
     private final Environment environment;
 
@@ -49,6 +50,11 @@ class MailConfigGuard {
             log.warn("Appen ser ut att köra på Clever Cloud, men {} saknas/är tom - länkarna i mailen pekar då "
                     + "på localhost (se ADR 0026 och CLAUDE.md). Sätt appens publika HTTPS-adress.",
                     BASE_URL_VARIABLE);
+        }
+        if ("false".equalsIgnoreCase(String.valueOf(environment.getProperty(STARTTLS_VARIABLE)).trim())) {
+            log.warn("Appen ser ut att köra på Clever Cloud, men {} är false - mail (med verifierings- och "
+                    + "återställningslänkar) skickas då utan STARTTLS-krav, dvs. potentiellt okrypterat. Låt "
+                    + "den vara true; implicit TLS (t.ex. port 465) stöds inte av konfigurationen.", STARTTLS_VARIABLE);
         }
     }
 }

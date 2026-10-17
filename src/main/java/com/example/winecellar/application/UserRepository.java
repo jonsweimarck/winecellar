@@ -32,6 +32,34 @@ public interface UserRepository {
      */
     void updateLastLogin(UserId id, Instant at);
 
+    /**
+     * WINE-65: sätter BARA lösenordshashen (riktad skrivning - ändrar aldrig t.ex. senaste login
+     * eller adminflaggan, som en hel-User-sparning kunde skriva över vid en samtidig ändring).
+     *
+     * @return false om användaren inte finns
+     */
+    boolean updateHashedPassword(UserId id, String hashedPassword);
+
+    /**
+     * WINE-65: aktiverar ett konto - sätter lösenordshashen och markerar kontot verifierat - men BARA
+     * om det fortfarande är overifierat (villkorad, riktad skrivning). Ett redan verifierat kontos
+     * lösenord ändras alltså aldrig härifrån.
+     *
+     * @return false om användaren saknas eller redan är verifierad (inget ändrades)
+     */
+    boolean activateAccount(UserId id, String hashedPassword);
+
+    /** WINE-65: overifierade konton skapade före tidpunkten (kandidater för städning). */
+    List<User> findUnverifiedCreatedBefore(Instant createdBefore);
+
+    /**
+     * WINE-65: raderar kontot BARA om det fortfarande är overifierat (villkorad), så att en användare som
+     * hinner verifieras mellan en kontroll och raderingen inte raderas.
+     *
+     * @return true om en rad raderades
+     */
+    boolean deleteIfUnverified(UserId id);
+
     /** WINE-61: scopas inte - anropande kod (AdminService) kontrollerar behörigheten. */
     void deleteById(UserId id);
 }

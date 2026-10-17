@@ -23,6 +23,14 @@
                     <button type="submit" class="knapp-bred">Skicka verifieringslänk</button>
                 </div>
             </div>
+            <!-- Honeypot (WINE-65): dolt för människor (utanför bild, ur tabbordningen och för
+                 skärmläsare), men en enkel bot som fyller i alla fält avslöjar sig. Ligger utanför
+                 .kort så att det inte påverkar kortets fält-stilar. -->
+            <div aria-hidden="true" style="position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden;">
+                <label>Lämna detta fält tomt
+                    <input type="text" name="kampanjref" tabindex="-1" autocomplete="off" value="">
+                </label>
+            </div>
         </form>
 
         <p class="info">Vi mejlar en länk där du bekräftar din e-postadress och väljer ditt lösenord.</p>

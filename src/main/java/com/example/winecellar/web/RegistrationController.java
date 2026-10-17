@@ -2,6 +2,8 @@ package com.example.winecellar.web;
 
 import com.example.winecellar.application.RegistrationResult;
 import com.example.winecellar.application.RegistrationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +17,11 @@ import org.springframework.web.bind.annotation.RequestParam;
  */
 @Controller
 public class RegistrationController {
+
+    /** Namnet på det dolda honeypot-fältet i registrera.html. */
+    private static final Logger log = LoggerFactory.getLogger(RegistrationController.class);
+
+    static final String HONEYPOT_FIELD = "kampanjref";
 
     private final RegistrationService registrationService;
 
@@ -30,7 +37,14 @@ public class RegistrationController {
     @PostMapping("/registrera")
     public String register(
             @RequestParam String username,
+            @RequestParam(name = HONEYPOT_FIELD, required = false) String honeypot,
             Model model) {
+        // Honeypot (WINE-65): ett dolt fält som en människa aldrig fyller i. Är det ifyllt är det en
+        // bot - inget konto, inget mail, men exakt samma svar som en lyckad registrering.
+        if (honeypot != null && !honeypot.isBlank()) {
+            log.info("Registrering avvisad: honeypot-fältet var ifyllt (ingen adress loggas).");
+            return "redirect:/registrerad";
+        }
         model.addAttribute("username", username);
 
         if (username == null || username.isBlank()) {

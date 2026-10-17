@@ -10,6 +10,13 @@ public sealed interface RegistrationResult {
     record Registered(User user) implements RegistrationResult {
     }
 
+    /**
+     * Det globala mailtaket är nått (WINE-65): inget konto skapades och inget mail skickades.
+     * Anroparen visar exakt samma svar som för {@link Registered}, så att taket inte avslöjas.
+     */
+    record Deferred() implements RegistrationResult {
+    }
+
     record UsernameTaken() implements RegistrationResult {
     }
 

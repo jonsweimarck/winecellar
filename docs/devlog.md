@@ -1210,3 +1210,22 @@ inte är arkitektur men värt att veta:
   migreringsfilen; `schema.sql` ger bara slutläget för en färsk databas. Entitetens `@UniqueConstraint` och
   `schema.sql`:s `CREATE TABLE IF NOT EXISTS` kolliderar inte: Hibernate skapar tabellen först och
   `CREATE ... IF NOT EXISTS` är då ett no-op.
+
+### WINE-65 - uppföljning av WINE-59:s granskning (2026-10-17)
+
+Se ADR 0026 ("Uppföljning") och CLAUDE.md för nuläget. Det som inte är arkitektur:
+
+- **Ingen schemaändring** - därför ingen migrering; allt är kod och konfiguration.
+- **`hasCapacity` + `tryAcquire` är inte atomärt** - den gamla `sendNewLink` kontrollerade kvoten först och
+  förbrukade den efter utfärdandet, så samtidiga anrop kunde släppa igenom fler än tre. Byttes till
+  `tryAcquire` före utfärdande + `release` om något felar. Bevisat med ett trådtest (`RegistrationServiceTest`).
+- **Platshållarhashen får inte bli en ogiltig sträng.** En första tanke var en uppenbart ogiltig hash;
+  men `DelegatingPasswordEncoder` kastar för ett okänt prefix (500 vid inloggning) och bcrypt avvisar en
+  felformad hash direkt (snabbt, vilket avslöjar kontostatus via svarstiden). Lösningen är en fast, korrekt
+  formad bcrypt-hash av ett kasserat slumptal.
+- **Spring översätter exceptions i transaktionsgränsen** - `PasswordResetAtomicityIT` fick först fel
+  undantagstyp (DataAccessException i stället för det kastade); testet kollar meddelandet.
+- **Städfelsscenariot** använder en tillfällig databastrigger som avvisar DELETE på `user_tokens` (droppas i en
+  `@After`-hook) - ett riktigt fel i stället för en mock i en Cucumber-kontext där alla bönor är äkta.
+- **Punkt 8 (full nyckelkarta):** i stället för att ändra kartans beteende begränsas orsaken - det globala
+  timtaket klipps till en bråkdel av nyckeltaket (`MailBudget`), så att levande poster inte kan fylla kartan.

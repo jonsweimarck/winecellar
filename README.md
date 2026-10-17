@@ -275,7 +275,7 @@ domän med punkt; sparas i gemener, unikt oavsett versaler). Ett nytt konto
 är overifierat och kan inte logga in förrän användaren öppnat länken i
 verifieringsmailet (giltig 24 timmar, engångsbruk; en ny länk kan begäras på
 `/verifiera/ny`). Registreringen frågar bara efter e-postadressen: ett nytt konto får
-ett slumpmässigt, oanvändbart lösenord, och användaren väljer sitt riktiga lösenord (med
+ett oanvändbart platshållarlösenord, och användaren väljer sitt riktiga lösenord (med
 bekräftelse) på sidan som verifieringslänken öppnar - först då aktiveras kontot, och
 hen skickas till inloggningen. Ingen som bara känner till en adress kan alltså ta över
 ett konto; bara brevlådans ägare kan välja lösenord. En ny registrering av en ännu
@@ -299,14 +299,24 @@ innehåll, inklusive länken, i loggen (gör aldrig det i produktion).
 | `WINECELLAR_MAIL_PORT` | SMTP-port | `587` |
 | `WINECELLAR_MAIL_USERNAME` / `WINECELLAR_MAIL_PASSWORD` | SMTP-inloggning (hoppas över om användarnamn är tomt) | tom |
 | `WINECELLAR_MAIL_FROM` | Avsändaradress | `no-reply@localhost` |
-| `WINECELLAR_MAIL_STARTTLS` | STARTTLS på/av | `true` |
+| `WINECELLAR_MAIL_STARTTLS` | STARTTLS på/av. På betyder att STARTTLS också KRÄVS (ingen tyst nedgradering till klartext). Implicit TLS (port 465) stöds inte. Ett lokalt SMTP-relä utan STARTTLS (t.ex. MailHog) kräver `false` | `true` |
 | `WINECELLAR_MAIL_LOG_CONTENT` | Logga mailets innehåll när SMTP saknas (bara lokalt) | `false` |
+| `WINECELLAR_MAIL_MAX_PER_HOUR` | Tak för utgående mail per timme (registrering och ny länk gemensamt) | `30` |
+| `WINECELLAR_MAIL_MAX_PER_DAY` | Tak för utgående mail per dygn (registrering och ny länk gemensamt) | `150` |
+| `WINECELLAR_MAIL_RESET_MAX_PER_HOUR` / `_PER_DAY` | Egen, separat budget för "glömt lösenord" (kan inte svältas av registreringstaket) | `10` / `50` |
 
 **Att sätta i Clever Cloud:** `WINECELLAR_BASE_URL`, `WINECELLAR_MAIL_HOST`,
 `WINECELLAR_MAIL_PORT`, `WINECELLAR_MAIL_USERNAME`, `WINECELLAR_MAIL_PASSWORD` och
 `WINECELLAR_MAIL_FROM` (avsändaradressen måste vara godkänd hos SMTP-leverantören).
 Migreringen `db/migrations/2026-10-09-add-email-verification.sql` körs
 automatiskt av `schema.sql` vid uppstart (kan också köras för hand i förväg).
+
+**Skydd mot massregistrering (WINE-65):** `WINECELLAR_MAIL_MAX_PER_*`-taken gäller registrering och ny
+länk gemensamt; "glömt lösenord" har en egen, separat budget (`WINECELLAR_MAIL_RESET_MAX_PER_*`). Båda räknas i minnet. Är taket
+nått skapas inget konto och inget mail skickas, men svaret är detsamma som vid en vanlig
+registrering. Registreringsformuläret har dessutom ett dolt honeypot-fält. En lyckad inloggning
+städar bort utgångna länkar och overifierade konton äldre än sju dagar. SMTP-anslutningen kräver
+STARTTLS när `WINECELLAR_MAIL_STARTTLS` är på.
 
 ### Admin
 

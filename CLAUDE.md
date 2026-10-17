@@ -79,8 +79,10 @@ dem:
   `_USERNAME`/`_PASSWORD`/`_FROM`** (se "E-postverifiering och glömt
   lösenord - nuläge"; saknas `WINECELLAR_MAIL_HOST` startar appen ändå men
   inga mail skickas, så inga nya konton kan aktiveras; `MailConfigGuard` (`web`) loggar
-  en varning vid uppstart om Clever Cloud-drift känns igen men någon av dem saknas -
-  samma säkerhetsnät-princip som `RememberMeKeyGuard`).
+  en varning vid uppstart om Clever Cloud-drift känns igen men någon av dem saknas, eller
+  om `WINECELLAR_MAIL_STARTTLS=false` - samma säkerhetsnät-princip som `RememberMeKeyGuard`.
+  Valfria, har defaultvärden: STARTTLS och de fyra mailtaken `WINECELLAR_MAIL_MAX_PER_*`/
+  `WINECELLAR_MAIL_RESET_MAX_PER_*`, se README och WINE-65-stycket nedan).
 
 ## Namngivning
 
@@ -656,7 +658,7 @@ användaren öppnat verifieringslänken och valt sitt lösenord där.
   använda "glömt lösenord". Ingen DB-unikindex på lower(username) (äldre dubbletter
   som skiljer sig på versaler hade kunnat stoppa uppstarten).
 - **Registreringen frågar BARA efter e-postadressen.** Ett overifierat konto får ett
-  slumpmässigt, oanvändbart lösenord (hash av 256 bitar slump som kastas) och är `disabled` i
+  oanvändbart platshållarlösenord (en DELAD fast bcrypt-hash av ett kasserat slumpvärde på 256 bitar - säkerheten vilar på disabled + okänd klartext, hashen finns för tidsjämnhet; ingen bcrypt vid registrering) och är `disabled` i
   `UserDetails`. Ingen känner alltså till något lösenord för ett förhandsregistrerat konto, och
   bara den som kontrollerar brevlådan kan välja ett (på verifieringslänken). Alla inloggningsfel
   ger samma `/login?error` (en egen `DaoAuthenticationProvider` i `SecurityConfig` kontrollerar `disabled` EFTER
@@ -690,6 +692,31 @@ användaren öppnat verifieringslänken och valt sitt lösenord där.
   (utan token) och besvarar neutralt. Samtidig förstagångsregistrering behandlas som "upptaget".
   Tester skapar verifierade konton via `support/TestUsers`/`TestAccounts` - det finns
   ingen "verifierad som standard"-konstruktor på `User`.
+- **Mailtak, honeypot och städning (WINE-65, se [ADR 0027](docs/adr/0027-mail-abuse-protection.md) och [ADR 0028](docs/adr/0028-stale-unverified-account-cleanup.md)).** `MailBudget`
+  (`application`) är ett GLOBALT tak för utgående mail, timme (`WINECELLAR_MAIL_MAX_PER_HOUR`,
+  default 30) och dygn (`WINECELLAR_MAIL_MAX_PER_DAY`, default 150), gemensamt för registrering och ny
+  länk. "Glömt lösenord" har en EGEN, mindre budget (`WINECELLAR_MAIL_RESET_MAX_PER_HOUR`/`_PER_DAY`,
+  default 10/50; två `MailBudget`-bönor i `MailConfig`, injicerade med `@Qualifier`) så att ett fullt
+  registreringstak aldrig svälter återställning; i minnet. Det globala taket återbetalas INTE vid
+  mailfel (bara per-adress-platsen), och platserna lämnas tillbaka i en `finally` om inget mail lämnas över. Slut tak = inget konto/ingen ändring/inget mail och samma
+  neutrala svar (`RegistrationResult.Deferred` ger samma redirect som `Registered`). Timtaket klipps
+  till under nyckeltaket i `RequestRateLimiter` så att per-adress-kartan aldrig kan fyllas av levande
+  poster. Kvoterna tas ATOMÄRT med `tryAcquire` före utfärdande (aldrig `hasCapacity` + förbruka
+  efteråt) och lämnas tillbaka med `release` om utfärdandet felar; felar själva (asynkrona) utskicket
+  anropar `SmtpMailSender` felcallbacken i `MailSender.send(..., onFailure)` och den per-adress-platsen
+  återbetalas (det globala taket räknar försöket). Honeypot = dolt fält `kampanjref` (loggas på INFO utan adress) i `registrera.html`;
+  ifyllt = redirect till samma bekräftelsesida utan att tjänsten anropas. Platshållarlösenordet för
+  ett overifierat konto är en FAST giltigt formad bcrypt-hash (`UNUSABLE_PASSWORD_HASH`), inte en
+  ny hash per registrering - måste förbli bcrypt-formad (kostnad 10) så att en inloggning mot kontot
+  gör en full jämförelse och svarstiden inte avslöjar kontostatus. `AccountWriter` gör både aktivering
+  och lösenordsåterställning transaktionellt med RIKTADE skrivningar (`UserRepository.activateAccount`,
+  `updateHashedPassword`) - spara aldrig hela `User` där. `StaleAccountCleanup` (+ lyssnaren
+  `StaleAccountCleanupTrigger` i `web`, som `@WebMvcTest` inte laddar) raderar vid lyckad inloggning
+  utgångna `user_tokens` och overifierade konton äldre än 7 dagar UTAN giltigt token (högst en gång per timme, i minnet);
+  fel fångas och loggas utan meddelande. `MailConfig` sätter `mail.smtp.starttls.required` när
+  STARTTLS är på. Cucumber-kontexten sätter höga globala tak (`CucumberSpringConfiguration`);
+  scenarierna för taken bygger egna tjänster med små tak (`RegistrationSteps`), och scenariot för
+  städfel provocerar ett riktigt databasfel med en tillfällig trigger på `user_tokens`.
 - **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (`schema.sql` har
   motsvarande rader för `email_verified`) lägger till `users.email_verified`, backfillar ALLA befintliga rader
   till `true` INNAN `NOT NULL` och skapar `user_tokens` (och städar övergivna tidigare varianter av den: kolumnen

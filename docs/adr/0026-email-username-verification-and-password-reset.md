@@ -25,8 +25,8 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   kommer fram. Adressen trimmas och sparas i gemener, och unikhet
   gäller oavsett versaler (uppslag är skiftlägesokänsliga).
 - **Registreringen frågar bara efter e-postadressen; lösenordet väljs på
-  verifieringslänken.** Ett konto skapas overifierat med ett slumpmässigt,
-  oanvändbart lösenord som ingen känner till, och kan inte logga in förrän
+  verifieringslänken.** Ett konto skapas overifierat med ett oanvändbart
+  platshållarlösenord (en delad, fast hash, se uppföljningsavsnittet nedan) som ingen kan logga in med, och kan inte logga in förrän
   adressen verifierats via en engångslänk (giltig 24 timmar). Länken öppnar
   en sida där användaren väljer och bekräftar sitt lösenord (samma regler som
   vid "glömt lösenord"); först då markeras kontot verifierat. Användaren loggas
@@ -88,10 +88,11 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   medvetet accepterat (samma resonemang som uppräkningen vid registrering) - inget
   dummyarbete läggs till.
 - Skydd mot att någon förhandsregistrerar en annans adress: det finns inget
-  lösenord att känna till. Ett förhandsregistrerat konto har bara ett slumpmässigt
-  lösenord som kastats, och bara den som kan öppna en länk i brevlådan kan välja
+  lösenord att känna till. Ett förhandsregistrerat konto har bara det oanvändbara
+  platshållarlösenordet (klartexten är okänd och kontot är avstängt), och bara den som kan öppna en länk i brevlådan kan välja
   ett. Länkarna går alltid bara till brevlådans ägare. För en verifierad adress
-  gäller "upptaget". Gamla overifierade konton städas inte bort. Är mailkvoten
+  gäller "upptaget". Overifierade konton äldre än sju dagar städas bort (se
+  0028 och uppföljningen nedan). Är mailkvoten
   slut vid en ny registrering ändras ingenting (ingen ny länk, inget mail) men svaret
   är detsamma som för en ny adress.
 - Störning via kvoten är accepterad: en anonym part kan förbruka en adress mailkvot
@@ -117,3 +118,25 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   RFC-validering (risk att avvisa korrekta adresser), och att skicka ett
   mail till alla befintliga konton för att bekräfta adressen (onödigt
   friktion för redan etablerade användare).
+
+## Uppföljning (WINE-65)
+
+Ett efterföljande granskningsvarv gav följande tillägg, utan att ändra något av ovanstående
+(avslöjande av verifierad adress vid registrering, svarstidsskillnader och att en anonym part kan
+förbruka en adress kvot är fortsatt medvetet accepterat):
+
+- **Skydd mot massregistrering och mailmissbruk** (globala tak i två budgetar, honeypot, atomära och
+  återbetalade kvotplatser, STARTTLS-krav) beskrivs i [0027](0027-mail-abuse-protection.md).
+- **Städning av övergivna overifierade konton och utgångna länkar** vid inloggning beskrivs i
+  [0028](0028-stale-unverified-account-cleanup.md).
+- **Platshållarlösenord utan bcrypt.** Alla overifierade konton delar EN fast, syntaktiskt giltig hash
+  med samma kostnadsfaktor som riktiga lösenord. Klartexten var ett slumpmässigt värde på minst 256
+  bitar som kasserades, och hashen genererades en gång offline. Säkerheten vilar på att kontot är
+  avstängt tills det aktiverats och att klartexten är okänd - hashen är inte hemlig. Den finns för
+  tidsjämnhet: registreringen blir billig för servern, medan ett inloggningsförsök mot kontot
+  fortfarande kostar en full jämförelse (samma svarstid som ett fel lösenord).
+- **Lösenordsbyte är en transaktion med riktade skrivningar.** Förbrukningen av länken, bytet av
+  hash och rensningen av övriga länkar sker atomärt: felar något rullas allt tillbaka och länken
+  fungerar fortfarande. Aktivering och återställning skriver bara hash (och verifierad-flaggan) och
+  sparar aldrig hela användaren, så en samtidig ändring av senaste login eller adminflaggan skrivs
+  inte över.

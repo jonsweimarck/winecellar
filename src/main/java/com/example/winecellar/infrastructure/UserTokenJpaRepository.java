@@ -20,6 +20,12 @@ interface UserTokenJpaRepository extends JpaRepository<UserTokenEntity, Long> {
     int deleteByUserAndPurpose(@Param("userId") Long userId, @Param("purpose") String purpose);
 
     @Modifying
+    @Query("delete from UserTokenEntity t where t.expiresAt <= :now")
+    int deleteExpired(@Param("now") java.time.Instant now);
+
+    boolean existsByUserId(Long userId);
+
+    @Modifying
     @Query("delete from UserTokenEntity t where t.userId = :userId")
     int deleteAllByUser(@Param("userId") Long userId);
 }

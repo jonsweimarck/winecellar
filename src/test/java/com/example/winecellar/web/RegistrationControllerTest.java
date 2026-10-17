@@ -123,6 +123,44 @@ class RegistrationControllerTest {
         }
 
         @Test
+        @DisplayName("ska ett ifyllt honeypot-fält ge exakt samma svar men aldrig nå RegistrationService")
+        void skaIgnorerarHoneypot() throws Exception {
+            mockMvc.perform(post("/registrera")
+                            .with(csrf())
+                            .param("username", "bot@example.com")
+                            .param("kampanjref", "http://spam.example"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/registrerad"));
+
+            verify(registrationService, never()).register(any());
+        }
+
+        @Test
+        @DisplayName("ska formuläret ha ett dolt honeypot-fält som en vanlig registrering lämnar tomt")
+        void skaHaHoneypotFältIFormuläretOchTillåtaTomtVärde() throws Exception {
+            mockMvc.perform(get("/registrera"))
+                    .andExpect(content().string(containsString("name=\"kampanjref\"")))
+                    .andExpect(content().string(containsString("tabindex=\"-1\"")));
+
+            when(registrationService.register("anna@example.com"))
+                    .thenReturn(new RegistrationResult.Registered(null));
+            mockMvc.perform(post("/registrera").with(csrf())
+                            .param("username", "anna@example.com").param("kampanjref", ""))
+                    .andExpect(redirectedUrl("/registrerad"));
+        }
+
+        @Test
+        @DisplayName("ska nått globalt mailtak ge exakt samma svar som en lyckad registrering")
+        void skaGeSammaSvarNärMailtaketÄrNått() throws Exception {
+            when(registrationService.register("anna@example.com"))
+                    .thenReturn(new RegistrationResult.Deferred());
+
+            mockMvc.perform(post("/registrera").with(csrf()).param("username", "anna@example.com"))
+                    .andExpect(status().is3xxRedirection())
+                    .andExpect(redirectedUrl("/registrerad"));
+        }
+
+        @Test
         @DisplayName("ska formuläret INTE fråga efter något lösenord")
         void skaInteFrågaEfterLösenord() throws Exception {
             mockMvc.perform(get("/registrera"))
