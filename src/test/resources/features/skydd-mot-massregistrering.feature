@@ -40,17 +40,24 @@ Egenskap: Skydd mot massregistrering och mailmissbruk
     När jag registrerar mig med e-postadressen "ny@example.com"
     Så finns ett overifierat konto "ny@example.com"
 
-  Scenario: Taket gäller registrering, ny länk och glömt lösenord gemensamt
+  Scenario: Registrering och ny länk delar tak
     Givet att det globala mailtaket är 3 mail per timme och 100 per dygn
-    Och att det finns ett verifierat konto "verifierad@example.com" med lösenordet "hemligt123"
     Och att jag har registrerat mig med e-postadressen "forst@example.com"
-    Och att jag har begärt en ny verifieringslänk för "forst@example.com" 1 gånger
-    Och att ett återställningsmail har begärts för "verifierad@example.com"
+    Och att jag har begärt en ny verifieringslänk för "forst@example.com" 2 gånger
     När jag registrerar mig med e-postadressen "ny@example.com"
     Så skickas inget mail till "ny@example.com"
     Och inget konto med användarnamnet "ny@example.com" har skapats
     När jag begär en ny verifieringslänk för "forst@example.com"
-    Så har exakt 2 verifieringsmail skickats till "forst@example.com"
+    Så har exakt 3 verifieringsmail skickats till "forst@example.com"
+
+  Scenario: Ett fullt registreringstak svälter inte lösenordsåterställning
+    Givet att det globala mailtaket är 3 mail per timme och 100 per dygn
+    Och att det finns ett verifierat konto "verifierad@example.com" med lösenordet "hemligt123"
+    Och att 3 mail redan har skickats
+    När jag registrerar mig med e-postadressen "ny@example.com"
+    Så skickas inget mail till "ny@example.com"
+    När ett återställningsmail begärs för "verifierad@example.com"
+    Så ett mail med en återställningslänk har skickats till "verifierad@example.com"
 
   Scenario: Honeypot: ett ifyllt dolt fält ger inget konto och inget mail men samma svar
     När en bot registrerar sig med e-postadressen "bot@example.com" och fyller i det dolda fältet

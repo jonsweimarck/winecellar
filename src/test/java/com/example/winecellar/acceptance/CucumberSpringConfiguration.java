@@ -33,7 +33,9 @@ public class CucumberSpringConfiguration extends SharedPostgres {
                     // Höga globala mailtak i den delade kontexten (WINE-65), så att många scenarier inte tömmer dem;
                     // scenarierna som testar taken bygger egna tjänster med små tak.
                     "winecellar.mail.max-per-hour=4000",
-                    "winecellar.mail.max-per-day=100000"
+                    "winecellar.mail.max-per-day=100000",
+                    "winecellar.mail.reset-max-per-hour=4000",
+                    "winecellar.mail.reset-max-per-day=100000"
             ).applyTo(context.getEnvironment());
         }
     }

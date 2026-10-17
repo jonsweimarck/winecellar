@@ -458,7 +458,7 @@ public class RegistrationSteps {
         customRegistration = new RegistrationService(userRepository, passwordEncoder, tokenService, accountWriter,
                 mailSender, budget, clock, "http://localhost:8080");
         customReset = new PasswordResetService(userRepository, passwordEncoder, tokenService, accountWriter,
-                mailSender, budget, sessionTerminator, clock, "http://localhost:8080");
+                mailSender, new MailBudget(1000, 1000, clock), sessionTerminator, clock, "http://localhost:8080");
     }
 
     @Och("att {int} mail redan har skickats")
@@ -467,6 +467,11 @@ public class RegistrationSteps {
             registration().register("tak" + i + "@example.com");
         }
         assertThat(mailSender.all()).hasSize(count);
+    }
+
+    @När("ett återställningsmail begärs för {string}")
+    public void ettÅterställningsmailBegärs(String address) {
+        customReset.requestReset(address);
     }
 
     @Och("att ett återställningsmail har begärts för {string}")
@@ -492,13 +497,13 @@ public class RegistrationSteps {
     @När("en bot registrerar sig med e-postadressen {string} och fyller i det dolda fältet")
     public void enBotRegistrerarSig(String address) throws Exception {
         lastPage = mockMvc.perform(post("/registrera").param("username", address)
-                .param("website", "http://spam.example").with(csrf())).andReturn();
+                .param("kampanjref", "http://spam.example").with(csrf())).andReturn();
     }
 
     @Och("svaret är detsamma som för en vanlig registrering")
     public void svaretÄrDetsammaSomFörEnVanligRegistrering() throws Exception {
         MvcResult ordinary = mockMvc.perform(post("/registrera").param("username", "vanlig@example.com")
-                .param("website", "").with(csrf())).andReturn();
+                .param("kampanjref", "").with(csrf())).andReturn();
         assertThat(lastPage.getResponse().getStatus()).isEqualTo(ordinary.getResponse().getStatus());
         assertThat(lastPage.getResponse().getRedirectedUrl()).isEqualTo(ordinary.getResponse().getRedirectedUrl())
                 .isEqualTo("/registrerad");

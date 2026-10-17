@@ -34,9 +34,11 @@ public class RegistrationService {
     static final Duration VERIFICATION_MAIL_WINDOW = Duration.ofHours(1);
 
     /**
-     * Platshållarlösenord för ett overifierat konto (WINE-65). Syntaktiskt en riktig bcrypt-hash
-     * (kostnad 10, samma som appens kodare) vars lösenord kasserades när den skapades, så ingen
-     * kan logga in med den - men ett inloggningsförsök mot kontot gör ändå en full bcrypt-jämförelse,
+     * Platshållarlösenord för ett overifierat konto (WINE-65), DELAT av alla overifierade konton.
+     * Klartexten var ett slumpmässigt värde på 256 bitar som kasserades direkt; hashen genererades EN gång
+     * offline (bcrypt, kostnad 10, samma som appens kodare) och finns bara här. Säkerheten vilar på att
+     * kontot är avstängt tills det aktiverats OCH att klartexten är okänd - inte på att hashen är hemlig.
+     * Hashen finns för tidsjämnhet: ett inloggningsförsök mot kontot gör ändå en full bcrypt-jämförelse,
      * så svarstiden avslöjar inte att kontot är overifierat (jfr LoginVerificationTest). Att
      * skapa kontot kostar däremot ingen bcrypt: tidigare hashades ett slumptal med full bcrypt vid
      * varje registrering, vilket gjorde registreringen till en billig CPU-förstärkare för en angripare.
@@ -56,7 +58,7 @@ public class RegistrationService {
 
     public RegistrationService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                                TokenService tokenService, AccountWriter accountWriter, MailSender mailSender,
-                               MailBudget mailBudget, Clock clock, @Value("${winecellar.base-url}") String baseUrl) {
+                               @org.springframework.beans.factory.annotation.Qualifier("registrationMailBudget") MailBudget mailBudget, Clock clock, @Value("${winecellar.base-url}") String baseUrl) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
@@ -99,6 +101,10 @@ public class RegistrationService {
             log.warn("Samtidig registrering av samma adress - behandlas som upptagen.");
             mailBudget.release();
             return new RegistrationResult.UsernameTaken();
+        } catch (RuntimeException e) {
+            // Inget konto skapades och inget mail går iväg: den globala platsen får inte läcka.
+            mailBudget.release();
+            throw e;
         }
         sendNewLink(user, true);
         return new RegistrationResult.Registered(user);
@@ -169,23 +175,32 @@ public class RegistrationService {
             verificationMailLimiter.release(address);
             return;
         }
-        String token;
+        // Båda platserna återlämnas om inget mail faktiskt lämnas över till avsändaren, oavsett orsak
+        // (samtidigt race, databasfel, ...). Bara ett mail som skickats får förbruka dem.
+        boolean handedOver = false;
         try {
-            token = tokenService.issue(user.id(), Purpose.EMAIL_VERIFICATION);
-        } catch (DataIntegrityViolationException e) {
-            log.warn("Verifieringstoken kunde inte utfärdas (samtidig begäran) för användare {}.", user.id());
-            verificationMailLimiter.release(address);
-            mailBudget.release();
-            return;
+            String token;
+            try {
+                token = tokenService.issue(user.id(), Purpose.EMAIL_VERIFICATION);
+            } catch (DataIntegrityViolationException e) {
+                log.warn("Verifieringstoken kunde inte utfärdas (samtidig begäran) för användare {}.", user.id());
+                return;
+            }
+            mailSender.send(address, "Verifiera din e-postadress - Vinkällaren",
+                    "Välkommen till Vinkällaren!\n\n"
+                            + "Öppna länken nedan för att bekräfta din e-postadress och välja ett lösenord. Länken "
+                            + "gäller i 24 timmar och kan bara användas en gång.\n\n"
+                            + baseUrl + "/verifiera?token=" + token + "\n\n"
+                            + "Om du inte har registrerat dig kan du bortse från det här mailet.\n",
+                    // Mailet gick inte att skicka: användaren ska inte ha förlorat en plats (det globala
+                    // taket räknar däremot försöket, så en trasig SMTP-server inte kan hamras obegränsat).
+                    () -> verificationMailLimiter.release(address));
+            handedOver = true;
+        } finally {
+            if (!handedOver) {
+                verificationMailLimiter.release(address);
+                mailBudget.release();
+            }
         }
-        mailSender.send(address, "Verifiera din e-postadress - Vinkällaren",
-                "Välkommen till Vinkällaren!\n\n"
-                        + "Öppna länken nedan för att bekräfta din e-postadress och välja ett lösenord. Länken "
-                        + "gäller i 24 timmar och kan bara användas en gång.\n\n"
-                        + baseUrl + "/verifiera?token=" + token + "\n\n"
-                        + "Om du inte har registrerat dig kan du bortse från det här mailet.\n",
-                // Mailet gick inte att skicka: användaren ska inte ha förlorat en plats (det globala
-                // taket räknar däremot försöket, så en trasig SMTP-server inte kan hamras obegränsat).
-                () -> verificationMailLimiter.release(address));
     }
 }

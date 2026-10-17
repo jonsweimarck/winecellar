@@ -119,3 +119,6 @@ winecellar:
     # detsamma som annars. I minnet, nollställs vid omstart.
     max-per-hour: ${WINECELLAR_MAIL_MAX_PER_HOUR:30}
     max-per-day: ${WINECELLAR_MAIL_MAX_PER_DAY:150}
+    # Egen, mindre budget för "glömt lösenord" (separat från registreringens, så att den inte kan svältas).
+    reset-max-per-hour: ${WINECELLAR_MAIL_RESET_MAX_PER_HOUR:10}
+    reset-max-per-day: ${WINECELLAR_MAIL_RESET_MAX_PER_DAY:50}

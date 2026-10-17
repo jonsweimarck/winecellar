@@ -32,7 +32,11 @@ public class AccountWriter {
      * verifierat. Tillämpas BARA om kontot fortfarande är overifierat - ett redan verifierat
      * kontos lösenord ändras aldrig härifrån.
      *
-     * @return false om kontot saknas/redan är verifierat eller någon annan hann före (inget ändras då)
+     * Ett undantag mitt i rullar allt tillbaka. Returnerar metoden false är det en avsiktlig "inget att göra":
+     * saknas kontot eller är det redan verifierat ändras inget; hann kontot bli verifierat först EFTER att
+     * tokenet förbrukats är tokenet förbrukat (och det finns inget att aktivera) - det är ofarligt.
+     *
+     * @return false om kontot saknas/redan är verifierat eller någon annan hann före
      */
     @Transactional
     public boolean activate(UserToken token, String newPasswordHash) {
@@ -55,7 +59,9 @@ public class AccountWriter {
     /**
      * Löser in ett återställningstoken: i EN transaktion förbrukas tokenet, lösenordet byts och
      * användarens övriga återställningstokens raderas. Felar något efter att tokenet förbrukats
-     * rullas allt tillbaka - länken är då fortfarande giltig och lösenordet oförändrat.
+     * rullas allt tillbaka - länken är då fortfarande giltig och lösenordet oförändrat. (Returnerar metoden
+     * false rullas inget tillbaka: hann någon annan förbruka länken ändras inget, och saknas användaren
+     * efter förbrukningen finns inget lösenord att byta - länken är då förbrukad, vilket är ofarligt.)
      *
      * @return false om någon annan hann före eller användaren saknas
      */

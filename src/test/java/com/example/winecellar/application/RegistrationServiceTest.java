@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -54,6 +55,47 @@ class RegistrationServiceTest {
         // Hashen är en syntaktiskt giltig bcrypt-hash: kodaren avvisar den inte i förväg utan jämför på riktigt.
         assertThat(RegistrationService.UNUSABLE_PASSWORD_HASH)
                 .startsWith("{bcrypt}$2a$10$").hasSize("{bcrypt}$2a$10$".length() + 53);
+    }
+
+    @Test
+    void platshållarhashenSkaHaSammaPrefixOchKostnadsfaktorSomAppensRiktigaHashar() {
+        String real = encoder.encode("nagot");
+        String placeholderHeader = RegistrationService.UNUSABLE_PASSWORD_HASH.substring(0, 15);
+        assertThat(placeholderHeader).isEqualTo("{bcrypt}$2a$10$");
+        assertThat(real).startsWith(placeholderHeader);
+    }
+
+    @Test
+    void skaLämnaTillbakaBådaPlatsernaNärUtfärdandetFelarMedEttAnnatUndantagÄnRace() {
+        MailBudget budget = new MailBudget(1, 100, clock);
+        TokenService failing = org.mockito.Mockito.mock(TokenService.class);
+        org.mockito.Mockito.when(failing.issue(any(), any())).thenThrow(new IllegalStateException("db nere"));
+        RegistrationService service = new RegistrationService(users, encoder, failing,
+                new AccountWriter(users, failing), mail, budget, clock, "http://x");
+        users.save(new User(null, "anna@example.com", "h", clock.instant(), 1, false, false, clock.instant(),
+                false));
+
+        // Fler försök än per-adress-kvoten (3): lyckas varje gång bara om platsen lämnades tillbaka
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> service.resendVerification("anna@example.com"))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+        assertThat(budget.tryAcquire()).isTrue();
+        assertThat(mail.all()).isEmpty();
+    }
+
+    @Test
+    void skaLämnaTillbakaDenGlobalaPlatsenNärKontoSparandetFelarMedEttAnnatUndantagÄnDubblett() {
+        MailBudget budget = new MailBudget(1, 100, clock);
+        UserRepository failingUsers = org.mockito.Mockito.mock(UserRepository.class);
+        org.mockito.Mockito.when(failingUsers.findByUsername(any())).thenReturn(java.util.Optional.empty());
+        org.mockito.Mockito.when(failingUsers.save(any())).thenThrow(new IllegalStateException("db nere"));
+        RegistrationService service = new RegistrationService(failingUsers, encoder, tokenService,
+                new AccountWriter(failingUsers, tokenService), mail, budget, clock, "http://x");
+
+        assertThatThrownBy(() -> service.register("anna@example.com")).isInstanceOf(IllegalStateException.class);
+
+        assertThat(budget.tryAcquire()).isTrue();
     }
 
     @Test

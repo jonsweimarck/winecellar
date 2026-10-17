@@ -48,6 +48,11 @@ public class JpaUserTokenRepository implements UserTokenRepository {
     }
 
     @Override
+    public boolean existsByUser(UserId userId) {
+        return jpaRepository.existsByUserId(userId.value());
+    }
+
+    @Override
     @Transactional
     public int deleteExpired(java.time.Instant now) {
         return jpaRepository.deleteExpired(now);

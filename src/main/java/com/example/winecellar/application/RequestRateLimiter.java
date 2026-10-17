@@ -79,6 +79,9 @@ public class RequestRateLimiter {
     /**
      * Återbetalar den senast förbrukade platsen för nyckeln (t.ex. när ett mail som kvoten
      * räknade för aldrig kunde skickas). No-op om nyckeln saknas eller inga platser finns kvar.
+     * Begränsning: den SENAST registrerade tidsstämpeln tas bort, inte nödvändigtvis den som tillhörde
+     * just det anrop som nu återbetalas. Det spelar ingen roll för antalet (det är alltid en plats som
+     * frigörs), men vid samtidiga anrop kan fönstret för en annan förfrågan bli något kortare än exakt.
      */
     public synchronized void release(String key) {
         Deque<Instant> times = requests.get(key);

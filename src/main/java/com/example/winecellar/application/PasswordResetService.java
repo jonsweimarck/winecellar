@@ -41,7 +41,7 @@ public class PasswordResetService {
 
     public PasswordResetService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                                 TokenService tokenService, AccountWriter accountWriter, MailSender mailSender,
-                                MailBudget mailBudget, SessionTerminator sessionTerminator, Clock clock,
+                                @org.springframework.beans.factory.annotation.Qualifier("resetMailBudget") MailBudget mailBudget, SessionTerminator sessionTerminator, Clock clock,
                                 @Value("${winecellar.base-url}") String baseUrl) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -79,24 +79,33 @@ public class PasswordResetService {
             limiter.release(address);
             return;
         }
-        String token;
+        // Båda platserna återlämnas om inget mail faktiskt lämnas över till avsändaren, oavsett orsak.
+        boolean handedOver = false;
         try {
-            token = tokenService.issue(user.get().id(), Purpose.PASSWORD_RESET);
-        } catch (DataIntegrityViolationException e) {
-            // Annan samtidig begäran hann före (unikt index) - tyst, samma neutrala svar.
-            log.warn("Återställningstoken kunde inte utfärdas (samtidig begäran) för användare {}.", user.get().id());
-            limiter.release(address);
-            mailBudget.release();
-            return;
+            String token;
+            try {
+                token = tokenService.issue(user.get().id(), Purpose.PASSWORD_RESET);
+            } catch (DataIntegrityViolationException e) {
+                // Annan samtidig begäran hann före (unikt index) - tyst, samma neutrala svar.
+                log.warn("Återställningstoken kunde inte utfärdas (samtidig begäran) för användare {}.",
+                        user.get().id());
+                return;
+            }
+            mailSender.send(user.get().username(), "Återställ ditt lösenord - Vinkällaren",
+                    "Någon (förhoppningsvis du) har begärt att återställa lösenordet för ditt konto i Vinkällaren.\n\n"
+                            + "Öppna länken nedan för att välja ett nytt lösenord. Länken gäller i 1 timme och kan "
+                            + "bara användas en gång.\n\n"
+                            + baseUrl + "/aterstall-losenord?token=" + token + "\n\n"
+                            + "Om du inte har begärt det här kan du bortse från mailet - ditt lösenord ändras inte.\n",
+                    // Mailet gick inte att skicka: användaren ska inte ha förlorat en plats i sin egen kvot.
+                    () -> limiter.release(address));
+            handedOver = true;
+        } finally {
+            if (!handedOver) {
+                limiter.release(address);
+                mailBudget.release();
+            }
         }
-        mailSender.send(user.get().username(), "Återställ ditt lösenord - Vinkällaren",
-                "Någon (förhoppningsvis du) har begärt att återställa lösenordet för ditt konto i Vinkällaren.\n\n"
-                        + "Öppna länken nedan för att välja ett nytt lösenord. Länken gäller i 1 timme och kan "
-                        + "bara användas en gång.\n\n"
-                        + baseUrl + "/aterstall-losenord?token=" + token + "\n\n"
-                        + "Om du inte har begärt det här kan du bortse från mailet - ditt lösenord ändras inte.\n",
-                // Mailet gick inte att skicka: användaren ska inte ha förlorat en plats i sin egen kvot.
-                () -> limiter.release(address));
     }
 
     /** Kontrollerar länken utan att förbruka den (för att visa formuläret eller ett felmeddelande). */

@@ -45,4 +45,17 @@ class MailConfigGuardTest {
 
         assertThat(output).doesNotContain("saknas/är tom");
     }
+
+    @Test
+    void skaVarnaOmStarttlsÄrAvstängtPåCleverCloud(CapturedOutput output) {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setProperty(RememberMeKeyGuard.CLEVER_CLOUD_SIGNAL_PROPERTY, "host");
+        environment.setProperty("WINECELLAR_MAIL_HOST", "smtp.example.com");
+        environment.setProperty("WINECELLAR_BASE_URL", "https://vin.example.com");
+        environment.setProperty("WINECELLAR_MAIL_STARTTLS", "false");
+
+        new MailConfigGuard(environment).warnIfNeeded();
+
+        assertThat(output).contains("WINECELLAR_MAIL_STARTTLS");
+    }
 }

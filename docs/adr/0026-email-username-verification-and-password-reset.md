@@ -126,8 +126,12 @@ Ett efterföljande granskningsvarv gav följande tillägg, utan att ändra någo
 förbruka en adress kvot är fortsatt medvetet accepterat):
 
 - **Globalt mailtak.** Kvoten per adress stoppar inte någon som registrerar många olika adresser.
-  Därför finns ett tak för det totala antalet utgående mail, per timme och per dygn, gemensamt för
-  alla mailtyper (registrering, ny länk, glömt lösenord). Taken sätts via miljövariabler med
+  Därför finns tak för det totala antalet utgående mail, per timme och per dygn, i TVÅ separata
+  budgetar: en gemensam för registrering och "ny länk", och en egen, mindre för "glömt lösenord".
+  Uppdelningen gör att ett fullt registreringstak aldrig kan svälta lösenordsåterställning. Restrisk:
+  den som tömmer återställningsbudgeten kan blockera återställning för alla en stund, men det kräver
+  många begäranden mot VERIFIERADE adresser (okända och overifierade adresser förbrukar inget), och
+  varje adress tillåter bara tre per timme. Taken sätts via miljövariabler med
   försiktiga standardvärden och räknas i minnet (nollställs vid omstart, passar enkelinstansdrift).
   Är taket nått skapas inget konto och inget mail skickas, men svaret är detsamma som för en lyckad
   registrering. Timtaket klipps så att det aldrig kan närma sig storleksgränsen på kartan över
@@ -139,13 +143,19 @@ förbruka en adress kvot är fortsatt medvetet accepterat):
 - **Kvotplatsen tas atomärt och återbetalas vid fel.** Platsen i kvoten per adress tas innan något
   ändras, så samtidiga anrop aldrig kan släppa igenom fler mail än kvoten. Går själva utskicket
   (som sker asynkront) sedan inte att genomföra återbetalas användarens plats, så ett trasigt
-  mailsystem inte gör att användaren förlorar sina försök. Det globala taket räknar däremot
-  försöket, så en nedlagd SMTP-server inte kan hamras obegränsat. Mailtrafiken kräver dessutom
+  mailsystem inte gör att användaren förlorar sina försök. Det globala taket återbetalas
+  INTE vid ett misslyckat utskick: det räknar försöket, så att en nedlagd SMTP-server inte kan hamras
+  obegränsat. Konsekvensen är att en längre SMTP-störning kan tömma budgeten på mail som aldrig gick
+  iväg, så att nya registreringar tillfälligt får det neutrala svaret utan mail tills fönstret passerat.
+  Platserna lämnas däremot tillbaka (både per adress och globalt) om ingen mailförsändelse alls
+  kommer till stånd, t.ex. vid ett databasfel. Mailtrafiken kräver dessutom
   STARTTLS när det är påslaget, så att länkarna aldrig går i klartext om servern inte erbjuder det.
-- **Platshållarlösenord utan bcrypt.** Ett overifierat konto får en fast, syntaktiskt giltig hash
-  vars lösenord aldrig fanns, i stället för en nyhashad slumpsträng. Det gör registreringen billig
-  för servern, medan ett inloggningsförsök mot kontot fortfarande kostar en full jämförelse (samma
-  svarstid som ett fel lösenord).
+- **Platshållarlösenord utan bcrypt.** Alla overifierade konton delar EN fast, syntaktiskt giltig hash
+  med samma kostnadsfaktor som riktiga lösenord. Klartexten var ett slumpmässigt värde på minst 256
+  bitar som kasserades, och hashen genererades en gång offline. Säkerheten vilar på att kontot är
+  avstängt tills det aktiverats och att klartexten är okänd - hashen är inte hemlig. Den finns för
+  tidsjämnhet: registreringen blir billig för servern, medan ett inloggningsförsök mot kontot
+  fortfarande kostar en full jämförelse (samma svarstid som ett fel lösenord).
 - **Lösenordsbyte är en transaktion med riktade skrivningar.** Förbrukningen av länken, bytet av
   hash och rensningen av övriga länkar sker atomärt: felar något rullas allt tillbaka och länken
   fungerar fortfarande. Aktivering och återställning skriver bara hash (och verifierad-flaggan) och
@@ -153,7 +163,9 @@ förbruka en adress kvot är fortsatt medvetet accepterat):
   inte över.
 - **Städning vid inloggning.** Samma mönster som för övergivna importmappar
   ([0017](0017-login-triggered-temp-import-cleanup.md)): en lyckad inloggning raderar utgångna länkar
-  och overifierade konton äldre än sju dagar (inklusive deras länkar). Verifierade konton, färska
+  och overifierade konton äldre än sju dagar (inklusive deras länkar), högst en gång per timme.
+  Ett gammalt overifierat konto som fortfarande har en giltig länk (användaren har begärt en ny)
+  städas inte bort. Verifierade konton, färska
   overifierade konton och giltiga länkar rörs aldrig. Ett fel i städningen loggas (utan någon
   tokeninformation) och fäller aldrig inloggningen. Ingen schemaläggare införs; en app som ingen
   loggar in i städas alltså inte, vilket är försumbart för dess storlek.

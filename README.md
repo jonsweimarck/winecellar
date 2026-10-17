@@ -301,8 +301,9 @@ innehåll, inklusive länken, i loggen (gör aldrig det i produktion).
 | `WINECELLAR_MAIL_FROM` | Avsändaradress | `no-reply@localhost` |
 | `WINECELLAR_MAIL_STARTTLS` | STARTTLS på/av | `true` |
 | `WINECELLAR_MAIL_LOG_CONTENT` | Logga mailets innehåll när SMTP saknas (bara lokalt) | `false` |
-| `WINECELLAR_MAIL_MAX_PER_HOUR` | Globalt tak för utgående mail per timme (alla mailtyper gemensamt) | `30` |
+| `WINECELLAR_MAIL_MAX_PER_HOUR` | Tak för utgående mail per timme (registrering och ny länk gemensamt) | `30` |
 | `WINECELLAR_MAIL_MAX_PER_DAY` | Globalt tak för utgående mail per dygn | `150` |
+| `WINECELLAR_MAIL_RESET_MAX_PER_HOUR` / `_PER_DAY` | Egen, separat budget för "glömt lösenord" (kan inte svältas av registreringstaket) | `10` / `50` |
 
 **Att sätta i Clever Cloud:** `WINECELLAR_BASE_URL`, `WINECELLAR_MAIL_HOST`,
 `WINECELLAR_MAIL_PORT`, `WINECELLAR_MAIL_USERNAME`, `WINECELLAR_MAIL_PASSWORD` och

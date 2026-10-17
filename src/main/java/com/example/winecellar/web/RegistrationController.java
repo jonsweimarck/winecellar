@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class RegistrationController {
 
     /** Namnet på det dolda honeypot-fältet i registrera.html. */
-    static final String HONEYPOT_FIELD = "website";
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RegistrationController.class);
+
+    static final String HONEYPOT_FIELD = "kampanjref";
 
     private final RegistrationService registrationService;
 
@@ -38,6 +40,7 @@ public class RegistrationController {
         // Honeypot (WINE-65): ett dolt fält som en människa aldrig fyller i. Är det ifyllt är det en
         // bot - inget konto, inget mail, men exakt samma svar som en lyckad registrering.
         if (honeypot != null && !honeypot.isBlank()) {
+            log.info("Registrering avvisad: honeypot-fältet var ifyllt (ingen adress loggas).");
             return "redirect:/registrerad";
         }
         model.addAttribute("username", username);

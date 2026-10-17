@@ -1,5 +1,6 @@
 package com.example.winecellar.web;
 
+import com.example.winecellar.application.MailBudget;
 import com.example.winecellar.application.MailSender;
 import com.example.winecellar.infrastructure.LoggingMailSender;
 import com.example.winecellar.infrastructure.SmtpMailSender;
@@ -30,6 +31,22 @@ public class MailConfig {
     @Bean
     public Clock clock() {
         return Clock.systemUTC();
+    }
+
+    /** Budget för registrering och "ny länk" (WINE-65). Skild från återställningsbudgeten nedan. */
+    @Bean
+    public MailBudget registrationMailBudget(
+            @Value("${winecellar.mail.max-per-hour:30}") int perHour,
+            @Value("${winecellar.mail.max-per-day:150}") int perDay, Clock clock) {
+        return new MailBudget(perHour, perDay, clock);
+    }
+
+    /** Egen, mindre budget för "glömt lösenord", så att ett fullt registreringstak aldrig svälter återställning. */
+    @Bean
+    public MailBudget resetMailBudget(
+            @Value("${winecellar.mail.reset-max-per-hour:10}") int perHour,
+            @Value("${winecellar.mail.reset-max-per-day:50}") int perDay, Clock clock) {
+        return new MailBudget(perHour, perDay, clock);
     }
 
     @Bean

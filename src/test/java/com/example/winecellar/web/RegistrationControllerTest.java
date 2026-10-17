@@ -128,7 +128,7 @@ class RegistrationControllerTest {
             mockMvc.perform(post("/registrera")
                             .with(csrf())
                             .param("username", "bot@example.com")
-                            .param("website", "http://spam.example"))
+                            .param("kampanjref", "http://spam.example"))
                     .andExpect(status().is3xxRedirection())
                     .andExpect(redirectedUrl("/registrerad"));
 
@@ -139,13 +139,13 @@ class RegistrationControllerTest {
         @DisplayName("ska formuläret ha ett dolt honeypot-fält som en vanlig registrering lämnar tomt")
         void skaHaHoneypotFältIFormuläretOchTillåtaTomtVärde() throws Exception {
             mockMvc.perform(get("/registrera"))
-                    .andExpect(content().string(containsString("name=\"website\"")))
+                    .andExpect(content().string(containsString("name=\"kampanjref\"")))
                     .andExpect(content().string(containsString("tabindex=\"-1\"")));
 
             when(registrationService.register("anna@example.com"))
                     .thenReturn(new RegistrationResult.Registered(null));
             mockMvc.perform(post("/registrera").with(csrf())
-                            .param("username", "anna@example.com").param("website", ""))
+                            .param("username", "anna@example.com").param("kampanjref", ""))
                     .andExpect(redirectedUrl("/registrerad"));
         }
 

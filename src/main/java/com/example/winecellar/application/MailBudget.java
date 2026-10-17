@@ -2,16 +2,15 @@ package com.example.winecellar.application;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Duration;
 
 /**
  * Globalt tak för utgående mail (WINE-65, skydd mot massregistrering/mailmissbruk): högst N mail
- * per timme OCH högst M per dygn, för ALLA mailtyper gemensamt (registrering, "ny länk" och
- * glömt lösenord). Kompletterar kvoten per adress, som inte stoppar en angripare som
+ * per timme OCH högst M per dygn. Det finns TVÅ separata budgetar (beans i MailConfig): en gemensam för
+ * registrering och "ny länk", och en egen, mindre för "glömt lösenord" - så att ett fullt registreringstak
+ * aldrig kan svälta lösenordsåterställning. Kompletterar kvoten per adress, som inte stoppar en angripare som
  * registrerar många olika adresser. Slut tak = anroparen gör ingenting (inget konto, inget
  * mail) och svarar ändå neutralt. Ingen CAPTCHA och ingen IP-baserad begränsning (ADR 0026).
  *
@@ -20,7 +19,6 @@ import java.time.Duration;
  * post i kvoten per adress kan kartorna då aldrig fyllas av levande poster, och en full karta
  * kan alltså inte tyst neka nya adresser.
  */
-@Service
 public class MailBudget {
 
     private static final Logger log = LoggerFactory.getLogger(MailBudget.class);
@@ -33,8 +31,7 @@ public class MailBudget {
     private final RequestRateLimiter hourly;
     private final RequestRateLimiter daily;
 
-    public MailBudget(@Value("${winecellar.mail.max-per-hour:30}") int perHour,
-                      @Value("${winecellar.mail.max-per-day:150}") int perDay, Clock clock) {
+    public MailBudget(int perHour, int perDay, Clock clock) {
         if (perHour < 1 || perDay < 1) {
             throw new IllegalArgumentException(
                     "winecellar.mail.max-per-hour och max-per-day måste vara minst 1 (fick " + perHour + "/" + perDay + ")");

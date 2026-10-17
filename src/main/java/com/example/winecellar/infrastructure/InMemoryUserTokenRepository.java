@@ -43,6 +43,11 @@ public class InMemoryUserTokenRepository implements UserTokenRepository {
     }
 
     @Override
+    public boolean existsByUser(UserId userId) {
+        return tokens.values().stream().anyMatch(t -> t.userId().equals(userId));
+    }
+
+    @Override
     public int deleteExpired(java.time.Instant now) {
         int before = tokens.size();
         tokens.values().removeIf(t -> !t.expiresAt().isAfter(now));
