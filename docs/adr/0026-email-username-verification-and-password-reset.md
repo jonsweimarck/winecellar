@@ -91,7 +91,8 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   lösenord att känna till. Ett förhandsregistrerat konto har bara ett slumpmässigt
   lösenord som kastats, och bara den som kan öppna en länk i brevlådan kan välja
   ett. Länkarna går alltid bara till brevlådans ägare. För en verifierad adress
-  gäller "upptaget". Gamla overifierade konton städas inte bort. Är mailkvoten
+  gäller "upptaget". Overifierade konton äldre än sju dagar städas bort (se
+  uppföljningen nedan). Är mailkvoten
   slut vid en ny registrering ändras ingenting (ingen ny länk, inget mail) men svaret
   är detsamma som för en ny adress.
 - Störning via kvoten är accepterad: en anonym part kan förbruka en adress mailkvot
@@ -117,3 +118,42 @@ kontaktkanal, och den enklaste är en e-postadress som kontot bevisat sig
   RFC-validering (risk att avvisa korrekta adresser), och att skicka ett
   mail till alla befintliga konton för att bekräfta adressen (onödigt
   friktion för redan etablerade användare).
+
+## Uppföljning (WINE-65): skydd mot massregistrering och städning
+
+Ett efterföljande granskningsvarv gav följande tillägg, utan att ändra något av ovanstående
+(avslöjande av verifierad adress vid registrering, svarstidsskillnader och att en anonym part kan
+förbruka en adress kvot är fortsatt medvetet accepterat):
+
+- **Globalt mailtak.** Kvoten per adress stoppar inte någon som registrerar många olika adresser.
+  Därför finns ett tak för det totala antalet utgående mail, per timme och per dygn, gemensamt för
+  alla mailtyper (registrering, ny länk, glömt lösenord). Taken sätts via miljövariabler med
+  försiktiga standardvärden och räknas i minnet (nollställs vid omstart, passar enkelinstansdrift).
+  Är taket nått skapas inget konto och inget mail skickas, men svaret är detsamma som för en lyckad
+  registrering. Timtaket klipps så att det aldrig kan närma sig storleksgränsen på kartan över
+  adresser: en full karta skulle annars tyst kunna neka nya adresser. Inget CAPTCHA och ingen
+  IP-baserad begränsning.
+- **Honeypot.** Registreringsformuläret har ett dolt fält som en människa aldrig fyller i. Är det
+  ifyllt skapas inget konto och inget mail skickas, men svaret är detsamma som för en vanlig
+  registrering.
+- **Kvotplatsen tas atomärt och återbetalas vid fel.** Platsen i kvoten per adress tas innan något
+  ändras, så samtidiga anrop aldrig kan släppa igenom fler mail än kvoten. Går själva utskicket
+  (som sker asynkront) sedan inte att genomföra återbetalas användarens plats, så ett trasigt
+  mailsystem inte gör att användaren förlorar sina försök. Det globala taket räknar däremot
+  försöket, så en nedlagd SMTP-server inte kan hamras obegränsat. Mailtrafiken kräver dessutom
+  STARTTLS när det är påslaget, så att länkarna aldrig går i klartext om servern inte erbjuder det.
+- **Platshållarlösenord utan bcrypt.** Ett overifierat konto får en fast, syntaktiskt giltig hash
+  vars lösenord aldrig fanns, i stället för en nyhashad slumpsträng. Det gör registreringen billig
+  för servern, medan ett inloggningsförsök mot kontot fortfarande kostar en full jämförelse (samma
+  svarstid som ett fel lösenord).
+- **Lösenordsbyte är en transaktion med riktade skrivningar.** Förbrukningen av länken, bytet av
+  hash och rensningen av övriga länkar sker atomärt: felar något rullas allt tillbaka och länken
+  fungerar fortfarande. Aktivering och återställning skriver bara hash (och verifierad-flaggan) och
+  sparar aldrig hela användaren, så en samtidig ändring av senaste login eller adminflaggan skrivs
+  inte över.
+- **Städning vid inloggning.** Samma mönster som för övergivna importmappar
+  ([0017](0017-login-triggered-temp-import-cleanup.md)): en lyckad inloggning raderar utgångna länkar
+  och overifierade konton äldre än sju dagar (inklusive deras länkar). Verifierade konton, färska
+  overifierade konton och giltiga länkar rörs aldrig. Ett fel i städningen loggas (utan någon
+  tokeninformation) och fäller aldrig inloggningen. Ingen schemaläggare införs; en app som ingen
+  loggar in i städas alltså inte, vilket är försumbart för dess storlek.

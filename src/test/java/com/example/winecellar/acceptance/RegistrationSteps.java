@@ -1,6 +1,11 @@
 package com.example.winecellar.acceptance;
 
+import com.example.winecellar.application.AccountWriter;
+import com.example.winecellar.application.MailBudget;
+import com.example.winecellar.application.PasswordResetService;
 import com.example.winecellar.application.RegistrationResult;
+import com.example.winecellar.application.SessionTerminator;
+import com.example.winecellar.application.TokenService;
 import com.example.winecellar.application.RegistrationService;
 import com.example.winecellar.application.TokenHasher;
 import com.example.winecellar.application.TokenOutcome;
@@ -16,6 +21,7 @@ import io.cucumber.java.sv.När;
 import io.cucumber.java.sv.Så;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -64,12 +70,26 @@ public class RegistrationSteps {
     private MutableClock clock;
 
     @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private TokenService tokenService;
+
+    @Autowired
+    private AccountWriter accountWriter;
+
+    @Autowired
+    private SessionTerminator sessionTerminator;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private WebApplicationContext webApplicationContext;
 
     private MockMvc mockMvc;
+    private RegistrationService customRegistration;
+    private PasswordResetService customReset;
     private RegistrationResult lastRegistration;
     private TokenOutcome lastOutcome;
     private MvcResult lastLogin;
@@ -95,6 +115,9 @@ public class RegistrationSteps {
         userRepository.deleteAll();
         clock.advance(Duration.ofHours(2));
         mailSender.clear();
+        mailSender.failSending(false);
+        customRegistration = null;
+        customReset = null;
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).apply(springSecurity()).build();
     }
 
@@ -107,25 +130,25 @@ public class RegistrationSteps {
 
     @Givet("att jag har registrerat mig med e-postadressen {string}")
     public void attJagHarRegistreratMig(String address) {
-        lastRegistration = registrationService.register(address);
+        lastRegistration = registration().register(address);
         assertThat(lastRegistration).isInstanceOf(RegistrationResult.Registered.class);
     }
 
     @Givet("att jag har registrerat mig igen med e-postadressen {string} {int} gånger")
     public void attJagHarRegistreratMigIgen(String address, int times) {
         for (int i = 0; i < times; i++) {
-            lastRegistration = registrationService.register(address);
+            lastRegistration = registration().register(address);
         }
     }
 
     @När("jag registrerar mig med e-postadressen {string}")
     public void jagRegistrerarMig(String address) {
-        lastRegistration = registrationService.register(address);
+        lastRegistration = registration().register(address);
     }
 
     @När("jag försöker registrera mig med e-postadressen {string}")
     public void jagFörsökerRegistreraMig(String address) {
-        lastRegistration = registrationService.register(address);
+        lastRegistration = registration().register(address);
     }
 
     @Så("avvisas registreringen eftersom användarnamnet måste vara en e-postadress")
@@ -146,7 +169,7 @@ public class RegistrationSteps {
     @Givet("att jag har begärt en ny verifieringslänk för {string} {int} gånger")
     public void attJagHarBegärtNyLänkFleraGånger(String address, int times) {
         for (int i = 0; i < times; i++) {
-            registrationService.resendVerification(address);
+            registration().resendVerification(address);
         }
     }
 
@@ -296,7 +319,7 @@ public class RegistrationSteps {
 
     @När("jag begär en ny verifieringslänk för {string}")
     public void jagBegärEnNyVerifieringslänk(String address) {
-        registrationService.resendVerification(address);
+        registration().resendVerification(address);
     }
 
     @Så("avvisas den första verifieringslänken som ogiltig")
@@ -424,6 +447,75 @@ public class RegistrationSteps {
     @Så("har exakt {int} återställningsmail skickats till {string}")
     public void harExaktÅterställningsmail(int count, String address) {
         assertThat(mailSender.sentTo(address)).hasSize(count);
+    }
+
+
+    // ---- Globalt mailtak, honeypot och misslyckade utskick (WINE-65) ----
+
+    @Givet("att det globala mailtaket är {int} mail per timme och {int} per dygn")
+    public void attDetGlobalaMailtaketÄr(int perHour, int perDay) {
+        MailBudget budget = new MailBudget(perHour, perDay, clock);
+        customRegistration = new RegistrationService(userRepository, passwordEncoder, tokenService, accountWriter,
+                mailSender, budget, clock, "http://localhost:8080");
+        customReset = new PasswordResetService(userRepository, passwordEncoder, tokenService, accountWriter,
+                mailSender, budget, sessionTerminator, clock, "http://localhost:8080");
+    }
+
+    @Och("att {int} mail redan har skickats")
+    public void attMailRedanHarSkickats(int count) {
+        for (int i = 1; i <= count; i++) {
+            registration().register("tak" + i + "@example.com");
+        }
+        assertThat(mailSender.all()).hasSize(count);
+    }
+
+    @Och("att ett återställningsmail har begärts för {string}")
+    public void attEttÅterställningsmailHarBegärts(String address) {
+        customReset.requestReset(address);
+    }
+
+    @Så("skickas inget mail till {string}")
+    public void skickasIngetMailTill(String address) {
+        assertThat(mailSender.sentTo(address)).isEmpty();
+    }
+
+    @Och("svaret till användaren är det neutrala {string}")
+    public void svaretÄrDetNeutrala(String text) throws Exception {
+        // Både en lyckad och en uppskjuten registrering ger samma redirect till bekräftelsesidan
+        // (RegistrationControllerTest); här bevisas att tjänsten inte svarar med ett fel.
+        assertThat(lastRegistration)
+                .isInstanceOfAny(RegistrationResult.Registered.class, RegistrationResult.Deferred.class);
+        String page = mockMvc.perform(get("/registrerad")).andReturn().getResponse().getContentAsString();
+        assertThat(page).contains(text);
+    }
+
+    @När("en bot registrerar sig med e-postadressen {string} och fyller i det dolda fältet")
+    public void enBotRegistrerarSig(String address) throws Exception {
+        lastPage = mockMvc.perform(post("/registrera").param("username", address)
+                .param("website", "http://spam.example").with(csrf())).andReturn();
+    }
+
+    @Och("svaret är detsamma som för en vanlig registrering")
+    public void svaretÄrDetsammaSomFörEnVanligRegistrering() throws Exception {
+        MvcResult ordinary = mockMvc.perform(post("/registrera").param("username", "vanlig@example.com")
+                .param("website", "").with(csrf())).andReturn();
+        assertThat(lastPage.getResponse().getStatus()).isEqualTo(ordinary.getResponse().getStatus());
+        assertThat(lastPage.getResponse().getRedirectedUrl()).isEqualTo(ordinary.getResponse().getRedirectedUrl())
+                .isEqualTo("/registrerad");
+    }
+
+    @Givet("att mailutskicken misslyckas")
+    public void attMailutskickenMisslyckas() {
+        mailSender.failSending(true);
+    }
+
+    @Och("att mailutskicken fungerar igen")
+    public void attMailutskickenFungerarIgen() {
+        mailSender.failSending(false);
+    }
+
+    private RegistrationService registration() {
+        return customRegistration != null ? customRegistration : registrationService;
     }
 
     // ---- Hjälpare -----------------------------------------------------

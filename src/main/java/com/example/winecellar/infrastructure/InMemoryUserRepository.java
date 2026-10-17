@@ -50,6 +50,31 @@ public class InMemoryUserRepository implements UserRepository {
     }
 
     @Override
+    public boolean updateHashedPassword(UserId id, String hashedPassword) {
+        return users.computeIfPresent(id.value(), (key, user) -> user.withHashedPassword(hashedPassword)) != null;
+    }
+
+    @Override
+    public boolean activateAccount(UserId id, String hashedPassword) {
+        boolean[] activated = {false};
+        users.computeIfPresent(id.value(), (key, user) -> {
+            if (user.emailVerified()) {
+                return user;
+            }
+            activated[0] = true;
+            return user.withHashedPassword(hashedPassword).withEmailVerified(true);
+        });
+        return activated[0];
+    }
+
+    @Override
+    public List<User> findUnverifiedCreatedBefore(Instant createdBefore) {
+        return users.values().stream()
+                .filter(user -> !user.emailVerified() && user.createdAt().isBefore(createdBefore))
+                .toList();
+    }
+
+    @Override
     public void deleteById(UserId id) {
         users.remove(id.value());
     }

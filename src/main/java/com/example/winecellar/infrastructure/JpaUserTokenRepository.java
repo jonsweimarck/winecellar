@@ -49,6 +49,12 @@ public class JpaUserTokenRepository implements UserTokenRepository {
 
     @Override
     @Transactional
+    public int deleteExpired(java.time.Instant now) {
+        return jpaRepository.deleteExpired(now);
+    }
+
+    @Override
+    @Transactional
     public void deleteAllByUser(UserId userId) {
         jpaRepository.deleteAllByUser(userId.value());
     }

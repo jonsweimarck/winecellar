@@ -14,6 +14,18 @@ interface UserJpaRepository extends JpaRepository<UserEntity, Long> {
     Optional<UserEntity> findFirstByUsernameIgnoreCaseOrderByIdAsc(String username);
 
     @Modifying
+    @Query("update UserEntity u set u.hashedPassword = :hash where u.id = :id")
+    int updateHashedPassword(@Param("id") Long id, @Param("hash") String hash);
+
+    /** Villkorad: bara ett fortfarande overifierat konto aktiveras (NULL räknas som verifierat, som i toDomain). */
+    @Modifying
+    @Query("update UserEntity u set u.hashedPassword = :hash, u.emailVerified = true "
+            + "where u.id = :id and u.emailVerified = false")
+    int activate(@Param("id") Long id, @Param("hash") String hash);
+
+    java.util.List<UserEntity> findByEmailVerifiedFalseAndCreatedAtBefore(Instant createdBefore);
+
+    @Modifying
     @Query("update UserEntity u set u.lastLoginAt = :at where u.id = :id")
     int updateLastLogin(@Param("id") Long id, @Param("at") Instant at);
 }

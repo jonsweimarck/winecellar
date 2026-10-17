@@ -656,7 +656,7 @@ användaren öppnat verifieringslänken och valt sitt lösenord där.
   använda "glömt lösenord". Ingen DB-unikindex på lower(username) (äldre dubbletter
   som skiljer sig på versaler hade kunnat stoppa uppstarten).
 - **Registreringen frågar BARA efter e-postadressen.** Ett overifierat konto får ett
-  slumpmässigt, oanvändbart lösenord (hash av 256 bitar slump som kastas) och är `disabled` i
+  oanvändbart platshållarlösenord (en fast, syntaktiskt giltig bcrypt-hash vars lösenord aldrig fanns - ingen bcrypt vid registrering, men en inloggning kostar fortfarande en full jämförelse) och är `disabled` i
   `UserDetails`. Ingen känner alltså till något lösenord för ett förhandsregistrerat konto, och
   bara den som kontrollerar brevlådan kan välja ett (på verifieringslänken). Alla inloggningsfel
   ger samma `/login?error` (en egen `DaoAuthenticationProvider` i `SecurityConfig` kontrollerar `disabled` EFTER
@@ -690,6 +690,28 @@ användaren öppnat verifieringslänken och valt sitt lösenord där.
   (utan token) och besvarar neutralt. Samtidig förstagångsregistrering behandlas som "upptaget".
   Tester skapar verifierade konton via `support/TestUsers`/`TestAccounts` - det finns
   ingen "verifierad som standard"-konstruktor på `User`.
+- **Mailtak, honeypot och städning (WINE-65, se ADR 0026 "Uppföljning").** `MailBudget`
+  (`application`) är ett GLOBALT tak för utgående mail, timme (`WINECELLAR_MAIL_MAX_PER_HOUR`,
+  default 30) och dygn (`WINECELLAR_MAIL_MAX_PER_DAY`, default 150), gemensamt för registrering, ny
+  länk och glömt lösenord; i minnet. Slut tak = inget konto/ingen ändring/inget mail och samma
+  neutrala svar (`RegistrationResult.Deferred` ger samma redirect som `Registered`). Timtaket klipps
+  till under nyckeltaket i `RequestRateLimiter` så att per-adress-kartan aldrig kan fyllas av levande
+  poster. Kvoterna tas ATOMÄRT med `tryAcquire` före utfärdande (aldrig `hasCapacity` + förbruka
+  efteråt) och lämnas tillbaka med `release` om utfärdandet felar; felar själva (asynkrona) utskicket
+  anropar `SmtpMailSender` felcallbacken i `MailSender.send(..., onFailure)` och den per-adress-platsen
+  återbetalas (det globala taket räknar försöket). Honeypot = dolt fält `website` i `registrera.html`;
+  ifyllt = redirect till samma bekräftelsesida utan att tjänsten anropas. Platshållarlösenordet för
+  ett overifierat konto är en FAST giltigt formad bcrypt-hash (`UNUSABLE_PASSWORD_HASH`), inte en
+  ny hash per registrering - måste förbli bcrypt-formad (kostnad 10) så att en inloggning mot kontot
+  gör en full jämförelse och svarstiden inte avslöjar kontostatus. `AccountWriter` gör både aktivering
+  och lösenordsåterställning transaktionellt med RIKTADE skrivningar (`UserRepository.activateAccount`,
+  `updateHashedPassword`) - spara aldrig hela `User` där. `StaleAccountCleanup` (+ lyssnaren
+  `StaleAccountCleanupTrigger` i `web`, som `@WebMvcTest` inte laddar) raderar vid lyckad inloggning
+  utgångna `user_tokens` och overifierade konton äldre än 7 dagar (med deras tokens - ingen FK);
+  fel fångas och loggas utan meddelande. `MailConfig` sätter `mail.smtp.starttls.required` när
+  STARTTLS är på. Cucumber-kontexten sätter höga globala tak (`CucumberSpringConfiguration`);
+  scenarierna för taken bygger egna tjänster med små tak (`RegistrationSteps`), och scenariot för
+  städfel provocerar ett riktigt databasfel med en tillfällig trigger på `user_tokens`.
 - **Migrering:** `db/migrations/2026-10-09-add-email-verification.sql` (`schema.sql` har
   motsvarande rader för `email_verified`) lägger till `users.email_verified`, backfillar ALLA befintliga rader
   till `true` INNAN `NOT NULL` och skapar `user_tokens` (och städar övergivna tidigare varianter av den: kolumnen

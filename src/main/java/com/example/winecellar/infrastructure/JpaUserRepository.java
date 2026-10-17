@@ -47,6 +47,24 @@ public class JpaUserRepository implements UserRepository {
     }
 
     @Override
+    @Transactional
+    public boolean updateHashedPassword(UserId id, String hashedPassword) {
+        return jpaRepository.updateHashedPassword(id.value(), hashedPassword) > 0;
+    }
+
+    @Override
+    @Transactional
+    public boolean activateAccount(UserId id, String hashedPassword) {
+        return jpaRepository.activate(id.value(), hashedPassword) > 0;
+    }
+
+    @Override
+    public List<User> findUnverifiedCreatedBefore(Instant createdBefore) {
+        return jpaRepository.findByEmailVerifiedFalseAndCreatedAtBefore(createdBefore).stream()
+                .map(JpaUserRepository::toDomain).toList();
+    }
+
+    @Override
     public void deleteById(UserId id) {
         jpaRepository.deleteById(id.value());
     }

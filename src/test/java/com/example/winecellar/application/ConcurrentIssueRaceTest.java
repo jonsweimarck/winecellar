@@ -36,7 +36,7 @@ class ConcurrentIssueRaceTest {
         when(racing.findByUsername(any())).thenReturn(java.util.Optional.empty());
         when(racing.save(any())).thenThrow(new DataIntegrityViolationException("unikt användarnamn"));
         RegistrationService service = new RegistrationService(racing, encoder, losingTokens,
-                new AccountWriter(racing, losingTokens), mail, clock, "http://x");
+                new AccountWriter(racing, losingTokens), mail, new MailBudget(1000, 1000, clock), clock, "http://x");
 
         assertThat(service.register("anna@example.com"))
                 .isInstanceOf(RegistrationResult.UsernameTaken.class);
@@ -47,7 +47,7 @@ class ConcurrentIssueRaceTest {
     void ÅterställningSkaInteKraschaOchInteSkickaMail() {
         Instant now = Instant.now();
         users.save(new User(null, "anna@example.com", "h", now, 1, false, false, now, true));
-        PasswordResetService service = new PasswordResetService(users, encoder, losingTokens, mail,
+        PasswordResetService service = new PasswordResetService(users, encoder, losingTokens, new AccountWriter(users, losingTokens), mail, new MailBudget(1000, 1000, clock),
                 mock(SessionTerminator.class), clock, "http://x");
         assertThatCode(() -> service.requestReset("anna@example.com")).doesNotThrowAnyException();
         assertThat(mail.all()).isEmpty();
@@ -58,7 +58,7 @@ class ConcurrentIssueRaceTest {
         Instant now = Instant.now();
         users.save(new User(null, "anna@example.com", "h", now, 1, false, false, now, false));
         RegistrationService service = new RegistrationService(users, encoder, losingTokens,
-                new AccountWriter(users, losingTokens), mail, clock, "http://x");
+                new AccountWriter(users, losingTokens), mail, new MailBudget(1000, 1000, clock), clock, "http://x");
 
         assertThat(service.register("anna@example.com")).isInstanceOf(RegistrationResult.Registered.class);
         assertThatCode(() -> service.resendVerification("anna@example.com")).doesNotThrowAnyException();

@@ -24,9 +24,25 @@ public class FakeMailSender implements MailSender {
 
     private final List<Mail> sent = new CopyOnWriteArrayList<>();
 
+    private volatile boolean failing;
+
+    /** Låtsas att SMTP-utskicken misslyckas (WINE-65): inget registreras och misslyckandehanteraren anropas. */
+    public void failSending(boolean failing) {
+        this.failing = failing;
+    }
+
     @Override
     public void send(String to, String subject, String body) {
         sent.add(new Mail(to, subject, body));
+    }
+
+    @Override
+    public void send(String to, String subject, String body, Runnable onFailure) {
+        if (failing) {
+            onFailure.run();
+            return;
+        }
+        send(to, subject, body);
     }
 
     public List<Mail> sentTo(String address) {

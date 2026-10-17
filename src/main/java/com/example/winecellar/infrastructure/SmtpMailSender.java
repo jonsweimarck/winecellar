@@ -16,7 +16,9 @@ import java.util.concurrent.TimeUnit;
  * dels för att en långsam SMTP-server inte ska hänga webbförfrågan, dels (för
  * "glömt lösenord") för att svarstiden inte ska avslöja om en adress finns -
  * ett riktigt utskick tar annars märkbart längre tid än "inget att skicka".
- * Fel loggas (utan mailets innehåll/token) och kastas aldrig vidare.
+ * Fel loggas (utan mailets innehåll/token) och kastas aldrig vidare. Anroparen kan
+ * ange en misslyckandehanterare (WINE-65) som körs när utskicket felar eller kastas ur
+ * kön, så att en kvotplats kan återbetalas.
  */
 public class SmtpMailSender implements MailSender {
 
@@ -31,8 +33,7 @@ public class SmtpMailSender implements MailSender {
                 Thread thread = new Thread(runnable, "mail-sender");
                 thread.setDaemon(true);
                 return thread;
-            },
-            (runnable, pool) -> log.warn("Mailkön är full - ett mail kastades (ingen token i loggen)."));
+            });
 
     public SmtpMailSender(JavaMailSender javaMailSender, String from) {
         this.javaMailSender = javaMailSender;
@@ -41,19 +42,38 @@ public class SmtpMailSender implements MailSender {
 
     @Override
     public void send(String to, String subject, String body) {
+        send(to, subject, body, () -> { });
+    }
+
+    @Override
+    public void send(String to, String subject, String body, Runnable onFailure) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(body);
-        executor.submit(() -> {
-            try {
-                javaMailSender.send(message);
-            } catch (Throwable t) {
-                // Fångar ALLT (även Error) så att tråden aldrig dör tyst; loggar bara
-                // typ och ämne - aldrig mailets innehåll (som innehåller en tokenlänk).
-                log.error("Kunde inte skicka mail \"{}\": {}", subject, t.getClass().getName());
-            }
-        });
+        try {
+            executor.execute(() -> {
+                try {
+                    javaMailSender.send(message);
+                } catch (Throwable t) {
+                    // Fångar ALLT (även Error) så att tråden aldrig dör tyst; loggar bara
+                    // typ och ämne - aldrig mailets innehåll (som innehåller en tokenlänk).
+                    log.error("Kunde inte skicka mail \"{}\": {}", subject, t.getClass().getName());
+                    runQuietly(onFailure);
+                }
+            });
+        } catch (RuntimeException rejected) {
+            log.warn("Mailkön är full - ett mail kastades (ingen token i loggen).");
+            runQuietly(onFailure);
+        }
+    }
+
+    private static void runQuietly(Runnable onFailure) {
+        try {
+            onFailure.run();
+        } catch (RuntimeException e) {
+            log.warn("Misslyckandehanteraren för ett mail kastade: {}", e.getClass().getName());
+        }
     }
 }
